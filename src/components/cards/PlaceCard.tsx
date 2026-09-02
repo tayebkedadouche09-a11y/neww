@@ -66,6 +66,21 @@ function getPlaceFallbackIcon(place: Place) {
   }
 }
 
+function formatCategory(category: Place['category']): string {
+  const labels: Record<Place['category'], string> = {
+    'food-drink': 'Food & Drink',
+    nightlife: 'Nightlife',
+    'arts-culture': 'Arts & Culture',
+    'outdoors-nature': 'Outdoors & Nature',
+    entertainment: 'Entertainment',
+    'arcade-gaming': 'Arcade & Gaming',
+    'hidden-gems': 'Hidden Gem',
+    'chill-spots': 'Chill Spot',
+    'shopping-vintage': 'Shopping & Vintage',
+  };
+  return labels[category] ?? 'Place';
+}
+
 export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
   const { toggleLikePlace, toggleSavePlace, isPlaceLiked, isPlaceSaved } = useAuth();
   const { openPlaceDetail, openShareModal, addPlaceToPlan, plans, showToast } = useData();
@@ -127,7 +142,7 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
             <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shadow-inner">
               <FallbackIcon className="w-8 h-8 text-vybe-lime" strokeWidth={1.7} />
             </div>
-            <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-slate-400">{place.category.replace('-', ' ')}</span>
+            <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-slate-400">{formatCategory(place.category)}</span>
           </div>
         )}
 
@@ -207,7 +222,7 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
             <div className="flex items-center gap-1 min-w-0">
               <MapPin className="w-3.5 h-3.5 text-vybe-cyan shrink-0" />
               <span className="truncate">
-                {locationLabel || 'Location unavailable'}
+                🇩🇿 Algeria · {locationLabel || 'Location unavailable'}
                 {hasDistance ? ` · ${place.distanceKm!.toFixed(1)} km` : ''}
               </span>
             </div>
@@ -219,6 +234,12 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
                 </span>
               </div>
             )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center px-2 py-1 rounded-lg bg-slate-100 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-[10px] font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+              {formatCategory(place.category)}
+            </span>
           </div>
 
           <h3 className="font-display font-bold text-lg text-slate-900 dark:text-white group-hover:text-vybe-lime transition-colors leading-tight line-clamp-1">
