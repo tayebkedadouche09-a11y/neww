@@ -1,0 +1,131 @@
+/**
+ * placesService — the ONLY place that knows how the places catalog is stored.
+ * Supabase-backed (RLS: world read, admin-only writes — see 0003_rls.sql).
+ */
+import { supabase } from '../lib/supabase';
+import { Place, PlaceReview } from '../types';
+import { DbPlaceRow, DbReviewRow, newUuid, rowToPlace, rowToReview } from './mappers';
+
+const assertBackend = () => {
+  if (!supabase) throw new Error('VYBE backend is not configured');
+  return supabase;
+};
+
+export function placeToRow(place: Place) {
+  return {
+    id: place.id,
+    external_place_id: place.providerPlaceId ?? null,
+    provider: place.provider ?? 'vybe',
+    name: place.name,
+    tagline: place.tagline,
+    description: place.description,
+    category: place.category,
+    primary_mood: place.primaryMood,
+    secondary_moods: place.secondaryMoods,
+    latitude: place.location.lat,
+    longitude: place.location.lng,
+    address: place.location.address,
+    neighborhood: place.location.neighborhood,
+    city: place.location.city,
+    price_level: place.priceLevel,
+    approx_cost_usd: place.approxCostUsd,
+    rating: place.rating,
+    review_count: place.reviewCount,
+    base_vybe_score: place.baseVybeScore,
+    photos: place.images,
+    tags: place.tags,
+    estimated_duration: place.estimatedDuration,
+    opening_hours: place.openingHours,
+    features: place.features,
+    suitable_for: place.suitableFor,
+    website: place.website ?? null,
+    phone: place.phone ?? null,
+    instagram: place.instagram ?? null,
+    featured: !!place.isFeatured,
+    trending: !!place.isTrending
+  };
+}
+
+/** Map a Partial<Place> (UI shape) to a partial DB row patch. */
+export function placePatchToRow(updates: Partial<Place>): Record<string, unknown> {
+  const patch: Record<string, unknown> = {};
+  const set = (k: string, v: unknown) => { if (v !== undefined) patch[k] = v; };
+  set('name', updates.name);
+  set('tagline', updates.tagline);
+  set('description', updates.description);
+  set('category', updates.category);
+  set('primary_mood', updates.primaryMood);
+  set('secondary_moods', updates.secondaryMoods);
+  if (updates.location) {
+    set('latitude', updates.location.lat);
+    set('longitude', updates.location.lng);
+    set('address', updates.location.address);
+    set('neighborhood', updates.location.neighborhood);
+    set('city', updates.location.city);
+  }
+  set('price_level', updates.priceLevel);
+  set('approx_cost_usd', updates.approxCostUsd);
+  set('rating', updates.rating);
+  set('review_count', updates.reviewCount);
+  set('base_vybe_score', updates.baseVybeScore);
+  set('photos', updates.images);
+  set('tags', updates.tags);
+  set('estimated_duration', updates.estimatedDuration);
+  set('opening_hours', updates.openingHours);
+  set('features', updates.features);
+  set('suitable_for', updates.suitableFor);
+  set('website', updates.website ?? null);
+  set('phone', updates.phone ?? null);
+  set('instagram', updates.instagram ?? null);
+  set('featured', updates.isFeatured);
+  set('trending', updates.isTrending);
+  return patch;
+}
+
+export const placesService = {
+  /** Full catalog incl. reviews (author profile embedded via FK). */
+  async listWithReviews(): Promise<Place[]> {
+    const db = assertBackend();
+    const { data, error } = await db
+      .from('places')
+      .select('*, reviews(*, profiles(display_name, avatar_url))')
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return (data as unknown as Array<DbPlaceRow & { reviews: DbReviewRow[] | null }>).map(row => {
+      const place = rowToPlace(row);
+      place.reviews = (row.reviews ?? [])
+        .map(rowToReview)
+        .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+      return place;
+    });
+  },
+
+  async create(place: Place): Promise<void> {
+    const db = assertBackend();
+    const { error } = await db.from('places').insert(placeToRow({ ...place, id: place.id || newUuid() }));
+    if (error) throw error;
+  },
+
+  async update(placeId: string, updates: Partial<Place>): Promise<void> {
+    const db = assertBackend();
+    const { error } = await db.from('places').update(placePatchToRow(updates)).eq('id', placeId);
+    if (error) throw error;
+  },
+
+  async remove(placeId: string): Promise<void> {
+    const db = assertBackend();
+    const { error } = await db.from('places').delete().eq('id', placeId);
+    if (error) throw error;
+  },
+
+  async listReviewsForPlace(placeId: string): Promise<PlaceReview[]> {
+    const db = assertBackend();
+    const { data, error } = await db
+      .from('reviews')
+      .select('*, profiles(display_name, avatar_url)')
+      .eq('place_id', placeId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data as unknown as DbReviewRow[]).map(rowToReview);
+  }
+};
