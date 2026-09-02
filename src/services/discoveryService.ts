@@ -11,34 +11,18 @@ export interface DiscoveryOptions {
   filters?: Partial<FilterState>;
 }
 
-// VYBE discovers a broad set of real-world place types instead of only
-// entertainment/food. Google still limits each Nearby Search response, so we
-// fan out across type families and deduplicate the results before rendering.
-const INITIAL_TYPE_GROUPS = [
-  ['restaurant', 'cafe', 'bakery', 'meal_takeaway', 'coffee_shop', 'dessert_shop', 'bar', 'night_club', 'cocktail_bar'],
-  ['movie_theater', 'bowling_alley', 'amusement_park', 'amusement_center', 'karaoke', 'live_music_venue', 'video_arcade', 'internet_cafe', 'go_karting_venue', 'miniature_golf_course', 'paintball_center'],
-  ['park', 'city_park', 'playground', 'indoor_playground', 'skateboard_park', 'water_park', 'zoo', 'aquarium', 'campground', 'botanical_garden', 'national_park', 'hiking_area'],
-  ['museum', 'art_gallery', 'art_museum', 'library', 'historical_place', 'historical_landmark', 'monument', 'tourist_attraction', 'observation_deck', 'plaza', 'cultural_landmark'],
-  ['shopping_mall', 'store', 'clothing_store', 'book_store', 'thrift_store', 'flea_market', 'toy_store', 'gift_shop', 'supermarket', 'grocery_store', 'department_store'],
-  ['gym', 'fitness_center', 'sports_complex', 'sports_club', 'sports_activity_location', 'swimming_pool', 'tennis_court', 'athletic_field', 'stadium', 'arena', 'adventure_sports_center'],
-  ['spa', 'garden', 'hair_salon', 'beauty_salon', 'nail_salon', 'laundry', 'dry_cleaning'],
-  ['mosque', 'church', 'synagogue', 'hindu_temple', 'place_of_worship', 'cemetery', 'funeral_home'],
-  ['school', 'university', 'library', 'preschool', 'primary_school', 'secondary_school'],
-  ['hospital', 'doctor', 'dentist', 'pharmacy', 'drugstore', 'physiotherapist', 'veterinary_care'],
-  ['hotel', 'lodging', 'hostel', 'motel', 'resort_hotel', 'guest_house'],
-  ['airport', 'bus_station', 'train_station', 'transit_station', 'subway_station', 'taxi_stand', 'car_rental', 'travel_agency'],
-  ['bank', 'atm', 'post_office', 'government_office', 'police', 'fire_station', 'lawyer', 'real_estate_agency', 'accounting'],
-  ['gas_station', 'car_dealer', 'car_repair', 'car_wash', 'electrician', 'plumber', 'locksmith', 'hardware_store', 'home_goods_store'],
-];
-
+// For the default Explorer/Map feed we intentionally omit includedTypes.
+// Google Places Nearby Search (New) documents that omitting type restrictions
+// returns places of all supported types. This also prevents INVALID_ARGUMENT
+// when Google adds/removes individual type names.
 const CATEGORY_TYPES: Record<CategoryType, string[]> = {
   'food-drink': ['restaurant', 'cafe', 'bakery', 'meal_takeaway', 'coffee_shop', 'dessert_shop'],
   nightlife: ['bar', 'night_club', 'karaoke', 'live_music_venue', 'cocktail_bar'],
-  'arts-culture': ['museum', 'art_gallery', 'art_museum', 'library', 'historical_place', 'performing_arts_theater'],
-  'outdoors-nature': ['park', 'city_park', 'playground', 'zoo', 'aquarium', 'campground', 'gym', 'fitness_center', 'botanical_garden', 'national_park', 'hiking_area'],
-  entertainment: ['movie_theater', 'bowling_alley', 'amusement_park', 'amusement_center', 'casino', 'water_park', 'go_karting_venue', 'miniature_golf_course', 'paintball_center'],
+  'arts-culture': ['museum', 'art_gallery', 'art_museum', 'library', 'historical_landmark', 'performing_arts_theater'],
+  'outdoors-nature': ['park', 'playground', 'zoo', 'aquarium', 'campground', 'gym', 'fitness_center', 'botanical_garden', 'national_park', 'hiking_area'],
+  entertainment: ['movie_theater', 'bowling_alley', 'amusement_park', 'amusement_center', 'water_park', 'go_karting_venue', 'miniature_golf_course', 'paintball_center'],
   'arcade-gaming': ['video_arcade', 'amusement_center', 'bowling_alley', 'internet_cafe'],
-  'hidden-gems': ['tourist_attraction', 'historical_landmark', 'monument', 'observation_deck', 'plaza', 'cultural_landmark'],
+  'hidden-gems': ['tourist_attraction', 'historical_landmark', 'monument', 'observation_deck', 'plaza'],
   'chill-spots': ['cafe', 'spa', 'library', 'internet_cafe', 'botanical_garden', 'garden'],
   'shopping-vintage': ['shopping_mall', 'store', 'clothing_store', 'book_store', 'thrift_store', 'flea_market', 'toy_store', 'gift_shop'],
 };
@@ -79,12 +63,14 @@ export async function discoverPlaces(options: DiscoveryOptions): Promise<Place[]
   let places: Place[];
   if (query) {
     places = await searchGooglePlacesText(query, userLat, userLng, radiusKm);
+  } else if (filters?.categories?.length) {
+    // Category mode uses a small, known-safe type set. The unfiltered feed
+    // below deliberately uses Google's all-types behavior.
+    const types = [...new Set(filters.categories.flatMap(category => CATEGORY_TYPES[category]))];
+    places = await searchNearbyGooglePlaces(userLat, userLng, radiusKm, types);
   } else {
-    const groups = filters?.categories?.length
-      ? [filters.categories.flatMap(category => CATEGORY_TYPES[category])]
-      : INITIAL_TYPE_GROUPS;
-    const results = await Promise.all(groups.map(types => searchNearbyGooglePlaces(userLat, userLng, radiusKm, types)));
-    places = results.flat();
+    // IMPORTANT: no includedTypes => Google returns places of all supported types.
+    places = await searchNearbyGooglePlaces(userLat, userLng, radiusKm);
   }
 
   const result = deduplicate(withDistance(places, userLat, userLng)).filter(place => matchesFilters(place, filters));
