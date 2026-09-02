@@ -38,7 +38,7 @@ function hasLateNightHours(weekdayText?: string[]): boolean {
 const GOOGLE_TYPE_TO_CATEGORY: Record<string, CategoryType> = {
   restaurant: 'food-drink', cafe: 'food-drink', bakery: 'food-drink', meal_takeaway: 'food-drink', meal_delivery: 'food-drink', coffee_shop: 'food-drink', dessert_shop: 'food-drink',
   bar: 'nightlife', night_club: 'nightlife', cocktail_bar: 'nightlife', karaoke: 'nightlife', live_music_venue: 'nightlife',
-  museum: 'arts-culture', art_gallery: 'arts-culture', art_museum: 'arts-culture', library: 'arts-culture', historical_place: 'arts-culture', performing_arts_theater: 'arts-culture',
+  museum: 'arts-culture', art_gallery: 'arts-culture', art_museum: 'arts-culture', library: 'arts-culture', historical_place: 'arts-culture', historical_landmark: 'arts-culture', performing_arts_theater: 'arts-culture',
   park: 'outdoors-nature', city_park: 'outdoors-nature', playground: 'outdoors-nature', indoor_playground: 'outdoors-nature', skateboard_park: 'outdoors-nature', water_park: 'outdoors-nature', zoo: 'outdoors-nature', aquarium: 'outdoors-nature', campground: 'outdoors-nature', gym: 'outdoors-nature', fitness_center: 'outdoors-nature', botanical_garden: 'outdoors-nature', national_park: 'outdoors-nature', hiking_area: 'outdoors-nature',
   amusement_park: 'entertainment', amusement_center: 'entertainment', bowling_alley: 'entertainment', movie_theater: 'entertainment', casino: 'entertainment', go_karting_venue: 'entertainment', miniature_golf_course: 'entertainment', paintball_center: 'entertainment',
   video_arcade: 'arcade-gaming', internet_cafe: 'arcade-gaming',
@@ -46,45 +46,74 @@ const GOOGLE_TYPE_TO_CATEGORY: Record<string, CategoryType> = {
   spa: 'chill-spots', garden: 'chill-spots',
   tourist_attraction: 'hidden-gems', historical_landmark: 'hidden-gems', monument: 'hidden-gems', observation_deck: 'hidden-gems', plaza: 'hidden-gems', cultural_landmark: 'hidden-gems',
   sports_complex: 'outdoors-nature', sports_club: 'outdoors-nature', sports_activity_location: 'outdoors-nature', swimming_pool: 'outdoors-nature', tennis_court: 'outdoors-nature', athletic_field: 'outdoors-nature', stadium: 'entertainment', arena: 'entertainment', adventure_sports_center: 'entertainment',
+  mosque: 'arts-culture', church: 'arts-culture', hindu_temple: 'arts-culture', synagogue: 'arts-culture', place_of_worship: 'arts-culture',
+  hospital: 'chill-spots', doctor: 'chill-spots', pharmacy: 'chill-spots', dentist: 'chill-spots',
+  hotel: 'chill-spots', lodging: 'chill-spots',
 };
 
 const GOOGLE_TYPE_TO_MOOD: Record<string, MoodType> = {
   restaurant: 'hungry', cafe: 'chill', bakery: 'hungry', meal_takeaway: 'hungry', meal_delivery: 'hungry', coffee_shop: 'chill', dessert_shop: 'hungry',
   bar: 'party', night_club: 'party', cocktail_bar: 'party', karaoke: 'party', live_music_venue: 'music',
-  museum: 'curious', art_gallery: 'creative', art_museum: 'curious', library: 'lazy', historical_place: 'curious', performing_arts_theater: 'creative',
+  museum: 'curious', art_gallery: 'creative', art_museum: 'curious', library: 'lazy', historical_place: 'curious', historical_landmark: 'curious', performing_arts_theater: 'creative',
   park: 'outdoor', city_park: 'outdoor', playground: 'energetic', indoor_playground: 'energetic', skateboard_park: 'energetic', water_park: 'energetic', zoo: 'explore', aquarium: 'curious', campground: 'outdoor', gym: 'energetic', fitness_center: 'energetic', botanical_garden: 'outdoor', national_park: 'outdoor', hiking_area: 'outdoor',
   amusement_park: 'energetic', amusement_center: 'energetic', bowling_alley: 'gaming', movie_theater: 'chill', casino: 'party', go_karting_venue: 'energetic', miniature_golf_course: 'gaming', paintball_center: 'energetic',
   video_arcade: 'gaming', internet_cafe: 'gaming',
   shopping_mall: 'explore', store: 'explore', clothing_store: 'explore', book_store: 'curious', thrift_store: 'explore', flea_market: 'explore', toy_store: 'explore', gift_shop: 'explore',
   spa: 'lazy', garden: 'chill', tourist_attraction: 'explore', historical_landmark: 'explore', monument: 'explore', observation_deck: 'explore', plaza: 'explore', cultural_landmark: 'explore',
   sports_complex: 'energetic', sports_club: 'energetic', sports_activity_location: 'energetic', swimming_pool: 'energetic', tennis_court: 'energetic', athletic_field: 'energetic', stadium: 'energetic', arena: 'energetic', adventure_sports_center: 'energetic',
+  mosque: 'curious', church: 'curious', hindu_temple: 'curious', synagogue: 'curious', place_of_worship: 'curious',
+  hospital: 'explore', doctor: 'explore', pharmacy: 'explore', dentist: 'explore', hotel: 'chill', lodging: 'chill',
 };
 
-function googleTypesToCategory(types?: string[]): CategoryType {
-  if (!types?.length) return 'food-drink';
-  for (const type of types) if (GOOGLE_TYPE_TO_CATEGORY[type]) return GOOGLE_TYPE_TO_CATEGORY[type];
-  return 'food-drink';
+const NAME_RULES: Array<{ category: CategoryType; mood: MoodType; words: string[] }> = [
+  { category: 'arcade-gaming', mood: 'gaming', words: ['arcade', 'gaming', 'gamer', 'video game', 'video games', 'playstation', 'xbox', 'espace jeux', 'salle de jeux', 'jeux video', 'jeux vidéos', 'jeux', 'gaming lounge', 'game room', 'bowling'] },
+  { category: 'food-drink', mood: 'hungry', words: ['restaurant', 'resto', 'pizzeria', 'pizza', 'burger', 'grill', 'tacos', 'snack', 'fast food', 'café', 'cafe', 'coffee', 'coffee shop', 'bakery', 'boulangerie', 'patisserie', 'pâtisserie', 'tea room', 'salon de thé'] },
+  { category: 'nightlife', mood: 'party', words: ['bar', 'pub', 'club', 'nightclub', 'boite de nuit', 'discothèque', 'disco', 'karaoke', 'lounge', 'cocktail'] },
+  { category: 'outdoors-nature', mood: 'outdoor', words: ['park', 'parc', 'jardin', 'garden', 'forêt', 'forest', 'plage', 'beach', 'promenade', 'hiking', 'randonnée', 'nature'] },
+  { category: 'entertainment', mood: 'energetic', words: ['cinema', 'cinéma', 'theatre', 'théâtre', 'amusement', 'manège', 'karting', 'paintball', 'bowling'] },
+  { category: 'shopping-vintage', mood: 'explore', words: ['mall', 'centre commercial', 'shopping', 'boutique', 'store', 'magasin', 'marché', 'market', 'friperie', 'bookstore', 'librairie'] },
+  { category: 'arts-culture', mood: 'curious', words: ['mosquée', 'mosquee', 'mosque', 'مسجد', 'église', 'eglise', 'church', 'temple', 'synagogue', 'museum', 'musée', 'musee', 'gallery', 'galerie', 'library', 'bibliothèque', 'bibliotheque'] },
+  { category: 'chill-spots', mood: 'lazy', words: ['spa', 'hotel', 'hôtel', 'resort', 'wellness', 'relax'] },
+];
+
+function normalizeName(value?: string): string {
+  return (value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ').trim();
 }
 
-function googleTypesToMood(types?: string[]): MoodType {
-  if (!types?.length) return 'explore';
-  for (const type of types) if (GOOGLE_TYPE_TO_MOOD[type]) return GOOGLE_TYPE_TO_MOOD[type];
-  return 'explore';
+function classifyPlace(types?: string[], name?: string): { category: CategoryType; mood: MoodType } {
+  const normalized = normalizeName(name);
+  const typeSet = new Set(types ?? []);
+
+  // Name evidence wins when it strongly identifies an activity. This prevents
+  // generic Google classifications such as "restaurant" from overriding names
+  // like "Jeux ..." or "Gaming ...".
+  for (const rule of NAME_RULES) {
+    if (rule.words.some(word => normalized.includes(normalizeName(word)))) return { category: rule.category, mood: rule.mood };
+  }
+
+  for (const type of typeSet) {
+    if (GOOGLE_TYPE_TO_CATEGORY[type]) {
+      return { category: GOOGLE_TYPE_TO_CATEGORY[type], mood: GOOGLE_TYPE_TO_MOOD[type] ?? 'explore' };
+    }
+  }
+
+  // Unknown/unclassified places remain visible as discoverable places rather
+  // than being incorrectly forced into food & drink.
+  return { category: 'hidden-gems', mood: 'explore' };
 }
 
 function googleTypesToSuitableFor(types?: string[]): CompanionType[] {
   const suitable: CompanionType[] = ['solo', 'friends'];
   if (!types) return suitable;
   const typeSet = new Set(types);
-  if (['restaurant', 'cafe', 'bar', 'night_club', 'karaoke', 'live_music_venue'].some(t => typeSet.has(t))) suitable.push('couple', 'group');
+  if (['restaurant', 'cafe', 'bar', 'night_club', 'karaoke', 'live_music_venue', 'video_arcade', 'bowling_alley'].some(t => typeSet.has(t))) suitable.push('couple', 'group');
   if (['park', 'playground', 'indoor_playground', 'amusement_park', 'shopping_mall', 'zoo', 'aquarium', 'water_park', 'sports_complex', 'swimming_pool'].some(t => typeSet.has(t))) suitable.push('family', 'group');
   return [...new Set(suitable)];
 }
 
 export function googlePlaceToVybePlace(gp: GooglePlaceResult): Place {
   const providerPlaceId = gp.place_id?.trim();
-  const category = googleTypesToCategory(gp.types);
-  const primaryMood = googleTypesToMood(gp.types);
+  const { category, mood: primaryMood } = classifyPlace(gp.types, gp.name);
   const photoUrls = googlePhotosToUrls(gp.photos);
   const openingHours = googleWeekdayToOpeningHours(gp.opening_hours?.weekday_text);
   const lat = gp.geometry?.location?.lat;
