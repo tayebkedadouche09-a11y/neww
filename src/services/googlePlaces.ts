@@ -58,7 +58,15 @@ async function libraryPlaceToResult(p: google.maps.places.Place): Promise<Google
 
   if (p.regularOpeningHours) {
     try {
-      openNow = await p.regularOpeningHours.isOpen();
+      // Some installed @types/google.maps versions do not expose isOpen()
+      // even though the runtime Places library may provide it. Access it
+      // defensively so TypeScript does not block production builds.
+      const openingHours = p.regularOpeningHours as unknown as {
+        isOpen?: () => Promise<boolean>;
+      };
+      if (typeof openingHours.isOpen === 'function') {
+        openNow = await openingHours.isOpen();
+      }
     } catch {
       // Opening state can be unavailable for some places. Keep it undefined
       // rather than guessing.
