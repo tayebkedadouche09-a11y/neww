@@ -11,8 +11,6 @@ function googlePriceLevelToVybe(priceLevel?: number): PriceLevel {
 
 function googlePhotosToUrls(photos?: { photo_reference?: string }[]): string[] {
   if (!photos || photos.length === 0) return [];
-  // Modern Places JavaScript Photo.getURI() returns a complete Google photo URI.
-  // Keep it unchanged and never synthesize legacy /maps/api/place/photo URLs.
   return photos
     .map(photo => photo.photo_reference?.trim())
     .filter((uri): uri is string => Boolean(uri && /^https?:\/\//i.test(uri)));
@@ -30,6 +28,16 @@ function googleWeekdayToOpeningHours(weekdayText?: string[]): Partial<PlaceOpeni
     }
   }
   return result;
+}
+
+function hasLateNightHours(weekdayText?: string[]): boolean {
+  if (!weekdayText?.length) return false;
+  return weekdayText.some(entry => {
+    const value = entry.toLowerCase();
+    if (/24\s*hours|open\s*24/i.test(value)) return true;
+    // Google localized hour strings vary, so recognize common 1–5 AM closing/opening times.
+    return /(?:1|2|3|4|5)(?::\d{2})?\s*(?:am|a\.m\.)\b/.test(value);
+  });
 }
 
 const GOOGLE_TYPE_TO_CATEGORY: Record<string, CategoryType> = {
@@ -84,7 +92,8 @@ export function googlePlaceToVybePlace(gp: GooglePlaceResult): Place {
       address: gp.formatted_address || gp.vicinity || '', neighborhood: '', city: '',
       lat: gp.geometry?.location?.lat ?? 0, lng: gp.geometry?.location?.lng ?? 0,
     },
-    priceLevel: googlePriceLevelToVybe(gp.price_level), approxCostUsd: gp.price_level != null ? gp.price_level * 15 : 0,
+    priceLevel: googlePriceLevelToVybe(gp.price_level),
+    approxCostUsd: 0,
     rating: gp.rating ?? 0, reviewCount: gp.user_ratings_total ?? 0, baseVybeScore: 75,
     images: photoUrls,
     tags: gp.types?.slice(0, 5).map(t => t.replace(/_/g, ' ')) ?? [], estimatedDuration: '',
@@ -98,7 +107,7 @@ export function googlePlaceToVybePlace(gp: GooglePlaceResult): Place {
       isIndoor: gp.types?.some(t => ['restaurant', 'cafe', 'museum', 'art_gallery', 'movie_theater', 'shopping_mall', 'library'].includes(t)) ?? true,
       hasFood: gp.types?.some(t => ['restaurant', 'cafe', 'bakery', 'meal_takeaway', 'meal_delivery'].includes(t)) ?? false,
       hasAlcohol: gp.types?.some(t => ['bar', 'night_club', 'casino'].includes(t)) ?? false,
-      isLateNight: gp.types?.some(t => ['bar', 'night_club', 'casino'].includes(t)) ?? false,
+      isLateNight: hasLateNightHours(gp.opening_hours?.weekday_text),
       isSecretGem: false, isPetFriendly: false,
       isWifiFriendly: gp.types?.some(t => ['cafe', 'library', 'restaurant'].includes(t)) ?? false,
       isPhotoSpot: gp.types?.some(t => ['tourist_attraction', 'art_gallery', 'park', 'museum'].includes(t)) ?? false,
