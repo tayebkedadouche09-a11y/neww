@@ -68,19 +68,37 @@ async function toVybePlaces(places: google.maps.places.Place[] | null | undefine
 export async function searchNearbyGooglePlaces(lat: number, lng: number, radiusKm: number = 5, type?: string | string[], keyword?: string): Promise<Place[]> {
   if (keyword?.trim()) return searchGooglePlacesText(keyword, lat, lng, radiusKm);
   const { Place } = await importPlacesLibrary();
-  const request: google.maps.places.SearchNearbyRequest = {
+  const baseRequest: google.maps.places.SearchNearbyRequest = {
     fields: PLACE_FIELDS,
     locationRestriction: { center: { lat, lng }, radius: Math.min(radiusKm * 1000, 50000) },
     maxResultCount: 20,
     rankPreference: 'POPULARITY',
   };
+
   if (type && !(Array.isArray(type) && type.length === 0)) {
-    // includedTypes is intentionally broader than includedPrimaryTypes: Google
-    // can match places that carry the requested activity/category as an
-    // associated type even when their primary type is more specific.
-    request.includedTypes = Array.isArray(type) ? type : [type];
+    baseRequest.includedTypes = Array.isArray(type) ? type : [type];
+    try {
+      const { places } = await Place.searchNearby(baseRequest);
+      return toVybePlaces(places);
+    } catch (error) {
+      // Google returns INVALID_ARGUMENT when a type is not accepted by the
+      // current Places API type table. Never let one bad category break VYBE:
+      // retry without type restrictions so the place can still be discovered.
+      console.warn('[Google Places] typed nearby search failed; retrying all-types search', error);
+      const { places } = await Place.searchNearby({
+        fields: PLACE_FIELDS,
+        locationRestriction: baseRequest.locationRestriction,
+        maxResultCount: 20,
+        rankPreference: 'POPULARITY',
+      });
+      return toVybePlaces(places);
+    }
   }
-  const { places } = await Place.searchNearby(request);
+
+  // No type restriction is intentional: Places API (New) documents this as
+  // the all-types nearby search and it avoids INVALID_ARGUMENT from stale or
+  // unsupported type names.
+  const { places } = await Place.searchNearby(baseRequest);
   return toVybePlaces(places);
 }
 
