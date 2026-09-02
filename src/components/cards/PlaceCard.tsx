@@ -9,6 +9,20 @@ import {
   Sparkles,
   ArrowUpRight,
   Gem,
+  Utensils,
+  Coffee,
+  Music,
+  Landmark,
+  Trees,
+  Gamepad2,
+  ShoppingBag,
+  Dumbbell,
+  Film,
+  Church,
+  Waves,
+  BookOpen,
+  Hotel,
+  Stethoscope,
 } from 'lucide-react';
 import { Place } from '../../types';
 import { VybeScoreBadge } from '../common/VybeScoreBadge';
@@ -24,18 +38,53 @@ interface PlaceCardProps {
   featured?: boolean;
 }
 
+function getPlaceFallbackIcon(place: Place) {
+  const haystack = `${place.name} ${place.tags.join(' ')}`.toLowerCase();
+
+  if (/mosque|masjid|مسجد|جامع/.test(haystack)) return Church;
+  if (/church|église|eglise|كنيسة/.test(haystack)) return Church;
+  if (/hospital|clinic|pharmacy|hôpital|clinique|مستشفى|صيدلية/.test(haystack)) return Stethoscope;
+  if (/hotel|hôtel|hostel|فندق/.test(haystack)) return Hotel;
+  if (/book|library|livre|bibliothèque|مكتبة/.test(haystack)) return BookOpen;
+  if (/coffee|café|cafe|قهوة|مقهى/.test(haystack)) return Coffee;
+  if (/restaurant|food|bakery|dessert|مطعم|مخبزة|حلويات/.test(haystack)) return Utensils;
+  if (/music|concert|karaoke|live|musique|موسيقى/.test(haystack)) return Music;
+  if (/cinema|movie|theater|film|cinéma|سينما|مسرح/.test(haystack)) return Film;
+  if (/gym|fitness|sport|stadium|pool|swimming|tennis|رياضة|ملعب|مسبح/.test(haystack)) return Dumbbell;
+
+  switch (place.category) {
+    case 'food-drink': return Utensils;
+    case 'nightlife': return Music;
+    case 'arts-culture': return Landmark;
+    case 'outdoors-nature': return Trees;
+    case 'entertainment': return Film;
+    case 'arcade-gaming': return Gamepad2;
+    case 'shopping-vintage': return ShoppingBag;
+    case 'chill-spots': return Coffee;
+    case 'hidden-gems': return Landmark;
+    default: return MapPin;
+  }
+}
+
 export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
   const { toggleLikePlace, toggleSavePlace, isPlaceLiked, isPlaceSaved } = useAuth();
   const { openPlaceDetail, openShareModal, addPlaceToPlan, plans, showToast } = useData();
   const requireAuth = useRequireAuth();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [imageFailed, setImageFailed] = useState(false);
+  const [failedImageIndexes, setFailedImageIndexes] = useState<number[]>([]);
 
   const isLiked = isPlaceLiked(place.id);
   const isSaved = isPlaceSaved(place.id);
   const moodObj = INITIAL_MOODS.find(m => m.id === place.primaryMood);
   const calculatedScore = scoreInfo || calculateVybeScore(place, {});
-  const imageUrl = place.images[currentImageIndex]?.trim();
+  const availableImageIndexes = place.images
+    .map((_, index) => index)
+    .filter(index => !failedImageIndexes.includes(index));
+  const activeImageIndex = availableImageIndexes.includes(currentImageIndex)
+    ? currentImageIndex
+    : (availableImageIndexes[0] ?? -1);
+  const imageUrl = activeImageIndex >= 0 ? place.images[activeImageIndex]?.trim() : undefined;
+  const FallbackIcon = getPlaceFallbackIcon(place);
   const hasDistance = typeof place.distanceKm === 'number' && Number.isFinite(place.distanceKm) && place.distanceKm >= 0;
   const locationLabel = place.location.neighborhood?.trim() || place.location.address?.trim();
   const openState = place.openingHours.isOpenNow;
@@ -58,18 +107,27 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
       data-cursor="VIEW"
     >
       <div className="relative aspect-[16/10] w-full overflow-hidden bg-slate-900">
-        {imageUrl && !imageFailed ? (
+        {imageUrl ? (
           <img
             src={imageUrl}
             alt={place.name}
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
             loading="lazy"
-            onError={() => setImageFailed(true)}
+            onError={() => {
+              if (activeImageIndex >= 0) {
+                setFailedImageIndexes(prev => prev.includes(activeImageIndex) ? prev : [...prev, activeImageIndex]);
+              }
+            }}
           />
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-slate-400 bg-slate-900" aria-label="No place photo available">
-            <MapPin className="w-8 h-8 opacity-60" />
-            <span className="text-[11px] font-mono uppercase tracking-wider">No photo available</span>
+          <div
+            className="w-full h-full flex flex-col items-center justify-center gap-3 text-slate-300 bg-gradient-to-br from-slate-950 via-slate-900 to-vybe-dark-surface"
+            aria-label={`${place.name} category icon`}
+          >
+            <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shadow-inner">
+              <FallbackIcon className="w-8 h-8 text-vybe-lime" strokeWidth={1.7} />
+            </div>
+            <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-slate-400">{place.category.replace('-', ' ')}</span>
           </div>
         )}
 
@@ -126,18 +184,17 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
           </span>
         </div>
 
-        {place.images.length > 1 && !imageFailed && (
+        {availableImageIndexes.length > 1 && (
           <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex items-center gap-1 z-10">
-            {place.images.map((_, idx) => (
+            {availableImageIndexes.map((idx) => (
               <button
                 key={idx}
                 aria-label={`Show photo ${idx + 1} of ${place.images.length}`}
                 onClick={(e) => {
                   e.stopPropagation();
                   setCurrentImageIndex(idx);
-                  setImageFailed(false);
                 }}
-                className={`w-1.5 h-1.5 rounded-full transition-all ${idx === currentImageIndex ? 'bg-vybe-lime w-4' : 'bg-white/40'}`}
+                className={`w-1.5 h-1.5 rounded-full transition-all ${idx === activeImageIndex ? 'bg-vybe-lime w-4' : 'bg-white/40'}`}
               />
             ))}
           </div>
