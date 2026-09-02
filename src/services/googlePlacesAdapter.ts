@@ -44,7 +44,7 @@ const GOOGLE_TYPE_TO_CATEGORY: Record<string, CategoryType> = {
   video_arcade: 'arcade-gaming', internet_cafe: 'arcade-gaming',
   shopping_mall: 'shopping-vintage', store: 'shopping-vintage', clothing_store: 'shopping-vintage', book_store: 'shopping-vintage', thrift_store: 'shopping-vintage', flea_market: 'shopping-vintage', toy_store: 'shopping-vintage', gift_shop: 'shopping-vintage',
   spa: 'chill-spots', garden: 'chill-spots',
-  tourist_attraction: 'hidden-gems', historical_landmark: 'hidden-gems', monument: 'hidden-gems', observation_deck: 'hidden-gems', plaza: 'hidden-gems', cultural_landmark: 'hidden-gems',
+  tourist_attraction: 'hidden-gems', monument: 'hidden-gems', observation_deck: 'hidden-gems', plaza: 'hidden-gems', cultural_landmark: 'hidden-gems',
   sports_complex: 'outdoors-nature', sports_club: 'outdoors-nature', sports_activity_location: 'outdoors-nature', swimming_pool: 'outdoors-nature', tennis_court: 'outdoors-nature', athletic_field: 'outdoors-nature', stadium: 'entertainment', arena: 'entertainment', adventure_sports_center: 'entertainment',
   mosque: 'arts-culture', church: 'arts-culture', hindu_temple: 'arts-culture', synagogue: 'arts-culture', place_of_worship: 'arts-culture',
   hospital: 'chill-spots', doctor: 'chill-spots', pharmacy: 'chill-spots', dentist: 'chill-spots',
@@ -80,15 +80,16 @@ function normalizeName(value?: string): string {
   return (value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ').trim();
 }
 
-function classifyPlace(types?: string[], name?: string): { category: CategoryType; mood: MoodType } {
+export function classifyPlace(types?: string[], name?: string): { category: CategoryType; mood: MoodType } {
   const normalized = normalizeName(name);
   const typeSet = new Set(types ?? []);
 
-  // Name evidence wins when it strongly identifies an activity. This prevents
-  // generic Google classifications such as "restaurant" from overriding names
-  // like "Jeux ..." or "Gaming ...".
+  // Strong name evidence wins over broad Google types. This keeps names such as
+  // "Jeux ..." / "Gaming ..." in arcade-gaming even when Google says restaurant.
   for (const rule of NAME_RULES) {
-    if (rule.words.some(word => normalized.includes(normalizeName(word)))) return { category: rule.category, mood: rule.mood };
+    if (rule.words.some(word => normalized.includes(normalizeName(word)))) {
+      return { category: rule.category, mood: rule.mood };
+    }
   }
 
   for (const type of typeSet) {
@@ -97,8 +98,7 @@ function classifyPlace(types?: string[], name?: string): { category: CategoryTyp
     }
   }
 
-  // Unknown/unclassified places remain visible as discoverable places rather
-  // than being incorrectly forced into food & drink.
+  // Never force an unknown place into food/drink. Keep it discoverable.
   return { category: 'hidden-gems', mood: 'explore' };
 }
 
