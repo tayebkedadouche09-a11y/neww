@@ -1,30 +1,24 @@
 import React, { useState } from 'react';
-import { 
-  ShieldCheck, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Flame, 
-  Star, 
-  Sparkles, 
-  Check, 
+import {
+  ShieldCheck,
+  Plus,
+  Edit,
+  Trash2,
+  Flame,
   X,
-  MapPin,
-  DollarSign,
-  Layers
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
+import { useAuth } from '../../context/AuthContext';
 import { Place, CategoryType, MoodType, PriceLevel } from '../../types';
 import { INITIAL_CATEGORIES } from '../../data/initialCategories';
 import { INITIAL_MOODS } from '../../data/initialMoods';
 
 export const AdminPortal: React.FC = () => {
+  const { isAdmin, isAuthenticated, isDemo } = useAuth();
   const { places, addPlace, updatePlace, deletePlace, showToast } = useData();
 
   const [isAddingPlace, setIsAddingPlace] = useState(false);
   const [editingPlaceId, setEditingPlaceId] = useState<string | null>(null);
-
-  // Form State
   const [name, setName] = useState('');
   const [tagline, setTagline] = useState('');
   const [description, setDescription] = useState('');
@@ -38,6 +32,16 @@ export const AdminPortal: React.FC = () => {
   const [isSecretGem, setIsSecretGem] = useState(false);
   const [isLateNight, setIsLateNight] = useState(false);
   const [isOutdoor, setIsOutdoor] = useState(false);
+
+  if (!isAuthenticated || !isAdmin || (isDemo && !isAdmin)) {
+    return (
+      <div className="max-w-xl mx-auto px-4 py-20 text-center">
+        <ShieldCheck className="w-12 h-12 mx-auto mb-4 text-slate-400" />
+        <h1 className="font-display font-extrabold text-2xl text-slate-900 dark:text-white">Admin access required</h1>
+        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">This area is restricted to authorized VYBE administrators.</p>
+      </div>
+    );
+  }
 
   const resetForm = () => {
     setName('');
@@ -64,6 +68,12 @@ export const AdminPortal: React.FC = () => {
     const img = imageUrl.trim() || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80';
 
     if (editingPlaceId) {
+      const existing = places.find(place => place.id === editingPlaceId);
+      if (!existing) {
+        showToast('Place no longer exists.', '⚠️', 'info');
+        resetForm();
+        return;
+      }
       updatePlace(editingPlaceId, {
         name,
         tagline,
@@ -72,27 +82,16 @@ export const AdminPortal: React.FC = () => {
         primaryMood,
         priceLevel,
         approxCostUsd: Number(approxCost),
-        location: {
-          address: address || 'Downtown Metropolis',
-          neighborhood: neighborhood || 'Central City',
-          city: 'Metropolis',
-          lat: 40.7185 + (Math.random() - 0.5) * 0.05,
-          lng: -73.9925 + (Math.random() - 0.5) * 0.05
-        },
+        location: existing.location,
         images: [img],
         features: {
+          ...existing.features,
           isFree: priceLevel === 'free',
           isOutdoor,
           isIndoor: !isOutdoor,
-          hasFood: true,
-          hasAlcohol: false,
           isLateNight,
           isSecretGem,
-          isPetFriendly: true,
-          isWifiFriendly: true,
-          isPhotoSpot: true,
-          isAccessible: true
-        }
+        },
       });
       showToast(`Updated place "${name}"`, '✏️', 'success');
     } else {
@@ -104,26 +103,19 @@ export const AdminPortal: React.FC = () => {
         primaryMood,
         secondaryMoods: ['chill', 'creative'],
         location: {
-          address: address || 'Downtown Metropolis',
-          neighborhood: neighborhood || 'Central City',
-          city: 'Metropolis',
-          lat: 40.7185 + (Math.random() - 0.5) * 0.05,
-          lng: -73.9925 + (Math.random() - 0.5) * 0.05
+          address: address.trim(),
+          neighborhood: neighborhood.trim(),
+          city: '',
+          lat: 0,
+          lng: 0,
         },
         priceLevel,
         approxCostUsd: Number(approxCost),
-        images: [img],
+        images: imageUrl.trim() ? [img] : [],
         tags: ['New Spot', 'Community Pick'],
         estimatedDuration: '1h - 2h',
         openingHours: {
-          monday: '10:00 - 22:00',
-          tuesday: '10:00 - 22:00',
-          wednesday: '10:00 - 22:00',
-          thursday: '10:00 - 22:00',
-          friday: '10:00 - 00:00',
-          saturday: '10:00 - 00:00',
-          sunday: '10:00 - 20:00',
-          isOpenNow: true
+          monday: '', tuesday: '', wednesday: '', thursday: '', friday: '', saturday: '', sunday: '',
         },
         features: {
           isFree: priceLevel === 'free',
@@ -133,14 +125,14 @@ export const AdminPortal: React.FC = () => {
           hasAlcohol: false,
           isLateNight,
           isSecretGem,
-          isPetFriendly: true,
-          isWifiFriendly: true,
-          isPhotoSpot: true,
-          isAccessible: true
+          isPetFriendly: false,
+          isWifiFriendly: false,
+          isPhotoSpot: false,
+          isAccessible: false,
         },
         suitableFor: ['friends', 'solo', 'couple'],
-        isFeatured: true,
-        isTrending: true
+        isFeatured: false,
+        isTrending: false,
       });
     }
 
@@ -167,288 +159,92 @@ export const AdminPortal: React.FC = () => {
 
   return (
     <div data-testid="admin-portal" className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-fadeIn">
-      
-      {/* Admin Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200 dark:border-white/10">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-vybe-pink/15 text-vybe-pink font-mono font-bold text-xs mb-2">
             <ShieldCheck className="w-3.5 h-3.5" />
             <span>CONTENT MANAGEMENT PORTAL</span>
           </div>
-          <h1 className="font-display font-extrabold text-3xl sm:text-4xl text-slate-900 dark:text-white">
-            Admin Place Management
-          </h1>
-          <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-            Create, curate, edit and feature new spots on VYBE platform.
-          </p>
+          <h1 className="font-display font-extrabold text-3xl sm:text-4xl text-slate-900 dark:text-white">Admin Place Management</h1>
+          <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Create, curate, edit and feature new spots on VYBE platform.</p>
         </div>
-
-        <button
-          onClick={() => {
-            resetForm();
-            setIsAddingPlace(true);
-          }}
-          className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-vybe-lime text-black font-bold text-xs shadow-neon-lime hover:scale-105 transition-all self-start sm:self-auto"
-        >
+        <button onClick={() => { resetForm(); setIsAddingPlace(true); }} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-vybe-lime text-black font-bold text-xs shadow-neon-lime hover:scale-105 transition-all self-start sm:self-auto">
           <Plus className="w-4 h-4" />
           <span>Add New Place</span>
         </button>
       </div>
 
-      {/* Creation & Edit Form */}
       {isAddingPlace && (
         <div className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border shadow-2xl space-y-6">
           <div className="flex justify-between items-center">
-            <h3 className="font-display font-bold text-xl text-slate-900 dark:text-white">
-              {editingPlaceId ? 'Edit Place Details' : 'Create New Spot'}
-            </h3>
-            <button onClick={resetForm} className="p-1 text-slate-400 hover:text-white">
-              <X className="w-5 h-5" />
-            </button>
+            <h3 className="font-display font-bold text-xl text-slate-900 dark:text-white">{editingPlaceId ? 'Edit Place Details' : 'Create New Spot'}</h3>
+            <button onClick={resetForm} className="p-1 text-slate-400 hover:text-white" aria-label="Close"><X className="w-5 h-5" /></button>
           </div>
 
           <form onSubmit={handleCreateOrUpdate} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Sonic Vinyl & Coffee Bar"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none"
-                />
+                <input type="text" required placeholder="Place name" value={name} onChange={e => setName(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none" />
               </div>
-
               <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Tagline</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Craft pour-overs, rare vinyl & lo-fi beats"
-                  value={tagline}
-                  onChange={e => setTagline(e.target.value)}
-                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none"
-                />
+                <input type="text" required placeholder="Short vibe description" value={tagline} onChange={e => setTagline(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none" />
               </div>
             </div>
 
             <div className="space-y-1">
               <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Full Description</label>
-              <textarea
-                rows={3}
-                required
-                placeholder="Deep dive description of the vibe and atmosphere..."
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none"
-              />
+              <textarea rows={3} required placeholder="Description" value={description} onChange={e => setDescription(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none" />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Category</label>
-                <select
-                  value={category}
-                  onChange={e => setCategory(e.target.value as CategoryType)}
-                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-xs font-bold text-slate-900 dark:text-white"
-                >
-                  {INITIAL_CATEGORIES.map(c => (
-                    <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Primary Mood</label>
-                <select
-                  value={primaryMood}
-                  onChange={e => setPrimaryMood(e.target.value as MoodType)}
-                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-xs font-bold text-slate-900 dark:text-white"
-                >
-                  {INITIAL_MOODS.map(m => (
-                    <option key={m.id} value={m.id}>{m.emoji} {m.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Price Level</label>
-                <select
-                  value={priceLevel}
-                  onChange={e => setPriceLevel(e.target.value as PriceLevel)}
-                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-xs font-bold text-slate-900 dark:text-white"
-                >
-                  <option value="free">Free ($0)</option>
-                  <option value="$">$ (Under $15)</option>
-                  <option value="$$">$$ ($15 - $35)</option>
-                  <option value="$$$">$$$ ($35+)</option>
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Approx Cost ($)</label>
-                <input
-                  type="number"
-                  value={approxCost}
-                  onChange={e => setApproxCost(Number(e.target.value))}
-                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white"
-                />
-              </div>
+              <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Category</label><select value={category} onChange={e => setCategory(e.target.value as CategoryType)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-xs font-bold text-slate-900 dark:text-white">{INITIAL_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}</select></div>
+              <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Primary Mood</label><select value={primaryMood} onChange={e => setPrimaryMood(e.target.value as MoodType)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-xs font-bold text-slate-900 dark:text-white">{INITIAL_MOODS.map(m => <option key={m.id} value={m.id}>{m.emoji} {m.label}</option>)}</select></div>
+              <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Price Level</label><select value={priceLevel} onChange={e => setPriceLevel(e.target.value as PriceLevel)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-xs font-bold text-slate-900 dark:text-white"><option value="free">Free</option><option value="$">$</option><option value="$$">$$</option><option value="$$$">$$$</option><option value="$$$$">$$$$</option></select></div>
+              <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Approx Cost ($)</label><input type="number" min="0" value={approxCost} onChange={e => setApproxCost(Number(e.target.value))} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white" /></div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Neighborhood</label>
-                <input
-                  type="text"
-                  placeholder="e.g. East River Arts"
-                  value={neighborhood}
-                  onChange={e => setNeighborhood(e.target.value)}
-                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Image URL</label>
-                <input
-                  type="url"
-                  placeholder="https://images.unsplash.com/..."
-                  value={imageUrl}
-                  onChange={e => setImageUrl(e.target.value)}
-                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white"
-                />
-              </div>
+              <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Address</label><input type="text" required={!editingPlaceId} placeholder="Real street address" value={address} onChange={e => setAddress(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white" /></div>
+              <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Image URL (optional)</label><input type="url" placeholder="https://..." value={imageUrl} onChange={e => setImageUrl(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white" /></div>
             </div>
 
-            {/* Feature Checkboxes */}
             <div className="flex flex-wrap gap-4 pt-2">
-              <label className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isSecretGem}
-                  onChange={e => setIsSecretGem(e.target.checked)}
-                  className="rounded accent-vybe-lime"
-                />
-                <span>💎 Mark as Hidden Gem</span>
-              </label>
-
-              <label className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isLateNight}
-                  onChange={e => setIsLateNight(e.target.checked)}
-                  className="rounded accent-vybe-lime"
-                />
-                <span>🌙 Late Night Hub</span>
-              </label>
-
-              <label className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isOutdoor}
-                  onChange={e => setIsOutdoor(e.target.checked)}
-                  className="rounded accent-vybe-lime"
-                />
-                <span>🌿 Outdoor / Open Air</span>
-              </label>
+              <label className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer"><input type="checkbox" checked={isSecretGem} onChange={e => setIsSecretGem(e.target.checked)} className="rounded accent-vybe-lime" /><span>💎 Hidden Gem</span></label>
+              <label className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer"><input type="checkbox" checked={isLateNight} onChange={e => setIsLateNight(e.target.checked)} className="rounded accent-vybe-lime" /><span>🌙 Late Night</span></label>
+              <label className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer"><input type="checkbox" checked={isOutdoor} onChange={e => setIsOutdoor(e.target.checked)} className="rounded accent-vybe-lime" /><span>🌿 Outdoor</span></label>
             </div>
 
             <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-white/10">
-              <button
-                type="button"
-                onClick={resetForm}
-                className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-6 py-2.5 rounded-xl bg-vybe-lime text-black font-bold text-xs uppercase tracking-wider shadow-neon-lime hover:scale-105 transition-all"
-              >
-                {editingPlaceId ? 'Update Place' : 'Publish Spot to VYBE'}
-              </button>
+              <button type="button" onClick={resetForm} className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white">Cancel</button>
+              <button type="submit" className="px-6 py-2.5 rounded-xl bg-vybe-lime text-black font-bold text-xs uppercase tracking-wider shadow-neon-lime hover:scale-105 transition-all">{editingPlaceId ? 'Update Place' : 'Publish Spot'}</button>
             </div>
-
           </form>
         </div>
       )}
 
-      {/* Places Management Table */}
       <div className="rounded-3xl bg-white dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border shadow-lg overflow-hidden">
-        <div className="p-5 border-b border-slate-200 dark:border-white/10 flex justify-between items-center">
-          <h3 className="font-display font-bold text-lg text-slate-900 dark:text-white">
-            Active Places Catalog ({places.length})
-          </h3>
-        </div>
-
+        <div className="p-5 border-b border-slate-200 dark:border-white/10"><h3 className="font-display font-bold text-lg text-slate-900 dark:text-white">Active Places Catalog ({places.length})</h3></div>
         <div className="divide-y divide-slate-100 dark:divide-white/5 overflow-x-auto">
           {places.map(place => (
-            <div
-              key={place.id}
-              className="p-4 flex items-center justify-between gap-4 hover:bg-slate-50 dark:hover:bg-vybe-dark-surface/50 transition-colors"
-            >
+            <div key={place.id} className="p-4 flex items-center justify-between gap-4 hover:bg-slate-50 dark:hover:bg-vybe-dark-surface/50 transition-colors">
               <div className="flex items-center gap-3 min-w-0">
-                <img
-                  src={place.images[0]}
-                  alt={place.name}
-                  loading="lazy"
-                  decoding="async"
-                  className="w-12 h-12 rounded-xl object-cover shrink-0"
-                />
+                <div className="w-12 h-12 rounded-xl bg-slate-900 shrink-0 flex items-center justify-center text-slate-500"><span aria-hidden="true">📍</span></div>
                 <div className="truncate">
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-display font-bold text-sm text-slate-900 dark:text-white truncate">
-                      {place.name}
-                    </h4>
-                    {place.isTrending && (
-                      <span className="px-2 py-0.5 rounded bg-orange-500/10 text-orange-400 font-mono text-[10px] font-bold">
-                        TRENDING
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-500 truncate">
-                    {place.category} · {place.location.neighborhood} · {place.priceLevel}
-                  </p>
+                  <div className="flex items-center gap-2"><h4 className="font-display font-bold text-sm text-slate-900 dark:text-white truncate">{place.name}</h4>{place.isTrending && <span className="px-2 py-0.5 rounded bg-orange-500/10 text-orange-400 font-mono text-[10px] font-bold">TRENDING</span>}</div>
+                  <p className="text-xs text-slate-500 truncate">{place.category} · {place.location.neighborhood || place.location.address || 'Location unavailable'} · {place.priceLevel}</p>
                 </div>
               </div>
-
               <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={() => {
-                    updatePlace(place.id, { isTrending: !place.isTrending });
-                  }}
-                  className={`p-2 rounded-xl text-xs font-bold transition-all ${
-                    place.isTrending ? 'bg-orange-500/20 text-orange-400' : 'bg-slate-100 dark:bg-vybe-dark-surface text-slate-400'
-                  }`}
-                  title="Toggle Trending"
-                >
-                  <Flame className="w-4 h-4" />
-                </button>
-
-                <button
-                  onClick={() => startEdit(place)}
-                  className="p-2 rounded-xl bg-slate-100 dark:bg-vybe-dark-surface text-slate-600 dark:text-slate-300 hover:text-vybe-lime transition-all"
-                  title="Edit Place"
-                >
-                  <Edit className="w-4 h-4" />
-                </button>
-
-                <button
-                  onClick={() => deletePlace(place.id)}
-                  className="p-2 rounded-xl bg-slate-100 dark:bg-vybe-dark-surface text-slate-600 dark:text-slate-400 hover:text-rose-500 transition-all"
-                  title="Delete Place"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <button onClick={() => updatePlace(place.id, { isTrending: !place.isTrending })} className={`p-2 rounded-xl text-xs font-bold transition-all ${place.isTrending ? 'bg-orange-500/20 text-orange-400' : 'bg-slate-100 dark:bg-vybe-dark-surface text-slate-400'}`} title="Toggle Trending" aria-label={`Toggle trending for ${place.name}`}><Flame className="w-4 h-4" /></button>
+                <button onClick={() => startEdit(place)} className="p-2 rounded-xl bg-slate-100 dark:bg-vybe-dark-surface text-slate-600 dark:text-slate-300 hover:text-vybe-lime transition-all" title="Edit Place" aria-label={`Edit ${place.name}`}><Edit className="w-4 h-4" /></button>
+                <button onClick={() => deletePlace(place.id)} className="p-2 rounded-xl bg-slate-100 dark:bg-vybe-dark-surface text-slate-600 dark:text-slate-400 hover:text-rose-500 transition-all" title="Delete Place" aria-label={`Delete ${place.name}`}><Trash2 className="w-4 h-4" /></button>
               </div>
             </div>
           ))}
         </div>
       </div>
-
     </div>
   );
 };
-
