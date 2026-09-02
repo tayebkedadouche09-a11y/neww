@@ -12,6 +12,37 @@ interface GoogleMapProps {
   onError?: (message: string) => void;
 }
 
+function getPlaceMarkerEmoji(place: Place): string {
+  const text = `${place.name} ${place.tags.join(' ')}`.toLowerCase();
+  if (/mosque|masjid|مسجد|جامع/.test(text)) return '🕌';
+  if (/church|eglise|église|كنيسة/.test(text)) return '⛪';
+  if (/synagogue|كنيس/.test(text)) return '🕍';
+  if (/hospital|clinic|pharmacy|hôpital|clinique|مستشفى|صيدلية/.test(text)) return '🏥';
+  if (/hotel|hostel|motel|hôtel|فندق/.test(text)) return '🏨';
+  if (/school|university|école|université|مدرسة|جامعة/.test(text)) return '🎓';
+  if (/restaurant|food|bakery|مطعم|مخبزة/.test(text)) return '🍽️';
+  if (/coffee|cafe|café|قهوة|مقهى/.test(text)) return '☕';
+  if (/game|arcade|jeux|gaming|video_arcade|ألعاب/.test(text)) return '🎮';
+  if (/cinema|movie|theater|film|cinéma|سينما|مسرح/.test(text)) return '🎬';
+  if (/gym|fitness|sport|stadium|pool|tennis|رياضة|ملعب|مسبح/.test(text)) return '🏋️';
+  if (/park|garden|playground|nature|حديقة/.test(text)) return '🌳';
+  if (/shopping|mall|store|market|boutique|تسوق|سوق/.test(text)) return '🛍️';
+  if (/museum|gallery|library|متحف|مكتبة/.test(text)) return '🏛️';
+  if (/bar|club|nightlife|music|karaoke|barre|موسيقى/.test(text)) return '🎵';
+  if (/airport|station|bus|train|transit|مطار|محطة/.test(text)) return '🚉';
+  switch (place.category) {
+    case 'food-drink': return '🍽️';
+    case 'nightlife': return '🎵';
+    case 'arcade-gaming': return '🎮';
+    case 'outdoors-nature': return '🌳';
+    case 'entertainment': return '🎬';
+    case 'arts-culture': return '🏛️';
+    case 'shopping-vintage': return '🛍️';
+    case 'chill-spots': return '☕';
+    default: return '📍';
+  }
+}
+
 export const GoogleMap: React.FC<GoogleMapProps> = ({
   places,
   onMarkerClick,
@@ -36,12 +67,10 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({
 
     const initializeMap = async () => {
       if (!mapRef.current || !googleMapsConfig.apiKey) return;
-
       try {
         const { Map, AdvancedMarkerElement } = await loadGoogleMaps();
         advancedMarkerRef.current = AdvancedMarkerElement;
         if (cancelled || !mapRef.current) return;
-
         const mapId = googleMapsConfig.mapId?.trim() || 'DEMO_MAP_ID';
         const map = new Map(mapRef.current, {
           center: userLocation || defaultCenter,
@@ -52,7 +81,6 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({
           streetViewControl: false,
           fullscreenControl: true,
         });
-
         mapInstance = map;
         googleMapRef.current = map;
         setMapLoaded(true);
@@ -65,7 +93,6 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({
     };
 
     initializeMap();
-
     return () => {
       cancelled = true;
       markersRef.current.forEach((marker) => { marker.map = null; });
@@ -80,26 +107,43 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({
 
   useEffect(() => {
     if (!mapLoaded || !googleMapRef.current || !advancedMarkerRef.current) return;
-
     markersRef.current.forEach((marker) => { marker.map = null; });
     markersRef.current = [];
     const AdvancedMarkerElement = advancedMarkerRef.current;
 
     places.forEach((place) => {
       if (place.location?.lat == null || place.location?.lng == null) return;
-
       const moodObj = INITIAL_MOODS.find((m) => m.id === place.primaryMood);
-      const emoji = moodObj?.emoji || '📍';
+      const emoji = getPlaceMarkerEmoji(place);
       const color = moodObj?.accentColor || '#CCFF00';
       const markerContent = document.createElement('div');
-      markerContent.innerHTML = `
-        <div class="custom-map-marker group relative cursor-pointer">
-          <div class="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold text-black font-sans shadow-lg" style="background-color:${color};border:2px solid #000;box-shadow:0 0 15px ${color}88">
-            <span>${emoji}</span>
-            <span class="font-mono text-[11px] font-extrabold">${place.features.isFree ? 'FREE' : place.priceLevel}</span>
-          </div>
-          <div class="w-2 h-2 bg-black rotate-45 mx-auto -mt-1 border-r border-b border-black"></div>
-        </div>`;
+      markerContent.className = 'custom-map-marker group relative cursor-pointer';
+      markerContent.style.cssText = 'width:46px;height:46px;border-radius:14px;overflow:hidden;border:2px solid #000;box-shadow:0 4px 14px rgba(0,0,0,.35);background:#111;position:relative;';
+
+      const imageUrl = place.images.find((image) => /^https?:\/\//i.test(image?.trim()))?.trim();
+      if (imageUrl) {
+        const image = document.createElement('img');
+        image.src = imageUrl;
+        image.alt = place.name;
+        image.loading = 'lazy';
+        image.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+        image.onerror = () => {
+          image.remove();
+          const fallback = document.createElement('span');
+          fallback.textContent = emoji;
+          fallback.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:24px;background:#111;';
+          markerContent.appendChild(fallback);
+        };
+        markerContent.appendChild(image);
+        const tint = document.createElement('span');
+        tint.style.cssText = `position:absolute;inset:0;border:2px solid ${color};border-radius:12px;pointer-events:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);`;
+        markerContent.appendChild(tint);
+      } else {
+        const fallback = document.createElement('span');
+        fallback.textContent = emoji;
+        fallback.style.cssText = `position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:24px;background:${color};`;
+        markerContent.appendChild(fallback);
+      }
 
       const marker = new AdvancedMarkerElement({
         map: googleMapRef.current!,
@@ -107,7 +151,6 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({
         content: markerContent,
         title: place.name,
       });
-
       marker.addEventListener('gmp-click', () => onLoadCallbackRef.current?.(place));
       markersRef.current.push(marker);
     });
@@ -121,13 +164,7 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({
   }, [selectedPlace]);
 
   if (mapError) return null;
-
   return (
-    <div
-      ref={mapRef}
-      className="w-full h-full rounded-3xl overflow-hidden"
-      style={{ minHeight: '550px' }}
-      aria-label="Google Maps"
-    />
+    <div ref={mapRef} className="w-full h-full rounded-3xl overflow-hidden" style={{ minHeight: '550px' }} aria-label="Google Maps" />
   );
 };
