@@ -19,31 +19,63 @@ const MapController: React.FC<{ center: [number, number]; zoom?: number }> = ({ 
   return null;
 };
 
+function getPlaceMarkerEmoji(place: Place): string {
+  const text = `${place.name} ${place.tags.join(' ')}`.toLowerCase();
+  if (/mosque|masjid|مسجد|جامع/.test(text)) return '🕌';
+  if (/church|eglise|église|كنيسة/.test(text)) return '⛪';
+  if (/synagogue|كنيس/.test(text)) return '🕍';
+  if (/hospital|clinic|pharmacy|hôpital|clinique|مستشفى|صيدلية/.test(text)) return '🏥';
+  if (/hotel|hostel|motel|hôtel|فندق/.test(text)) return '🏨';
+  if (/school|university|école|université|مدرسة|جامعة/.test(text)) return '🎓';
+  if (/restaurant|food|bakery|مطعم|مخبزة/.test(text)) return '🍽️';
+  if (/coffee|cafe|café|قهوة|مقهى/.test(text)) return '☕';
+  if (/game|arcade|jeux|gaming|video_arcade|ألعاب/.test(text)) return '🎮';
+  if (/cinema|movie|theater|film|cinéma|سينما|مسرح/.test(text)) return '🎬';
+  if (/gym|fitness|sport|stadium|pool|tennis|رياضة|ملعب|مسبح/.test(text)) return '🏋️';
+  if (/park|garden|playground|nature|حديقة/.test(text)) return '🌳';
+  if (/shopping|mall|store|market|boutique|تسوق|سوق/.test(text)) return '🛍️';
+  if (/museum|gallery|library|متحف|مكتبة/.test(text)) return '🏛️';
+  if (/bar|club|nightlife|music|karaoke|موسيقى/.test(text)) return '🎵';
+  if (/airport|station|bus|train|transit|مطار|محطة/.test(text)) return '🚉';
+  return '📍';
+}
+
 function createCustomMarkerIcon(place: Place, isSelected: boolean) {
   const moodObj = INITIAL_MOODS.find(m => m.id === place.primaryMood);
-  const emoji = moodObj?.emoji || '📍';
+  const emoji = getPlaceMarkerEmoji(place);
   const color = moodObj?.accentColor || '#CCFF00';
+  const imageUrl = place.images.find(image => /^https?:\/\//i.test(image?.trim()))?.trim();
+  const fallback = `<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:20px;background:${color}">${emoji}</span>`;
+  const media = imageUrl
+    ? `<img src="${imageUrl.replace(/"/g, '&quot;')}" alt="" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.outerHTML='${fallback.replace(/'/g, "\\'")}'" />`
+    : fallback;
   const html = `
-    <div class="custom-map-marker group relative cursor-pointer ${isSelected ? 'scale-125 z-50' : ''}">
-      <div class="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold text-black font-sans shadow-lg transition-all"
-           style="background-color: ${color}; border: 2px solid #000; box-shadow: 0 0 15px ${color}88;">
-        <span>${emoji}</span>
-        <span class="font-mono text-[11px] font-extrabold">${place.features.isFree ? 'FREE' : place.priceLevel}</span>
-      </div>
-      <div class="w-2 h-2 bg-black rotate-45 mx-auto -mt-1 border-r border-b border-black"></div>
+    <div class="custom-map-marker group relative cursor-pointer ${isSelected ? 'scale-125 z-50' : ''}" style="width:46px;height:46px;border-radius:14px;overflow:hidden;border:2px solid #000;box-shadow:0 4px 14px rgba(0,0,0,.35);background:#111;">
+      ${media}
+      <div style="position:absolute;inset:0;border:2px solid ${color};border-radius:12px;pointer-events:none;"></div>
     </div>`;
-  return L.divIcon({ html, className: 'leaflet-custom-div-icon', iconSize: [60, 30], iconAnchor: [30, 28] });
+  return L.divIcon({ html, className: 'leaflet-custom-div-icon', iconSize: [46, 46], iconAnchor: [23, 42] });
 }
 
 const PlacePreview: React.FC<{ place: Place; onOpen: (place: Place) => void }> = ({ place, onOpen }) => {
-  const imageUrl = place.images[0]?.trim();
+  const imageUrls = place.images.filter(image => /^https?:\/\//i.test(image?.trim())).map(image => image.trim());
+  const [imageIndex, setImageIndex] = useState(0);
+  const [failedImages, setFailedImages] = useState<number[]>([]);
+  const available = imageUrls.map((_, index) => index).filter(index => !failedImages.includes(index));
+  const activeIndex = available.includes(imageIndex) ? imageIndex : (available[0] ?? -1);
+  const imageUrl = activeIndex >= 0 ? imageUrls[activeIndex] : undefined;
   const hasDistance = typeof place.distanceKm === 'number' && Number.isFinite(place.distanceKm) && place.distanceKm >= 0;
-  const [imageFailed, setImageFailed] = useState(false);
+  const emoji = getPlaceMarkerEmoji(place);
+
   return (
     <div className="absolute bottom-6 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-md z-10 animate-fadeIn">
       <div onClick={() => onOpen(place)} className="flex items-center gap-4 p-4 rounded-3xl bg-white/95 dark:bg-vybe-dark-card/95 backdrop-blur-xl border border-slate-200 dark:border-vybe-dark-border shadow-2xl cursor-pointer hover:border-vybe-lime transition-all group">
         <div className="w-24 h-24 rounded-2xl shrink-0 overflow-hidden border border-black/10 dark:border-white/10 bg-slate-900 flex items-center justify-center">
-          {imageUrl && !imageFailed ? <img src={imageUrl} alt={place.name} loading="lazy" decoding="async" onError={() => setImageFailed(true)} className="w-full h-full object-cover group-hover:scale-105 transition-transform" /> : <MapPin className="w-7 h-7 text-slate-500" aria-label="No photo available" />}
+          {imageUrl ? (
+            <img src={imageUrl} alt={place.name} loading="lazy" decoding="async" onError={() => setFailedImages(prev => prev.includes(activeIndex) ? prev : [...prev, activeIndex])} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+          ) : (
+            <span className="text-4xl" aria-label={`${place.name} category icon`}>{emoji}</span>
+          )}
         </div>
         <div className="flex-1 min-w-0 space-y-1">
           <div className="flex items-center justify-between gap-2">
@@ -80,9 +112,7 @@ export const VybeMap: React.FC = () => {
   const [activePreviewPlace, setActivePreviewPlace] = useState<Place | null>(filteredPlaces[0]?.place || null);
   const [useGoogle, setUseGoogle] = useState(isGoogleMapsConfigured);
 
-  useEffect(() => {
-    setUseGoogle(isGoogleMapsConfigured);
-  }, []);
+  useEffect(() => { setUseGoogle(isGoogleMapsConfigured); }, []);
 
   useEffect(() => {
     if (selectedPlace) setActivePreviewPlace(selectedPlace);
@@ -107,13 +137,7 @@ export const VybeMap: React.FC = () => {
   if (useGoogle) {
     return (
       <div className={mapShell}>
-        <GoogleMap
-          places={filteredPlaces.map(fp => fp.place)}
-          onMarkerClick={handleMarkerClick}
-          selectedPlace={selectedPlace}
-          userLocation={userLocation}
-          onError={() => setUseGoogle(false)}
-        />
+        <GoogleMap places={filteredPlaces.map(fp => fp.place)} onMarkerClick={handleMarkerClick} selectedPlace={selectedPlace} userLocation={userLocation} onError={() => setUseGoogle(false)} />
         <MapOverlay count={filteredPlaces.length} requestLocation={requestLocation} geoLoading={geoLoading} />
         {activePreviewPlace && <PlacePreview place={activePreviewPlace} onOpen={openPlaceDetail} />}
       </div>
