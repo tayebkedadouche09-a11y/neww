@@ -11,6 +11,7 @@ export interface DiscoveryOptions {
   filters?: Partial<FilterState>;
 }
 
+// Only valid, specific Google primary place types are sent to includedPrimaryTypes.
 const INITIAL_TYPE_GROUPS = [
   ['restaurant', 'cafe', 'bakery', 'meal_takeaway'],
   ['bar', 'night_club', 'movie_theater', 'bowling_alley', 'amusement_park'],
@@ -24,7 +25,7 @@ const CATEGORY_TYPES: Record<CategoryType, string[]> = {
   'outdoors-nature': ['park', 'zoo', 'aquarium', 'campground', 'gym'],
   entertainment: ['movie_theater', 'bowling_alley', 'amusement_park', 'casino'],
   'arcade-gaming': ['bowling_alley', 'amusement_arcade'],
-  'hidden-gems': ['tourist_attraction', 'point_of_interest'],
+  'hidden-gems': ['tourist_attraction'],
   'chill-spots': ['cafe', 'spa', 'library'],
   'shopping-vintage': ['shopping_mall', 'store', 'clothing_store', 'book_store'],
 };
@@ -50,7 +51,10 @@ function matchesFilters(place: Place, filters?: Partial<FilterState>): boolean {
       !place.secondaryMoods.some(mood => filters.moods?.includes(mood))) return false;
   if (filters.categories?.length && !filters.categories.includes(place.category)) return false;
   if (filters.priceLevels?.length && !filters.priceLevels.includes(place.priceLevel)) return false;
-  if (filters.maxBudget !== undefined && !place.features.isFree && place.approxCostUsd > filters.maxBudget) return false;
+  // Google does not provide an exact spend amount in this adapter. Only apply
+  // a numeric budget filter when a real cost estimate exists.
+  if (filters.maxBudget !== undefined && !place.features.isFree &&
+      place.approxCostUsd > 0 && place.approxCostUsd > filters.maxBudget) return false;
   if (filters.companion && !place.suitableFor.includes(filters.companion)) return false;
   if (filters.onlyOpenNow && place.openingHours.isOpenNow !== true) return false;
   if (filters.onlyFree && !place.features.isFree) return false;
@@ -73,14 +77,8 @@ export async function discoverPlaces(options: DiscoveryOptions): Promise<Place[]
   let places: Place[];
 
   if (query) {
-    // Google owns relevance here. Do not apply a second name/tag substring filter.
     places = await searchGooglePlacesText(query, userLat, userLng, radiusKm);
   } else {
-    // Push each category group to Google as includedPrimaryTypes so the
-    // Places API itself filters by type. The previous approach fetched
-    // untyped results and re-filtered client-side by tag — a category/type
-    // mapping mismatch that silently dropped valid Google places
-    // (20 raw Google results → 5 kept, 3 identical duplicate API calls).
     const groups = filters?.categories?.length
       ? [filters.categories.flatMap(category => CATEGORY_TYPES[category])]
       : INITIAL_TYPE_GROUPS;
@@ -91,7 +89,6 @@ export async function discoverPlaces(options: DiscoveryOptions): Promise<Place[]
   }
 
   const result = deduplicate(withDistance(places, userLat, userLng)).filter(place => matchesFilters(place, filters));
-  // SAFE DIAGNOSTIC: final count leaving discoveryService (after distance + filters).
   console.log(`[discovery] discoveryServiceResultCount: ${result.length}`);
   return result;
 }
