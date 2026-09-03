@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
@@ -22,36 +22,6 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Harden admin place publishing
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          p = Path('src/components/admin/AdminPortal.tsx')
-          s = p.read_text()
-          if 'const [latitude, setLatitude] = useState(0);' not in s:
-              s = s.replace("  const [neighborhood, setNeighborhood] = useState('');", "  const [neighborhood, setNeighborhood] = useState('');\n  const [latitude, setLatitude] = useState(0);\n  const [longitude, setLongitude] = useState(0);")
-          s = s.replace("    setNeighborhood('');\n    setPriceLevel('$$');", "    setNeighborhood('');\n    setLatitude(0);\n    setLongitude(0);\n    setPriceLevel('$$');")
-          old_img = "    const img = imageUrl.trim() || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80';"
-          if old_img in s:
-              s = s.replace(old_img, "    const img = imageUrl.trim();")
-          s = s.replace("    if (!name.trim()) return;", "    if (!name.trim() || !tagline.trim() || !description.trim()) return;\n    if (!editingPlaceId && (!address.trim() || !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 || (latitude === 0 && longitude === 0))) {\n      showToast('New places need a real address and valid map coordinates.', '📍', 'info');\n      return;\n    }")
-          s = s.replace("        images: [img],", "        images: img ? [img] : existing.images,")
-          s = s.replace("          city: '',\n          lat: 0,\n          lng: 0,", "          city: '',\n          lat: latitude,\n          lng: longitude,")
-          s = s.replace("        images: imageUrl.trim() ? [img] : [],", "        images: img ? [img] : [],")
-          s = s.replace("    setNeighborhood(place.location.neighborhood);\n    setPriceLevel(place.priceLevel);", "    setNeighborhood(place.location.neighborhood);\n    setLatitude(place.location.lat);\n    setLongitude(place.location.lng);\n    setPriceLevel(place.priceLevel);")
-          marker = '''            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">\n              <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Address</label><input type="text" required={!editingPlaceId} placeholder="Real street address" value={address} onChange={e => setAddress(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white" /></div>\n              <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Image URL (optional)</label><input type="url" placeholder="https://..." value={imageUrl} onChange={e => setImageUrl(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white" /></div>\n            </div>'''
-          if 'name="latitude"' not in s and marker in s:
-              replacement = marker + '''\n\n            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">\n              <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Latitude</label><input name="latitude" type="number" required={!editingPlaceId} min="-90" max="90" step="any" placeholder="e.g. 36.7538" value={latitude} onChange={e => setLatitude(Number(e.target.value))} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white" /></div>\n              <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Longitude</label><input name="longitude" type="number" required={!editingPlaceId} min="-180" max="180" step="any" placeholder="e.g. 3.0588" value={longitude} onChange={e => setLongitude(Number(e.target.value))} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white" /></div>\n            </div>'''
-              s = s.replace(marker, replacement)
-          p.write_text(s)
-          PY
-          if ! git diff --quiet -- src/components/admin/AdminPortal.tsx; then
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git add src/components/admin/AdminPortal.tsx
-            git commit -m 'fix: require valid coordinates for admin places [skip ci]'
-            git push
-          fi
       - name: Typecheck
         run: npm run typecheck
       - name: Production build
