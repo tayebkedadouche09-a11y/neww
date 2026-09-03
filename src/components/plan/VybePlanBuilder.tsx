@@ -93,7 +93,7 @@ export const VybePlanBuilder: React.FC = () => {
           <select value={currentPlan?.id || ''} onChange={e => { const selected = plans.find(p => p.id === e.target.value); if (selected) setActivePlan(selected); }} className="bg-slate-100 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-900 dark:text-white focus:outline-none">
             {plans.map(p => <option key={p.id} value={p.id}>{p.title} ({p.items.length} stops)</option>)}
           </select>
-          <button onClick={() => setIsCreatingNew(true)} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-vybe-lime text-black font-bold text-xs shadow-neon-lime hover:scale-105 transition-all"><Plus className="w-4 h-4" /><span>New Plan</span></button>
+          <button onClick={() => { if (!requireAuth()) return; setIsCreatingNew(true); }} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-vybe-lime text-black font-bold text-xs shadow-neon-lime hover:scale-105 transition-all"><Plus className="w-4 h-4" /><span>New Plan</span></button>
         </div>
       </div>
 
