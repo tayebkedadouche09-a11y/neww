@@ -1,18 +1,20 @@
-import React, { useEffect, useState } from 'react';
-import { 
-  Bookmark, 
-  Heart, 
-  Calendar, 
-  Edit3, 
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  Bookmark,
+  Heart,
+  Calendar,
+  Edit3,
   Share2,
   LogOut,
-  ArrowRight
+  ArrowRight,
+  LoaderCircle,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { PlaceCard } from '../cards/PlaceCard';
 import { INITIAL_MOODS } from '../../data/initialMoods';
-import { MoodType } from '../../types';
+import { MoodType, Place } from '../../types';
+import { getGooglePlaceDetails } from '../../services/googlePlaces';
 
 export const ProfileView: React.FC = () => {
   const { currentUser, profiles, switchProfile, updateProfile, logout } = useAuth();
@@ -22,6 +24,8 @@ export const ProfileView: React.FC = () => {
   const [editName, setEditName] = useState(currentUser?.name || '');
   const [editBio, setEditBio] = useState(currentUser?.bio || '');
   const [editMoods, setEditMoods] = useState<MoodType[]>(currentUser?.favoriteMoods || ['chill']);
+  const [hydratedPlaces, setHydratedPlaces] = useState<Place[]>([]);
+  const [hydratingPlaces, setHydratingPlaces] = useState(false);
 
   useEffect(() => {
     setEditName(currentUser?.name || '');
@@ -29,15 +33,58 @@ export const ProfileView: React.FC = () => {
     setEditMoods(currentUser?.favoriteMoods || ['chill']);
   }, [currentUser?.id]);
 
+  // Saved/liked places can come from Google Places and may no longer be in the
+  // current discovery result set. Rehydrate those IDs so Save/Like really mean
+  // "keep this place for later", even after a new search or page refresh.
+  useEffect(() => {
+    let cancelled = false;
+    const ids = [...new Set([...(currentUser?.savedPlaceIds || []), ...(currentUser?.likedPlaceIds || [])])];
+    const missingGoogleIds = ids
+      .filter(id => !places.some(place => place.id === id))
+      .filter(id => id.startsWith('google:'))
+      .map(id => id.slice('google:'.length))
+      .filter(Boolean);
+
+    if (!currentUser || missingGoogleIds.length === 0) {
+      setHydratedPlaces([]);
+      setHydratingPlaces(false);
+      return;
+    }
+
+    setHydratingPlaces(true);
+    void Promise.all(missingGoogleIds.map(async placeId => {
+      try {
+        return await getGooglePlaceDetails(placeId);
+      } catch (error) {
+        console.warn('[VYBE profile] failed to restore saved Google place', placeId, error);
+        return null;
+      }
+    })).then(results => {
+      if (!cancelled) setHydratedPlaces(results.filter((place): place is Place => Boolean(place)));
+    }).finally(() => {
+      if (!cancelled) setHydratingPlaces(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.id, currentUser?.savedPlaceIds, currentUser?.likedPlaceIds, places]);
+
+  const allKnownPlaces = useMemo(() => {
+    const byId = new Map<string, Place>();
+    [...places, ...hydratedPlaces].forEach(place => byId.set(place.id, place));
+    return [...byId.values()];
+  }, [places, hydratedPlaces]);
+
   if (!currentUser) return null;
 
-  const savedPlaces = places.filter(p => currentUser.savedPlaceIds.includes(p.id));
-  const likedPlaces = places.filter(p => currentUser.likedPlaceIds.includes(p.id));
+  const savedPlaces = allKnownPlaces.filter(p => currentUser.savedPlaceIds.includes(p.id));
+  const likedPlaces = allKnownPlaces.filter(p => currentUser.likedPlaceIds.includes(p.id));
   const userPlans = plans.filter(p => p.userId === currentUser.id);
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
-    updateProfile({ name: editName, bio: editBio, favoriteMoods: editMoods });
+    updateProfile({ name: editName.trim(), bio: editBio.trim(), favoriteMoods: editMoods });
     showToast('Profile updated!', '✨', 'success');
     setActiveSubTab('saved');
   };
@@ -84,14 +131,8 @@ export const ProfileView: React.FC = () => {
                 {profiles.map(p => <button key={p.id} onClick={() => switchProfile(p.id)} className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${currentUser.id === p.id ? 'bg-vybe-lime text-black shadow-sm' : 'bg-white dark:bg-vybe-dark-card text-slate-600 dark:text-slate-400 hover:text-white'}`}>{p.name.split(' ')[0]}</button>)}
               </div>
             </div>
-            <button onClick={() => openShareModal()} className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-black font-bold text-xs hover:scale-105 transition-all shadow-md">
-              <Share2 className="w-3.5 h-3.5" />
-              <span>Share My VYBE</span>
-            </button>
-            <button onClick={() => { logout(); setActiveTab('explore'); showToast('Signed out — returning to public visitor mode.', '👋', 'info'); }} className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-rose-500/10 text-rose-500 dark:text-rose-400 border border-rose-500/30 hover:bg-rose-500 hover:text-white font-bold text-xs transition-all" data-testid="profile-signout">
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Sign Out</span>
-            </button>
+            <button onClick={() => openShareModal()} className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-black font-bold text-xs hover:scale-105 transition-all shadow-md"><Share2 className="w-3.5 h-3.5" /><span>Share My VYBE</span></button>
+            <button onClick={() => { logout(); setActiveTab('explore'); showToast('Signed out — returning to public visitor mode.', '👋', 'info'); }} className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-rose-500/10 text-rose-500 dark:text-rose-400 border border-rose-500/30 hover:bg-rose-500 hover:text-white font-bold text-xs transition-all" data-testid="profile-signout"><LogOut className="w-3.5 h-3.5" /><span>Sign Out</span></button>
           </div>
         </div>
 
@@ -110,24 +151,17 @@ export const ProfileView: React.FC = () => {
         <button onClick={() => setActiveSubTab('edit')} className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all ${activeSubTab === 'edit' ? 'bg-black text-white dark:bg-vybe-lime dark:text-black shadow-neon-lime' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-vybe-dark-surface'}`}><Edit3 className="w-4 h-4" /><span>Edit Profile</span></button>
       </div>
 
-      {activeSubTab === 'saved' && <div className="space-y-6">{savedPlaces.length === 0 ? <div className="p-12 text-center rounded-3xl bg-slate-50 dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border space-y-2"><span className="text-3xl">🔖</span><p className="font-display font-bold text-slate-800 dark:text-white">Your saved collection is empty.</p><p className="text-xs text-slate-500">Tap the bookmark icon on any spot to save it here.</p></div> : <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">{savedPlaces.map(place => <PlaceCard key={place.id} place={place} />)}</div>}</div>}
+      {activeSubTab === 'saved' && <div className="space-y-6">{hydratingPlaces && savedPlaces.length === 0 ? <div className="p-12 text-center rounded-3xl bg-slate-50 dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border space-y-2"><LoaderCircle className="w-7 h-7 mx-auto animate-spin text-vybe-lime" /><p className="font-display font-bold text-slate-800 dark:text-white">Restoring your saved spots…</p><p className="text-xs text-slate-500">VYBE is fetching the saved place details.</p></div> : savedPlaces.length === 0 ? <div className="p-12 text-center rounded-3xl bg-slate-50 dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border space-y-2"><span className="text-3xl">🔖</span><p className="font-display font-bold text-slate-800 dark:text-white">Your saved collection is empty.</p><p className="text-xs text-slate-500">Tap the bookmark icon on any spot to save it here.</p></div> : <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">{savedPlaces.map(place => <PlaceCard key={place.id} place={place} />)}</div>}</div>}
 
-      {activeSubTab === 'liked' && <div className="space-y-6">{likedPlaces.length === 0 ? <div className="p-12 text-center rounded-3xl bg-slate-50 dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border space-y-2"><span className="text-3xl">💖</span><p className="font-display font-bold text-slate-800 dark:text-white">No liked vibes yet.</p><p className="text-xs text-slate-500">Heart places to build your personal taste profile.</p></div> : <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">{likedPlaces.map(place => <PlaceCard key={place.id} place={place} />)}</div>}</div>}
+      {activeSubTab === 'liked' && <div className="space-y-6">{hydratingPlaces && likedPlaces.length === 0 ? <div className="p-12 text-center rounded-3xl bg-slate-50 dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border space-y-2"><LoaderCircle className="w-7 h-7 mx-auto animate-spin text-vybe-lime" /><p className="font-display font-bold text-slate-800 dark:text-white">Restoring your liked spots…</p><p className="text-xs text-slate-500">VYBE is fetching the liked place details.</p></div> : likedPlaces.length === 0 ? <div className="p-12 text-center rounded-3xl bg-slate-50 dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border space-y-2"><span className="text-3xl">💖</span><p className="font-display font-bold text-slate-800 dark:text-white">No liked vibes yet.</p><p className="text-xs text-slate-500">Heart places to build your personal taste profile.</p></div> : <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">{likedPlaces.map(place => <PlaceCard key={place.id} place={place} />)}</div>}</div>}
 
       {activeSubTab === 'plans' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {userPlans.length === 0 ? (
-            <div className="sm:col-span-2 p-12 text-center rounded-3xl bg-slate-50 dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border space-y-2">
-              <span className="text-3xl">🗓️</span>
-              <p className="font-display font-bold text-slate-800 dark:text-white">No plans yet.</p>
-              <p className="text-xs text-slate-500">Build an outing from Explore and save the stops you want.</p>
-            </div>
+            <div className="sm:col-span-2 p-12 text-center rounded-3xl bg-slate-50 dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border space-y-2"><span className="text-3xl">🗓️</span><p className="font-display font-bold text-slate-800 dark:text-white">No plans yet.</p><p className="text-xs text-slate-500">Build an outing from Explore and save the stops you want.</p></div>
           ) : userPlans.map(plan => (
             <button key={plan.id} type="button" onClick={() => openPlan(plan)} className="text-left p-6 rounded-3xl bg-white dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border shadow-lg space-y-3 hover:border-vybe-lime/60 hover:shadow-neon-lime/10 transition-all group">
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-mono text-vybe-lime font-bold uppercase">{plan.mood} VIBE</span>
-                <span className="text-xs text-slate-400 font-mono">{plan.items.length} Stops</span>
-              </div>
+              <div className="flex justify-between items-center"><span className="text-xs font-mono text-vybe-lime font-bold uppercase">{plan.mood} VIBE</span><span className="text-xs text-slate-400 font-mono">{plan.items.length} Stops</span></div>
               <h3 className="font-display font-bold text-lg text-slate-900 dark:text-white">{plan.title}</h3>
               <p className="text-xs text-slate-500">Target budget: ~${plan.targetBudgetUsd} · Created {plan.date}</p>
               <span className="inline-flex items-center gap-1.5 text-xs font-bold text-vybe-cyan group-hover:text-vybe-lime transition-colors">Open plan <ArrowRight className="w-3.5 h-3.5" /></span>
