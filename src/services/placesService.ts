@@ -5,6 +5,7 @@
 import { supabase } from '../lib/supabase';
 import { Place, PlaceReview } from '../types';
 import { DbPlaceRow, DbReviewRow, newUuid, rowToPlace, rowToReview } from './mappers';
+import { getGooglePlaceDetails } from './googlePlaces';
 
 const assertBackend = () => {
   if (!supabase) throw new Error('VYBE backend is not configured');
@@ -46,6 +47,41 @@ export function placeToRow(place: Place) {
   };
 }
 
+/**
+ * Materialize an external Google place before a user-owned row references it.
+ * The catalog itself remains admin-write protected; authenticated users only
+ * invoke the narrowly-scoped ensure_google_place RPC.
+ */
+const googleEnsureInFlight = new Map<string, Promise<void>>();
+export async function ensureGooglePlaceStored(placeId: string): Promise<void> {
+  if (!placeId.startsWith('google:')) return;
+  const providerId = placeId.slice('google:'.length).trim();
+  if (!providerId) throw new Error('Invalid Google place ID');
+
+  const existing = googleEnsureInFlight.get(providerId);
+  if (existing) return existing;
+
+  const task = (async () => {
+    const db = assertBackend();
+    const { data, error: lookupError } = await db.from('places').select('id').eq('id', placeId).maybeSingle();
+    if (lookupError) throw lookupError;
+    if (data?.id) return;
+
+    const place = await getGooglePlaceDetails(providerId);
+    if (!place) throw new Error('Unable to load this Google place for saving.');
+
+    const { error } = await db.rpc('ensure_google_place', { payload: placeToRow(place) });
+    if (error) throw error;
+  })();
+
+  googleEnsureInFlight.set(providerId, task);
+  try {
+    await task;
+  } finally {
+    googleEnsureInFlight.delete(providerId);
+  }
+}
+
 /** Map a Partial<Place> (UI shape) to a partial DB row patch. */
 export function placePatchToRow(updates: Partial<Place>): Record<string, unknown> {
   const patch: Record<string, unknown> = {};
@@ -83,7 +119,6 @@ export function placePatchToRow(updates: Partial<Place>): Record<string, unknown
 }
 
 export const placesService = {
-  /** Full catalog incl. reviews (author profile embedded via FK). */
   async listWithReviews(): Promise<Place[]> {
     const db = assertBackend();
     const { data, error } = await db
