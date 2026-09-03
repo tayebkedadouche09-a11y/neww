@@ -10,7 +10,7 @@ type GooglePhoto = {
 type GooglePlace = {
   id?: string;
   displayName?: { text?: string };
-  location?: { lat?: () => number; lng?: () => number; lat?: number; lng?: number };
+  location?: { lat?: number | (() => number); lng?: number | (() => number) };
   photos?: Array<{
     getURI: (options?: { maxWidth?: number; maxHeight?: number }) => string;
     authorAttributions?: Array<{ displayName?: string; uri?: string }>;
@@ -34,7 +34,6 @@ type GoogleWindow = Window & {
 };
 
 let placesPromise: Promise<PlacesLibrary | null> | null = null;
-
 const apiKey = () => String(import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '').trim();
 
 function getNumber(value: number | (() => number) | undefined): number | undefined {
@@ -42,12 +41,7 @@ function getNumber(value: number | (() => number) | undefined): number | undefin
 }
 
 function normalize(value: string): string {
-  return value
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
+  return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
 function similarity(a: string, b: string): number {
@@ -64,26 +58,23 @@ async function loadPlacesLibrary(): Promise<PlacesLibrary | null> {
   placesPromise = (async () => {
     const win = window as GoogleWindow;
     if (!win.google?.maps?.importLibrary) {
-      const existing = document.querySelector<HTMLScriptElement>('script[data-vybe-google-places]');
-      if (!existing) {
-        const script = document.createElement('script');
+      let script = document.querySelector<HTMLScriptElement>('script[data-vybe-google-places]');
+      if (!script) {
+        script = document.createElement('script');
         script.async = true;
         script.defer = true;
         script.dataset.vybeGooglePlaces = '1';
         script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey())}&loading=async`;
         document.head.appendChild(script);
-        await new Promise<void>((resolve, reject) => {
-          script.addEventListener('load', () => resolve(), { once: true });
-          script.addEventListener('error', () => reject(new Error('Google Places failed to load')), { once: true });
-        });
-      } else if (!win.google?.maps?.importLibrary) {
-        await new Promise<void>((resolve, reject) => {
-          const onLoad = () => resolve();
-          const onError = () => reject(new Error('Google Places failed to load'));
-          existing.addEventListener('load', onLoad, { once: true });
-          existing.addEventListener('error', onError, { once: true });
-        });
       }
+      await new Promise<void>((resolve, reject) => {
+        if (window === win && (window as GoogleWindow).google?.maps?.importLibrary) {
+          resolve();
+          return;
+        }
+        script!.addEventListener('load', () => resolve(), { once: true });
+        script!.addEventListener('error', () => reject(new Error('Google Places failed to load')), { once: true });
+      });
     }
 
     const importLibrary = (window as GoogleWindow).google?.maps?.importLibrary;
@@ -113,17 +104,15 @@ export async function findGooglePhoto(place: Place): Promise<GooglePhoto | null>
       region: 'dz',
     });
 
-    const scored = places
-      .map((candidate) => {
-        const lat = getNumber(candidate.location?.lat);
-        const lng = getNumber(candidate.location?.lng);
-        const distance = Number.isFinite(lat) && Number.isFinite(lng)
-          ? Math.sqrt((Number(lat) - place.lat) ** 2 + (Number(lng) - place.lng) ** 2)
-          : 99;
-        const nameScore = similarity(place.name, candidate.displayName?.text || '');
-        return { candidate, score: nameScore * 5 - Math.min(distance * 100, 5) };
-      })
-      .sort((a, b) => b.score - a.score);
+    const scored = places.map((candidate) => {
+      const lat = getNumber(candidate.location?.lat);
+      const lng = getNumber(candidate.location?.lng);
+      const distance = Number.isFinite(lat) && Number.isFinite(lng)
+        ? Math.sqrt((Number(lat) - place.lat) ** 2 + (Number(lng) - place.lng) ** 2)
+        : 99;
+      const nameScore = similarity(place.name, candidate.displayName?.text || '');
+      return { candidate, score: nameScore * 5 - Math.min(distance * 100, 5) };
+    }).sort((a, b) => b.score - a.score);
 
     const match = scored[0]?.candidate;
     const photo = match?.photos?.[0];
