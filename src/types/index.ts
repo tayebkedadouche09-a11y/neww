@@ -65,6 +65,11 @@ export interface PlaceOpeningHours {
   isOpenNow?: boolean;
 }
 
+export interface PlacePhotoAttribution {
+  displayName: string;
+  uri?: string;
+}
+
 export type ProviderType = 'vybe' | 'google';
 
 export interface Place {
@@ -89,6 +94,8 @@ export interface Place {
   reviewCount: number;
   baseVybeScore: number; // 85-99
   images: string[];
+  /** Fresh, in-memory Google photo attribution metadata. Never persisted. */
+  photoAttributions?: PlacePhotoAttribution[];
   tags: string[];
   estimatedDuration: string; // e.g. "1.5h - 2h"
   openingHours: PlaceOpeningHours;
@@ -183,4 +190,3 @@ export interface FilterState {
   onlyLateNight: boolean;
   sortBy: 'vybe-score' | 'rating' | 'distance' | 'price-asc' | 'trending';
 }
-
