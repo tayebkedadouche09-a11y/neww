@@ -33,7 +33,8 @@ export function placeToRow(place: Place) {
     rating: place.rating,
     review_count: place.reviewCount,
     base_vybe_score: place.baseVybeScore,
-    photos: place.images,
+    // Google photo URIs are ephemeral and must not be persisted.
+    photos: place.provider === 'google' ? [] : place.images,
     tags: place.tags,
     estimated_duration: place.estimatedDuration,
     opening_hours: place.openingHours,
@@ -85,8 +86,6 @@ export async function ensureGooglePlaceStored(placeId: string): Promise<void> {
     let payload: { id?: string; error?: string } = {};
     try { payload = await response.json(); } catch { /* handled below */ }
     if (!response.ok || payload.id !== placeId) {
-      // Fall back to the already available browser Google details only for UX;
-      // persistence remains server-verified and never trusts this payload.
       await getGooglePlaceDetails(providerId).catch(() => null);
       throw new Error(payload.error || 'Unable to verify this Google place for saving.');
     }
@@ -122,7 +121,7 @@ export function placePatchToRow(updates: Partial<Place>): Record<string, unknown
   set('rating', updates.rating);
   set('review_count', updates.reviewCount);
   set('base_vybe_score', updates.baseVybeScore);
-  set('photos', updates.images);
+  if (updates.images !== undefined && updates.provider !== 'google') set('photos', updates.images);
   set('tags', updates.tags);
   set('estimated_duration', updates.estimatedDuration);
   set('opening_hours', updates.openingHours);
