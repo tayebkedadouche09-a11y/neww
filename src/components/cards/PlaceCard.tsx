@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Heart, Bookmark, MapPin, Clock, Share2, Plus, Navigation, Sparkles, ArrowUpRight, Gem, Utensils, Coffee, Music, Landmark, Trees, Gamepad2, ShoppingBag, Dumbbell, Film, Church, BookOpen, Hotel, Stethoscope, BadgeCheck } from 'lucide-react';
 import { Place } from '../../types';
 import { VybeScoreBadge } from '../common/VybeScoreBadge';
@@ -77,19 +77,11 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
   const openState = place.openingHours.isOpenNow;
   const trustLabel = getTrustLabel(place);
 
-  const handleImageError = async () => {
-    if (refreshAttemptedRef.current) {
-      if (activeImageIndex >= 0) setFailedImageIndexes(prev => prev.includes(activeImageIndex) ? prev : [...prev, activeImageIndex]);
-      return;
-    }
-
+  const refreshGoogleImages = async () => {
+    if (refreshAttemptedRef.current) return;
     const isGooglePlace = place.provider === 'google' || Boolean(place.providerPlaceId) || place.id.startsWith('google:');
     const providerId = place.providerPlaceId || (place.id.startsWith('google:') ? place.id.slice('google:'.length) : '');
-    if (!isGooglePlace || !providerId) {
-      if (activeImageIndex >= 0) setFailedImageIndexes(prev => prev.includes(activeImageIndex) ? prev : [...prev, activeImageIndex]);
-      return;
-    }
-
+    if (!isGooglePlace || !providerId) return;
     refreshAttemptedRef.current = true;
     try {
       const freshPlace = await getGooglePlaceDetails(providerId);
@@ -98,13 +90,21 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
         setRefreshedImages(freshImages);
         setFailedImageIndexes([]);
         setCurrentImageIndex(0);
-        return;
       }
     } catch (error) {
-      console.warn('[PlaceCard] Google photo refresh failed', providerId, error);
+      console.warn('[PlaceCard] Google photo hydration failed', providerId, error);
     }
+  };
 
+  useEffect(() => {
+    if (place.images.some(image => /^https?:\/\//i.test(image?.trim()))) return;
+    void refreshGoogleImages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [place.id]);
+
+  const handleImageError = async () => {
     if (activeImageIndex >= 0) setFailedImageIndexes(prev => prev.includes(activeImageIndex) ? prev : [...prev, activeImageIndex]);
+    if (!refreshAttemptedRef.current) await refreshGoogleImages();
   };
 
   const handleQuickAddPlan = (e: React.MouseEvent) => {
