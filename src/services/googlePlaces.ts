@@ -27,17 +27,27 @@ async function libraryPlaceToResult(p: google.maps.places.Place): Promise<Google
   let openNow: boolean | undefined;
   if (p.regularOpeningHours) {
     try {
-      const openingHours = p.regularOpeningHours as unknown as { isOpen?: () => Promise<boolean> };
-      if (typeof openingHours.isOpen === 'function') openNow = await openingHours.isOpen();
+      if (typeof p.isOpen === 'function') openNow = await p.isOpen();
     } catch {
       // Keep unknown rather than guessing.
     }
   }
 
+  // Google photo URIs are ephemeral. We only keep the fresh URI and attribution
+  // in the in-memory Place object returned from this fresh Place instance.
   const photos = (p.photos ?? []).slice(0, 5).flatMap(photo => {
     try {
       const uri = photo.getURI({ maxWidth: 1200, maxHeight: 750 });
-      return uri ? [{ photo_reference: uri, height: photo.heightPx ?? 0, width: photo.widthPx ?? 0, html_attributions: (photo.authorAttributions ?? []).map(a => a.displayName) }] : [];
+      const authorAttributions = (photo.authorAttributions ?? [])
+        .map(author => ({ displayName: author.displayName, uri: author.uri, photoUri: author.photoUri }))
+        .filter(author => Boolean(author.displayName));
+      return uri ? [{
+        photo_reference: uri,
+        height: photo.heightPx ?? 0,
+        width: photo.widthPx ?? 0,
+        html_attributions: authorAttributions.map(a => a.displayName),
+        author_attributions: authorAttributions,
+      }] : [];
     } catch {
       return [];
     }
@@ -105,8 +115,9 @@ export async function searchGooglePlacesText(query: string, lat?: number, lng?: 
 }
 
 export async function getGooglePlaceDetails(placeId: string): Promise<Place | null> {
+  if (!/^[A-Za-z0-9_-]{1,300}$/.test(placeId.trim())) throw new Error('Invalid Google place ID');
   const { Place } = await importPlacesLibrary();
-  const place = new Place({ id: placeId });
+  const place = new Place({ id: placeId.trim() });
   await place.fetchFields({ fields: PLACE_FIELDS });
   if (!place.id || (!place.displayName && !place.location)) return null;
   return googlePlaceToVybePlace(await libraryPlaceToResult(place));
