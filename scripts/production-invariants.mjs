@@ -40,6 +40,9 @@ const envExample = read('.env.example');
 const ci = read('.github/workflows/ci.yml');
 const schema = read('supabase/migrations/0001_schema.sql');
 const googlePersistenceMigration = read('supabase/migrations/0007_google_place_persistence.sql');
+const googleHardeningMigration = read('supabase/migrations/0009_lock_google_materializer.sql');
+const googleServerEndpoint = read('api/materialize-google-place.ts');
+const securityHeaders = read('vercel.json');
 
 assert(!app.includes('ModeBadge'), 'Legacy demo-mode indicator is not part of the shipped app shell.');
 assert(!authModal.includes('Demo') && !authModal.includes('demo'), 'Authentication UI contains no demo login or persona controls.');
@@ -75,10 +78,13 @@ assert(likes.includes("from('likes')") && likes.includes('id: newUuid()') && lik
 assert(plansService.includes("from('plan_items')") && plansService.includes('plan_id') && plansService.includes('ensureGooglePlaceStored(item.placeId)'), 'Plan items persist against the owning plan and materialize external Google places.');
 assert(collectionsService.includes("from('collection_items')") && collectionsService.includes('id: newUuid()') && collectionsService.includes('ensureGooglePlaceStored(placeId)'), 'Collection items have stable row ids and materialize external Google places.');
 assert(reviewsService.includes("from('reviews')") && reviewsService.includes('ensureGooglePlaceStored(input.placeId)'), 'Reviews materialize external Google places before FK writes.');
-assert(placesService.includes('ensureGooglePlaceStored') && placesService.includes("db.rpc('ensure_google_place'"), 'Google place materialization uses a dedicated backend RPC.');
+assert(placesService.includes('ensureGooglePlaceStored') && placesService.includes('/api/materialize-google-place') && !placesService.includes("db.rpc('ensure_google_place'"), 'Google place materialization uses the authenticated server verification endpoint.');
 assert(mappers.includes('globalThis.crypto') && mappers.includes('randomUUID') && mappers.includes('getRandomValues') && mappers.includes("return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'"), 'UUID fallback remains valid for Supabase UUID columns.');
 assert(schema.includes('collection_id uuid not null references public.collections(id)'), 'Supabase collection item FK uses the same UUID type as collections.id.');
-assert(googlePersistenceMigration.includes('create or replace function public.ensure_google_place(payload jsonb)') && googlePersistenceMigration.includes('security definer') && googlePersistenceMigration.includes('grant execute on function public.ensure_google_place(jsonb) to authenticated'), 'Google persistence migration exposes only an authenticated, scoped SECURITY DEFINER helper.');
+assert(googlePersistenceMigration.includes('create or replace function public.ensure_google_place(payload jsonb)') && googlePersistenceMigration.includes('security definer'), 'Legacy Google persistence migration is present for database history.');
+assert(googleHardeningMigration.includes('revoke all on function public.ensure_google_place(jsonb) from authenticated'), 'Legacy client-callable Google materializer is disabled for authenticated clients.');
+assert(googleServerEndpoint.includes('SUPABASE_SERVICE_ROLE_KEY') && googleServerEndpoint.includes('GOOGLE_PLACES_SERVER_API_KEY') && googleServerEndpoint.includes('/auth/v1/user') && googleServerEndpoint.includes('verifiedId !== placeId'), 'Google place writes require a verified Supabase session and server-side Google identity.');
+assert(securityHeaders.includes('Strict-Transport-Security') && securityHeaders.includes('X-Content-Type-Options') && securityHeaders.includes('X-Frame-Options'), 'Baseline browser security headers are configured.');
 assert(!googleMap.includes('maps.googleapis.com/maps/api/js?'), 'GoogleMap does not embed the legacy Maps JavaScript URL loader.');
 assert(indexHtml.includes('<link rel="manifest" href="/manifest.webmanifest" />'), 'PWA manifest is linked from the document head.');
 assert(main.includes("navigator.serviceWorker.register('/sw.js')"), 'Production registers the offline shell service worker.');
