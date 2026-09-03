@@ -24,6 +24,20 @@ export const collectionsService = {
       .map(row => rowToCollection(row, row.collection_items ?? []));
   },
 
+  async getPublic(collectionId: string): Promise<Collection | null> {
+    const db = assertBackend();
+    const { data, error } = await db
+      .from('collections')
+      .select('*, collection_items(*)')
+      .eq('id', collectionId)
+      .eq('is_public', true)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    const row = data as unknown as DbCollectionRow & { collection_items: DbCollectionItemRow[] | null };
+    return rowToCollection(row, row.collection_items ?? []);
+  },
+
   async create(col: Collection): Promise<void> {
     const db = assertBackend();
     const { error } = await db.from('collections').insert({
