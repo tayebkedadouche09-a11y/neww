@@ -9,7 +9,7 @@ export interface DiscoveryOptions { userLat?: number; userLng?: number; radiusKm
 const CATEGORY_TYPES: Record<CategoryType, string[]> = {
   'food-drink': ['restaurant', 'cafe', 'bakery', 'meal_takeaway', 'coffee_shop', 'dessert_shop'],
   nightlife: ['bar', 'night_club', 'karaoke', 'live_music_venue', 'cocktail_bar'],
-  'arts-culture': ['museum', 'art_gallery', 'art_museum', 'library', 'historical_landmark', 'performing_arts_theater', 'place_of_worship'],
+  'arts-culture': ['museum', 'art_gallery', 'art_museum', 'library', 'historical_landmark', 'performing_arts_theater'],
   'outdoors-nature': ['park', 'playground', 'zoo', 'aquarium', 'campground', 'gym', 'fitness_center', 'botanical_garden', 'national_park', 'hiking_area', 'beach'],
   entertainment: ['movie_theater', 'bowling_alley', 'amusement_park', 'amusement_center', 'water_park', 'go_karting_venue', 'miniature_golf_course', 'paintball_center'],
   'arcade-gaming': ['video_arcade', 'amusement_center', 'bowling_alley', 'internet_cafe'],
@@ -23,7 +23,7 @@ const QUERY_TO_GOOGLE_TYPES: Record<string, string[]> = {
   cinema: ['movie_theater'], gym: ['gym', 'fitness_center'], hotel: ['hotel', 'lodging'], shopping: CATEGORY_TYPES['shopping-vintage'], library: ['library'],
   museum: ['museum', 'art_gallery', 'art_museum'], 'sports center': ['sports_complex', 'sports_club', 'sports_activity_location', 'swimming_pool', 'tennis_court', 'athletic_field', 'stadium', 'arena'],
   nightlife: CATEGORY_TYPES.nightlife, 'arcade gaming': CATEGORY_TYPES['arcade-gaming'], 'live music': ['live_music_venue'], hospital: ['hospital'], theatre: ['performing_arts_theater'],
-  playground: ['playground', 'indoor_playground'], beach: ['beach'], mosque: ['place_of_worship'],
+  playground: ['playground', 'indoor_playground'], beach: ['beach'], mosque: ['mosque'],
 };
 
 function deduplicate(places: Place[]): Place[] {
@@ -131,19 +131,25 @@ async function fetchOsmPlaces(userLat: number, userLng: number, radiusKm: number
     : normalizedQuery
       ? [`name~"${normalizedQuery.replace(/[\\"\n\r\[\]]/g, ' ')}",i`]
       : OSM_BROAD_QUERIES;
-  const query = buildOsmQuery(userLat, userLng, Math.min(radiusKm * 1000, 50000), clauses);
-  const endpoints = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
-  let lastError: unknown = null;
-  for (const endpoint of endpoints) {
-    try {
-      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }, body: new URLSearchParams({ data: query }) });
-      if (!response.ok) throw new Error(`OSM discovery failed (${response.status})`);
-      const payload = await response.json();
-      const converted = (payload.elements || []).map(osmElementToPlace).filter(Boolean) as Place[];
-      return withDistance(deduplicate(converted), userLat, userLng).sort((a, b) => (a.distanceKm ?? 999) - (b.distanceKm ?? 999)).slice(0, 250);
-    } catch (error) { lastError = error; }
-  }
-  throw lastError instanceof Error ? lastError : new Error('OSM discovery is unavailable right now.');
+
+  const response = await fetch('/api/osm-discovery', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      lat: userLat,
+      lng: userLng,
+      radiusMeters: Math.min(Math.max(radiusKm * 1000, 100), 50_000),
+      clauses,
+    }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error((payload as { error?: string }).error || `OSM discovery failed (${response.status})`);
+  const converted = (Array.isArray((payload as { elements?: unknown }).elements) ? (payload as { elements: any[] }).elements : [])
+    .map(osmElementToPlace)
+    .filter(Boolean) as Place[];
+  return withDistance(deduplicate(converted), userLat, userLng)
+    .sort((a, b) => (a.distanceKm ?? 999) - (b.distanceKm ?? 999))
+    .slice(0, 250);
 }
 
 async function discoverGooglePlaces(options: DiscoveryOptions): Promise<Place[]> {
