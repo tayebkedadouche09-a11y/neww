@@ -99,7 +99,7 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({ places, onMarkerClick, sel
       const markerContent = document.createElement('div');
       markerContent.className = `custom-map-marker group relative cursor-pointer${isSelected ? ' selected' : ''}`;
       markerContent.style.cssText = `width:46px;height:46px;border-radius:14px;overflow:hidden;border:2px solid #000;box-shadow:0 4px 14px rgba(0,0,0,.35);background:#111;position:relative;transform:${isSelected ? 'scale(1.25)' : 'scale(1)'};z-index:${isSelected ? '20' : '1'};transition:transform .2s ease;`;
-      const imageUrl = place.images.find(image => /^https?:\/\//i.test(image?.trim()))?.trim();
+      const imageUrl = place.images.find(image => image?.trim().toLowerCase().startsWith('http'))?.trim();
       if (imageUrl) {
         const image = document.createElement('img');
         image.src = imageUrl; image.alt = place.name; image.loading = 'lazy';
