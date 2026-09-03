@@ -10,6 +10,7 @@ const PLACE_FIELDS: string[] = [
   'regularOpeningHours', 'businessStatus', 'nationalPhoneNumber', 'websiteURI',
 ];
 
+const PHOTO_ONLY_FIELDS = ['photos'];
 const PRICE_LEVEL_ORDER = ['FREE', 'INEXPENSIVE', 'MODERATE', 'EXPENSIVE', 'VERY_EXPENSIVE'];
 
 async function importPlacesLibrary(): Promise<google.maps.PlacesLibrary> {
@@ -19,6 +20,16 @@ async function importPlacesLibrary(): Promise<google.maps.PlacesLibrary> {
     throw new Error('Google Maps JavaScript API did not provide importLibrary');
   }
   return window.google.maps.importLibrary('places');
+}
+
+async function hydrateMissingPhotos(p: google.maps.places.Place): Promise<void> {
+  if (!p.id || (p.photos?.length ?? 0) > 0) return;
+  try {
+    await p.fetchFields({ fields: PHOTO_ONLY_FIELDS });
+  } catch (error) {
+    // Photo enrichment is best-effort; the card fallback remains available.
+    console.warn(`[Google Places] photo hydration failed for ${p.id}`, error);
+  }
 }
 
 async function libraryPlaceToResult(p: google.maps.places.Place): Promise<GooglePlaceResult> {
@@ -61,8 +72,14 @@ async function libraryPlaceToResult(p: google.maps.places.Place): Promise<Google
   };
 }
 
-async function toVybePlaces(places: google.maps.places.Place[] | null | undefined): Promise<Place[]> {
-  return Promise.all((places ?? []).map(async p => googlePlaceToVybePlace(await libraryPlaceToResult(p))));
+async function toVybePlaces(
+  places: google.maps.places.Place[] | null | undefined,
+  hydratePhotos = false,
+): Promise<Place[]> {
+  return Promise.all((places ?? []).map(async p => {
+    if (hydratePhotos) await hydrateMissingPhotos(p);
+    return googlePlaceToVybePlace(await libraryPlaceToResult(p));
+  }));
 }
 
 const buildNearbyRequest = (
@@ -82,7 +99,7 @@ async function searchNearbyGooglePlacesSingle(lat: number, lng: number, radiusKm
   const request = buildNearbyRequest(lat, lng, radiusKm, type ? [type] : undefined);
   try {
     const { places } = await Place.searchNearby(request);
-    return toVybePlaces(places);
+    return toVybePlaces(places, true);
   } catch (error) {
     if (type) {
       console.warn(`[Google Places] nearby search failed for type ${type}; skipping this type`, error);
@@ -112,7 +129,7 @@ export async function searchGooglePlacesText(query: string, lat?: number, lng?: 
     request.locationBias = { center: { lat, lng }, radius: Math.min((radiusKm ?? 5) * 1000, 50000) };
   }
   const { places } = await Place.searchByText(request);
-  return toVybePlaces(places);
+  return toVybePlaces(places, true);
 }
 
 export async function getGooglePlaceDetails(placeId: string): Promise<Place | null> {
