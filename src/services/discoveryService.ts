@@ -138,7 +138,7 @@ function osmElementToPlace(element: any): Place | null {
   if (!name || !coords) return null;
   const categoryHint = [tags.amenity, tags.leisure, tags.tourism, tags.shop, tags.sport, tags.natural, tags.religion, tags['theatre:type']].filter(Boolean) as string[];
   const extraNames = [tags.name, tags['name:fr'], tags['name:ar']].filter(Boolean).join(' ');
-  const tagsForClassifier = [...categoryHint, ...Object.values(tags).filter(v => typeof v === 'string').slice(0, 10), extraNames].filter(Boolean);
+  const tagsForClassifier = [...categoryHint, ...Object.values(tags).filter(v => typeof v === 'string').slice(0, 10), extraNames];
   if (tags.religion === 'muslim' || normalize(name).includes('mosque') || normalize(name).includes('mosquee') || name.includes('مسجد') || name.includes('جامع')) tagsForClassifier.push('mosque');
   const { category, mood } = classifyPlace(tagsForClassifier, name);
   const address = [tags['addr:housenumber'], tags['addr:street'], tags['addr:suburb'], tags['addr:city']].filter(Boolean).join(', ');
@@ -146,7 +146,7 @@ function osmElementToPlace(element: any): Place | null {
   const isFree = priceLevel === 'free';
   return {
     id: `osm:${element.type}:${element.id}`,
-    provider: 'osm',
+    provider: 'osm' as Place['provider'],
     providerPlaceId: `osm:${element.type}:${element.id}`,
     name,
     tagline: address || tags['addr:street'] || tags['addr:city'] || 'Nearby place',
