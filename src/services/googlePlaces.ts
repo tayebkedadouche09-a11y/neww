@@ -65,41 +65,44 @@ async function toVybePlaces(places: google.maps.places.Place[] | null | undefine
   return Promise.all((places ?? []).map(async p => googlePlaceToVybePlace(await libraryPlaceToResult(p))));
 }
 
+const buildNearbyRequest = (
+  lat: number,
+  lng: number,
+  radiusKm: number,
+  includedTypes?: string[],
+): google.maps.places.SearchNearbyRequest => ({
+  fields: PLACE_FIELDS,
+  locationRestriction: { center: { lat, lng }, radius: Math.min(radiusKm * 1000, 50000) },
+  maxResultCount: 20,
+  ...(includedTypes?.length ? { includedTypes } : {}),
+});
+
+async function searchNearbyGooglePlacesSingle(lat: number, lng: number, radiusKm: number, type?: string): Promise<Place[]> {
+  const { Place } = await importPlacesLibrary();
+  const request = buildNearbyRequest(lat, lng, radiusKm, type ? [type] : undefined);
+  try {
+    const { places } = await Place.searchNearby(request);
+    return toVybePlaces(places);
+  } catch (error) {
+    if (type) {
+      console.warn(`[Google Places] nearby search failed for type ${type}; skipping this type`, error);
+      return [];
+    }
+    throw error;
+  }
+}
+
 export async function searchNearbyGooglePlaces(lat: number, lng: number, radiusKm: number = 5, type?: string | string[], keyword?: string): Promise<Place[]> {
   if (keyword?.trim()) return searchGooglePlacesText(keyword, lat, lng, radiusKm);
-  const { Place } = await importPlacesLibrary();
-  const baseRequest: google.maps.places.SearchNearbyRequest = {
-    fields: PLACE_FIELDS,
-    locationRestriction: { center: { lat, lng }, radius: Math.min(radiusKm * 1000, 50000) },
-    maxResultCount: 20,
-    rankPreference: 'POPULARITY',
-  };
 
-  if (type && !(Array.isArray(type) && type.length === 0)) {
-    baseRequest.includedTypes = Array.isArray(type) ? type : [type];
-    try {
-      const { places } = await Place.searchNearby(baseRequest);
-      return toVybePlaces(places);
-    } catch (error) {
-      // Google returns INVALID_ARGUMENT when a type is not accepted by the
-      // current Places API type table. Never let one bad category break VYBE:
-      // retry without type restrictions so the place can still be discovered.
-      console.warn('[Google Places] typed nearby search failed; retrying all-types search', error);
-      const { places } = await Place.searchNearby({
-        fields: PLACE_FIELDS,
-        locationRestriction: baseRequest.locationRestriction,
-        maxResultCount: 20,
-        rankPreference: 'POPULARITY',
-      });
-      return toVybePlaces(places);
-    }
+  if (Array.isArray(type) && type.length > 0) {
+    // Places (New) caps each nearby request at 20 results. Split multi-type
+    // discovery into independent requests, then merge and dedupe upstream.
+    const batches = await Promise.all(type.map(placeType => searchNearbyGooglePlacesSingle(lat, lng, radiusKm, placeType)));
+    return batches.flat();
   }
 
-  // No type restriction is intentional: Places API (New) documents this as
-  // the all-types nearby search and it avoids INVALID_ARGUMENT from stale or
-  // unsupported type names.
-  const { places } = await Place.searchNearby(baseRequest);
-  return toVybePlaces(places);
+  return searchNearbyGooglePlacesSingle(lat, lng, radiusKm, typeof type === 'string' ? type : undefined);
 }
 
 export async function searchGooglePlacesText(query: string, lat?: number, lng?: number, radiusKm?: number): Promise<Place[]> {
