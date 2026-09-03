@@ -20,6 +20,7 @@ const api = fs.readFileSync(path.join(root, 'api/materialize-google-place.ts'), 
 const vercel = fs.readFileSync(path.join(root, 'vercel.json'), 'utf8');
 const migration = fs.readFileSync(path.join(root, 'supabase/migrations/0009_lock_google_materializer.sql'), 'utf8');
 const authModal = fs.readFileSync(path.join(root, 'src/components/auth/AuthModal.tsx'), 'utf8');
+const authService = fs.readFileSync(path.join(root, 'src/services/authService.ts'), 'utf8');
 
 const requiredApiPatterns = [
   ['method gate', /req\.method !== 'POST'/],
@@ -41,8 +42,15 @@ if (!/revoke all on function public\.ensure_google_place\(jsonb\) from authentic
   failures.push('Legacy client-callable Google materializer is not revoked for authenticated users.');
 }
 
-if (!/12/.test(authModal) || !/\[a-z\]/.test(authModal) || !/\[A-Z\]/.test(authModal) || !/\\d/.test(authModal) || !/\[^A-Za-z0-9\]/.test(authModal)) {
-  failures.push('Client signup password policy is weaker than the required 12+ mixed-character policy.');
+const passwordPolicyChecks = [
+  ['12 character minimum', /PASSWORD_MIN_LENGTH\s*=\s*12/],
+  ['lowercase requirement', /\[a-z\]/],
+  ['uppercase requirement', /\[A-Z\]/],
+  ['numeric requirement', /\\d/],
+  ['symbol requirement', /\[\^A-Za-z0-9\]/]
+];
+for (const [name, pattern] of passwordPolicyChecks) {
+  if (!pattern.test(authModal) || !pattern.test(authService)) failures.push(`Password policy missing ${name}.`);
 }
 
 if (!/Strict-Transport-Security/.test(vercel) || !/X-Content-Type-Options/.test(vercel) || !/X-Frame-Options/.test(vercel)) {
