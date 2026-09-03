@@ -100,6 +100,23 @@ export const placesService = {
     });
   },
 
+  async getPublic(placeId: string): Promise<Place | null> {
+    const db = assertBackend();
+    const { data, error } = await db
+      .from('places')
+      .select('*, reviews(*, profiles(display_name, avatar_url))')
+      .eq('id', placeId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    const row = data as unknown as DbPlaceRow & { reviews: DbReviewRow[] | null };
+    const place = rowToPlace(row);
+    place.reviews = (row.reviews ?? [])
+      .map(rowToReview)
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    return place;
+  },
+
   async create(place: Place): Promise<void> {
     const db = assertBackend();
     const { error } = await db.from('places').insert(placeToRow({ ...place, id: place.id || newUuid() }));
