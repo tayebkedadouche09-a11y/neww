@@ -24,6 +24,10 @@ function planItemToRow(planId: string, item: PlanItem) {
   };
 }
 
+// Protect Build My Night from a parent/child FK race when the UI creates a plan
+// and immediately adds its first item before the plan insert has committed.
+const planCreateInFlight = new Map<string, Promise<void>>();
+
 export const plansService = {
   async list(userId: string): Promise<VybePlan[]> {
     const db = assertBackend();
@@ -53,21 +57,30 @@ export const plansService = {
 
   async create(plan: VybePlan): Promise<void> {
     const db = assertBackend();
-    const { error } = await db.from('plans').insert({
-      id: plan.id,
-      user_id: plan.userId,
-      title: plan.title,
-      date: plan.date,
-      mood: plan.mood,
-      budget: plan.targetBudgetUsd,
-      cover_image: plan.coverImage ?? null,
-      is_public: plan.isPublic
-    });
-    if (error) throw error;
+    const task = (async () => {
+      const { error } = await db.from('plans').insert({
+        id: plan.id,
+        user_id: plan.userId,
+        title: plan.title,
+        date: plan.date,
+        mood: plan.mood,
+        budget: plan.targetBudgetUsd,
+        cover_image: plan.coverImage ?? null,
+        is_public: plan.isPublic
+      });
+      if (error) throw error;
+    })();
+    planCreateInFlight.set(plan.id, task);
+    try {
+      await task;
+    } finally {
+      planCreateInFlight.delete(plan.id);
+    }
   },
 
   async addItem(planId: string, item: PlanItem): Promise<void> {
     const db = assertBackend();
+    await planCreateInFlight.get(planId);
     await ensureGooglePlaceStored(item.placeId);
     const { error } = await db.from('plan_items').upsert(
       planItemToRow(planId, item),
