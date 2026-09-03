@@ -26,7 +26,7 @@ interface DataContextType {
   isAuthModalOpen: boolean; setIsAuthModalOpen: (open: boolean) => void; authModalMode: 'login' | 'register' | 'profile' | 'forgot'; setAuthModalMode: (mode: 'login' | 'register' | 'profile' | 'forgot') => void;
   plans: VybePlan[]; activePlan: VybePlan | null; setActivePlan: (plan: VybePlan | null) => void;
   createPlan: (title: string, mood: MoodType, targetBudgetUsd?: number) => VybePlan;
-  addPlaceToPlan: (planId: string, placeId: string, customTime?: string) => void; removePlaceFromPlan: (planId: string, planItemId: string) => void;
+  addPlaceToPlan: (planId: string, placeId: string, customTime?: string, placeOverride?: Place) => void; removePlaceFromPlan: (planId: string, planItemId: string) => void;
   updatePlanItem: (planId: string, planItemId: string, updates: { startTime?: string; customNote?: string; durationMinutes?: number }) => void; deletePlan: (planId: string) => void;
   collections: Collection[]; createCollection: (name: string, emoji: string, color: string, description?: string) => Collection;
   addPlaceToCollection: (collectionId: string, placeId: string) => void; removePlaceFromCollection: (collectionId: string, placeId: string) => void; deleteCollection: (collectionId: string) => void;
@@ -199,7 +199,17 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const openShareModal = (place?: Place) => { setShareTargetPlace(place || selectedPlace || null); setIsShareModalOpen(true); };
 
   const createPlan = (title: string, mood: MoodType, targetBudgetUsd = 50) => { const newPlan: VybePlan = { id: dataMode === 'supabase' ? newUuid() : `plan-${Date.now()}`, userId: currentUser?.id || 'u-1', title, date: 'Upcoming Outing', mood, targetBudgetUsd, isPublic: true, createdAt: new Date().toISOString(), items: [] }; setPlans(prev => [newPlan, ...prev]); setActivePlan(newPlan); if (realUserId) void plansService.create(newPlan).catch(e => console.error(e)); return newPlan; };
-  const addPlaceToPlan = (planId: string, placeId: string, customTime = '20:00') => { const plan = plans.find(p => p.id === planId); const place = places.find(p => p.id === placeId); if (!plan || !place || plan.items.some(item => item.placeId === placeId)) return; const newItem: PlanItem = { id: dataMode === 'supabase' ? newUuid() : `item-${Date.now()}`, placeId, startTime: customTime, durationMinutes: 90, customNote: `Experience ${place.name} (${place.tagline})`, order: plan.items.length + 1 }; const updatedPlans = plans.map(p => p.id === planId ? { ...p, items: [...p.items, newItem] } : p); setPlans(updatedPlans); setActivePlan(prev => prev?.id === planId ? updatedPlans.find(p => p.id === planId) || null : prev); if (realUserId) void plansService.addItem(planId, newItem).catch(e => console.error(e)); };
+  const addPlaceToPlan = (planId: string, placeId: string, customTime = '20:00', placeOverride?: Place) => {
+    const plan = plans.find(p => p.id === planId);
+    const place = places.find(p => p.id === placeId) ?? placeOverride;
+    if (!plan || !place || plan.items.some(item => item.placeId === placeId)) return;
+    const newItem: PlanItem = { id: dataMode === 'supabase' ? newUuid() : `item-${Date.now()}`, placeId, startTime: customTime, durationMinutes: 90, customNote: `Experience ${place.name} (${place.tagline})`, order: plan.items.length + 1 };
+    const updatedPlans = plans.map(p => p.id === planId ? { ...p, items: [...p.items, newItem] } : p);
+    setPlans(updatedPlans);
+    setActivePlan(prev => prev?.id === planId ? updatedPlans.find(p => p.id === planId) || null : prev);
+    if (placeOverride && !places.some(p => p.id === placeOverride.id)) setPlaces(prev => [placeOverride, ...prev]);
+    if (realUserId) void plansService.addItem(planId, newItem).catch(e => console.error(e));
+  };
   const removePlaceFromPlan = (planId: string, planItemId: string) => { const updatedPlans = plans.map(p => p.id === planId ? { ...p, items: p.items.filter(item => item.id !== planItemId) } : p); setPlans(updatedPlans); if (activePlan?.id === planId) setActivePlan(updatedPlans.find(p => p.id === planId) || null); if (realUserId) void plansService.removeItem(planItemId).catch(e => console.error(e)); };
   const updatePlanItem = (planId: string, planItemId: string, updates: { startTime?: string; customNote?: string; durationMinutes?: number }) => { const updatedPlans = plans.map(p => p.id === planId ? { ...p, items: p.items.map(item => item.id === planItemId ? { ...item, ...updates } : item) } : p); setPlans(updatedPlans); if (activePlan?.id === planId) setActivePlan(updatedPlans.find(p => p.id === planId) || null); if (realUserId) void plansService.updateItem(planItemId, updates).catch(e => console.error(e)); };
   const deletePlan = (planId: string) => { setPlans(prev => { const nextPlans = prev.filter(p => p.id !== planId); if (activePlan?.id === planId) setActivePlan(nextPlans[0] || null); return nextPlans; }); if (realUserId) void plansService.remove(planId).catch(e => console.error(e)); };
