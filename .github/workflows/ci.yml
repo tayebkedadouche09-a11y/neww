@@ -21,6 +21,8 @@ jobs:
         run: npm ci
       - name: Production invariants
         run: node scripts/production-invariants.mjs
+      - name: Real-only runtime invariants
+        run: node scripts/real-only-invariants.mjs
       - name: Typecheck
         run: npm run typecheck
       - name: Production build
