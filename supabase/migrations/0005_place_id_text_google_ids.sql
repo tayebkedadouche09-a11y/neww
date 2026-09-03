@@ -20,10 +20,23 @@ alter table public.places alter column id type text using id::text;
 alter table public.places alter column id drop default;
 alter table public.places add primary key (id);
 
--- Add provider column for data provenance tracking ('vybe' vs 'google')
-if not exists (select 1 from pg_attribute where attrelid = 'public.places'::regclass and attname = 'provider') then
-  alter table public.places add column provider text not null default 'vybe' check (provider in ('vybe', 'google'));
-end if;
+-- Add provider column for data provenance tracking ('vybe' vs 'google').
+-- Wrapped in DO because IF/THEN is PL/pgSQL, not top-level SQL.
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_attribute
+    where attrelid = 'public.places'::regclass
+      and attname = 'provider'
+      and not attisdropped
+  ) then
+    alter table public.places
+      add column provider text not null default 'vybe'
+      check (provider in ('vybe', 'google'));
+  end if;
+end
+$$;
 
 -- ----------------------------------------------------------------------------
 -- collection_items.place_id : UUID → TEXT
