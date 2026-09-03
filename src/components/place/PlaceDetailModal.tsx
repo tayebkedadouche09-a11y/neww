@@ -38,7 +38,9 @@ export const PlaceDetailModal: React.FC = () => {
     setIsReviewModalOpen,
     collections,
     addPlaceToCollection,
-    showToast
+    showToast,
+    setActiveTab,
+    setSelectedPlace
   } = useData();
   const { toggleLikePlace, toggleSavePlace, isPlaceLiked, isPlaceSaved } = useAuth();
   const requireAuth = useRequireAuth();
@@ -75,6 +77,13 @@ export const PlaceDetailModal: React.FC = () => {
     if (selectedCollectionId) {
       addPlaceToCollection(selectedCollectionId, selectedPlace.id);
     }
+  };
+
+  const openInAppMap = () => {
+    setSelectedPlace(selectedPlace);
+    setIsDetailOpen(false);
+    setActiveTab('map');
+    showToast(`${selectedPlace.name} is centered on the VYBE map`, '📍', 'success');
   };
 
   const openGoogleMaps = () => {
@@ -318,6 +327,14 @@ export const PlaceDetailModal: React.FC = () => {
                     {selectedPlace.location.address}
                   </p>
                 </div>
+
+                <button
+                  onClick={openInAppMap}
+                  className="w-full py-2.5 px-4 rounded-xl bg-vybe-lime text-black font-display font-bold text-xs flex items-center justify-center gap-2 shadow-neon-lime hover:scale-[1.02] transition-all"
+                >
+                  <MapPin className="w-4 h-4" />
+                  <span>View on VYBE Map</span>
+                </button>
 
                 <button
                   onClick={openGoogleMaps}
