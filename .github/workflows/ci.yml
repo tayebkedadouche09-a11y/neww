@@ -22,6 +22,8 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Production invariants
+        run: node scripts/production-invariants.mjs
       - name: Typecheck
         run: npm run typecheck
       - name: Production build
