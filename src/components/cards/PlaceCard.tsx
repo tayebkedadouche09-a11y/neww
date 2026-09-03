@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Heart, Bookmark, MapPin, Clock, Share2, Plus, Navigation, Sparkles, ArrowUpRight, Gem, Utensils, Coffee, Music, Landmark, Trees, Gamepad2, ShoppingBag, Dumbbell, Film, Church, BookOpen, Hotel, Stethoscope, BadgeCheck } from 'lucide-react';
 import { Place } from '../../types';
 import { VybeScoreBadge } from '../common/VybeScoreBadge';
@@ -8,6 +8,7 @@ import { useData } from '../../context/DataContext';
 import { INITIAL_MOODS } from '../../data/initialMoods';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { classifyPlace } from '../../services/googlePlacesAdapter';
+import { getGooglePlaceDetails } from '../../services/googlePlaces';
 
 interface PlaceCardProps { place: Place; scoreInfo?: ReturnType<typeof calculateVybeScore>; featured?: boolean; }
 
@@ -56,6 +57,8 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
   const requireAuth = useRequireAuth();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [failedImageIndexes, setFailedImageIndexes] = useState<number[]>([]);
+  const [refreshedImages, setRefreshedImages] = useState<string[] | null>(null);
+  const refreshAttemptedRef = useRef(false);
 
   const classified = classifyPlace(place.tags, place.name);
   const displayCategory = classified.category;
@@ -64,14 +67,45 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
   const isSaved = isPlaceSaved(place.id);
   const moodObj = INITIAL_MOODS.find(m => m.id === displayMood);
   const calculatedScore = scoreInfo || calculateVybeScore({ ...place, category: displayCategory, primaryMood: displayMood }, {});
-  const availableImageIndexes = place.images.map((_, index) => index).filter(index => !failedImageIndexes.includes(index));
+  const imageList = refreshedImages ?? place.images;
+  const availableImageIndexes = imageList.map((_, index) => index).filter(index => !failedImageIndexes.includes(index));
   const activeImageIndex = availableImageIndexes.includes(currentImageIndex) ? currentImageIndex : (availableImageIndexes[0] ?? -1);
-  const imageUrl = activeImageIndex >= 0 ? place.images[activeImageIndex]?.trim() : undefined;
+  const imageUrl = activeImageIndex >= 0 ? imageList[activeImageIndex]?.trim() : undefined;
   const FallbackIcon = getPlaceFallbackIcon(place, displayCategory);
   const hasDistance = typeof place.distanceKm === 'number' && Number.isFinite(place.distanceKm) && place.distanceKm >= 0;
   const locationLabel = place.location.neighborhood?.trim() || place.location.address?.trim();
   const openState = place.openingHours.isOpenNow;
   const trustLabel = getTrustLabel(place);
+
+  const handleImageError = async () => {
+    if (refreshAttemptedRef.current) {
+      if (activeImageIndex >= 0) setFailedImageIndexes(prev => prev.includes(activeImageIndex) ? prev : [...prev, activeImageIndex]);
+      return;
+    }
+
+    const isGooglePlace = place.provider === 'google' || Boolean(place.providerPlaceId) || place.id.startsWith('google:');
+    const providerId = place.providerPlaceId || (place.id.startsWith('google:') ? place.id.slice('google:'.length) : '');
+    if (!isGooglePlace || !providerId) {
+      if (activeImageIndex >= 0) setFailedImageIndexes(prev => prev.includes(activeImageIndex) ? prev : [...prev, activeImageIndex]);
+      return;
+    }
+
+    refreshAttemptedRef.current = true;
+    try {
+      const freshPlace = await getGooglePlaceDetails(providerId);
+      const freshImages = freshPlace?.images?.filter(Boolean) ?? [];
+      if (freshImages.length) {
+        setRefreshedImages(freshImages);
+        setFailedImageIndexes([]);
+        setCurrentImageIndex(0);
+        return;
+      }
+    } catch (error) {
+      console.warn('[PlaceCard] Google photo refresh failed', providerId, error);
+    }
+
+    if (activeImageIndex >= 0) setFailedImageIndexes(prev => prev.includes(activeImageIndex) ? prev : [...prev, activeImageIndex]);
+  };
 
   const handleQuickAddPlan = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -89,7 +123,7 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
   return (
     <div onClick={() => openPlaceDetail({ ...place, category: displayCategory, primaryMood: displayMood })} data-testid="place-card" className="group relative flex flex-col rounded-3xl bg-white dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border hover:border-vybe-lime/60 shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden cursor-pointer interactive-hover" data-cursor="VIEW">
       <div className="relative aspect-[16/10] w-full overflow-hidden bg-slate-900">
-        {imageUrl ? <img src={imageUrl} alt={place.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" loading="lazy" onError={() => { if (activeImageIndex >= 0) setFailedImageIndexes(prev => prev.includes(activeImageIndex) ? prev : [...prev, activeImageIndex]); }} /> :
+        {imageUrl ? <img src={imageUrl} alt={place.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" loading="lazy" onError={() => { void handleImageError(); }} /> :
           <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-slate-300 bg-gradient-to-br from-slate-950 via-slate-900 to-vybe-dark-surface" aria-label={`${place.name} category icon`}>
             <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shadow-inner"><FallbackIcon className="w-8 h-8 text-vybe-lime" strokeWidth={1.7} /></div>
             <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-slate-400">{formatCategory(displayCategory)}</span>
@@ -106,7 +140,7 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
           <div className="flex items-center gap-1.5">{moodObj && <span className="px-2.5 py-1 rounded-lg bg-black/70 backdrop-blur-md text-white text-xs font-bold flex items-center gap-1 border border-white/10"><span>{moodObj.emoji}</span><span>{moodObj.label}</span></span>}{place.features.isSecretGem && <span className="px-2 py-1 rounded-lg bg-purple-500/80 backdrop-blur-md text-white text-[10px] font-bold flex items-center gap-1"><Gem className="w-3 h-3" /><span>Hidden</span></span>}</div>
           <span className="px-2.5 py-1 rounded-lg bg-black/70 backdrop-blur-md text-vybe-lime text-xs font-mono font-bold border border-vybe-lime/30">{place.features.isFree ? 'FREE' : place.priceLevel}</span>
         </div>
-        {availableImageIndexes.length > 1 && <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex items-center gap-1 z-10">{availableImageIndexes.map(idx => <button key={idx} aria-label={`Show photo ${idx + 1} of ${place.images.length}`} onClick={(e) => { e.stopPropagation(); setCurrentImageIndex(idx); }} className={`w-1.5 h-1.5 rounded-full transition-all ${idx === activeImageIndex ? 'bg-vybe-lime w-4' : 'bg-white/40'}`} />)}</div>}
+        {availableImageIndexes.length > 1 && <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex items-center gap-1 z-10">{availableImageIndexes.map(idx => <button key={idx} aria-label={`Show photo ${idx + 1} of ${imageList.length}`} onClick={(e) => { e.stopPropagation(); setCurrentImageIndex(idx); }} className={`w-1.5 h-1.5 rounded-full transition-all ${idx === activeImageIndex ? 'bg-vybe-lime w-4' : 'bg-white/40'}`} />)}</div>}
       </div>
       <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
         <div className="space-y-2">
