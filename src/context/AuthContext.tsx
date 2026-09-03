@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useMemo, useState, useEffect, useCallback } from 'react';
 import { UserProfile } from '../types';
 import { supabase, isBackendConfigured } from '../lib/supabase';
-import { dataMode, LOCAL_STORAGE_KEYS } from '../lib/dataMode';
+import { dataMode } from '../lib/dataMode';
 import { authService, AuthResult } from '../services/authService';
 import { profileService } from '../services/profileService';
 import { likesService } from '../services/likesService';
@@ -16,22 +16,14 @@ interface AuthContextType {
   session: AuthSession;
   loading: boolean;
   isAuthenticated: boolean;
-  isDemoMode: boolean;
-  isDemo: boolean;
   isAdmin: boolean;
   sessionMode: SessionMode;
   appDataMode: typeof dataMode;
-  profiles: UserProfile[];
   signIn: (email: string, password: string) => Promise<AuthResult>;
   signUp: (name: string, username: string, email: string, password: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<AuthResult>;
-  login: (email: string, password?: string) => boolean;
-  register: (name: string, username: string, email: string) => boolean;
-  logout: () => void;
-  switchProfile: (profileId: string) => void;
   updateProfile: (updates: Partial<UserProfile>) => void;
-  enterDemoMode: (email?: string) => boolean;
   toggleLikePlace: (placeId: string) => void;
   toggleSavePlace: (placeId: string) => void;
   isPlaceLiked: (placeId: string) => boolean;
@@ -44,53 +36,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<AuthSession>(ANONYMOUS_SESSION);
   const [remoteProfile, setRemoteProfile] = useState<UserProfile | null>(null);
   const [authLoading, setAuthLoading] = useState<boolean>(isBackendConfigured);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!isBackendConfigured || !supabase) {
-      setAuthLoading(false);
-      return;
-    }
-
-    (async () => {
-      try {
-        const s = await authService.getSession();
-        if (cancelled) return;
-        if (s?.user) {
-          const meta = s.user.user_metadata as { display_name?: string; username?: string } | undefined;
-          await hydrateRealUser(s.user.id, s.user.email ?? '', { displayName: meta?.display_name, username: meta?.username });
-        } else {
-          setRemoteProfile(null);
-          setSession(ANONYMOUS_SESSION);
-        }
-      } catch (error) {
-        console.error('[VYBE auth] session restore failed', error);
-        if (!cancelled) setSession(ANONYMOUS_SESSION);
-      } finally {
-        if (!cancelled) setAuthLoading(false);
-      }
-    })();
-
-    const unsubscribe = authService.onAuthStateChange((event, signedIn) => {
-      if (cancelled) return;
-      if (event === 'SIGNED_OUT') {
-        setRemoteProfile(null);
-        setSession(ANONYMOUS_SESSION);
-      } else if (signedIn) {
-        supabase!.auth.getUser().then(({ data }) => {
-          if (!cancelled && data.user) {
-            const meta = data.user.user_metadata as { display_name?: string; username?: string } | undefined;
-            void hydrateRealUser(data.user.id, data.user.email ?? '', { displayName: meta?.display_name, username: meta?.username });
-          }
-        }).catch(error => console.error('[VYBE auth] getUser failed', error));
-      }
-    });
-
-    return () => {
-      cancelled = true;
-      unsubscribe();
-    };
-  }, []);
 
   const hydrateRealUser = useCallback(async (userId: string, email: string, meta?: { displayName?: string; username?: string }) => {
     try {
@@ -110,6 +55,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setAuthLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!isBackendConfigured || !supabase) {
+      setAuthLoading(false);
+      return;
+    }
+    (async () => {
+      try {
+        const s = await authService.getSession();
+        if (cancelled) return;
+        if (s?.user) {
+          const meta = s.user.user_metadata as { display_name?: string; username?: string } | undefined;
+          await hydrateRealUser(s.user.id, s.user.email ?? '', { displayName: meta?.display_name, username: meta?.username });
+        } else {
+          setRemoteProfile(null);
+          setSession(ANONYMOUS_SESSION);
+        }
+      } catch (error) {
+        console.error('[VYBE auth] session restore failed', error);
+        if (!cancelled) setSession(ANONYMOUS_SESSION);
+      } finally {
+        if (!cancelled) setAuthLoading(false);
+      }
+    })();
+    const unsubscribe = authService.onAuthStateChange((event, signedIn) => {
+      if (cancelled) return;
+      if (event === 'SIGNED_OUT') {
+        setRemoteProfile(null);
+        setSession(ANONYMOUS_SESSION);
+      } else if (signedIn) {
+        supabase!.auth.getUser().then(({ data }) => {
+          if (!cancelled && data.user) {
+            const meta = data.user.user_metadata as { display_name?: string; username?: string } | undefined;
+            void hydrateRealUser(data.user.id, data.user.email ?? '', { displayName: meta?.display_name, username: meta?.username });
+          }
+        }).catch(error => console.error('[VYBE auth] getUser failed', error));
+      }
+    });
+    return () => { cancelled = true; unsubscribe(); };
+  }, [hydrateRealUser]);
 
   const currentUser = useMemo(() => session.mode === 'auth' ? remoteProfile : null, [session.mode, remoteProfile]);
   const realAuthUser = session.mode === 'auth' ? currentUser : null;
@@ -146,13 +132,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!isBackendConfigured) return { ok: false, error: 'VYBE backend is not configured.' };
     return authService.resetPassword(email);
   }, []);
-
-  // Kept only as compatibility shims for old callers; demo/local authentication is removed.
-  const login = () => false;
-  const register = () => false;
-  const logout = () => { void signOut(); };
-  const switchProfile = () => undefined;
-  const enterDemoMode = () => false;
 
   const updateProfile = (updates: Partial<UserProfile>) => {
     if (!realAuthUser) return;
@@ -194,22 +173,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       session,
       loading: authLoading,
       isAuthenticated: session.mode === 'auth' && !!currentUser,
-      isDemoMode: false,
-      isDemo: false,
       isAdmin: currentUser?.isAdmin === true,
       sessionMode: session.mode,
       appDataMode: dataMode,
-      profiles: [],
       signIn,
       signUp,
       signOut,
       resetPassword,
-      login,
-      register,
-      logout,
-      switchProfile,
       updateProfile,
-      enterDemoMode,
       toggleLikePlace,
       toggleSavePlace,
       isPlaceLiked,
