@@ -19,7 +19,15 @@ import { PlaceCard } from '../cards/PlaceCard';
 
 const USD_TO_DZD_DISPLAY = 130;
 
-const PLACE_TYPES = [
+type PlaceType = {
+  id: string;
+  query: string;
+  label: string;
+  emoji: string;
+  flag?: string;
+};
+
+const PLACE_TYPES: readonly PlaceType[] = [
   { id: 'mosque', query: 'mosque', label: 'Mosques', emoji: '🕌', flag: '🇩🇿' },
   { id: 'restaurant', query: 'restaurant', label: 'Restaurants', emoji: '🍽️' },
   { id: 'cafe', query: 'cafe', label: 'Cafés', emoji: '☕' },
@@ -38,7 +46,7 @@ const PLACE_TYPES = [
   { id: 'theatre', query: 'theatre', label: 'Theatre', emoji: '🎭' },
   { id: 'playground', query: 'playground', label: 'Playgrounds', emoji: '🛝' },
   { id: 'beach', query: 'beach', label: 'Beaches', emoji: '🏖️' },
-] as const;
+];
 
 const TIME_OPTIONS: { value: TimeDuration; label: string; icon: string }[] = [
   { value: '15min', label: '15 min', icon: '⚡' },
@@ -51,7 +59,7 @@ const TIME_OPTIONS: { value: TimeDuration; label: string; icon: string }[] = [
 
 const BUDGET_OPTIONS = [
   { value: 'free' as const, usd: undefined, label: 'Free', sub: '$0 / 0 DZD', icon: '💸' },
-  { value: 10, label: 'Under $10', sub: `≈ ${10 * USD_TO_DZD_DISPLAY.toLocaleString()} DZD`, icon: '🪙' },
+  { value: 10, label: 'Under $10', sub: `≈ ${(10 * USD_TO_DZD_DISPLAY).toLocaleString()} DZD`, icon: '🪙' },
   { value: 25, label: 'Under $25', sub: `≈ ${25 * USD_TO_DZD_DISPLAY} DZD`, icon: '💵' },
   { value: 50, label: 'Under $50', sub: `≈ ${(50 * USD_TO_DZD_DISPLAY).toLocaleString()} DZD`, icon: '💳' },
   { value: 'unlimited' as const, usd: undefined, label: 'No Limit', sub: 'USD / DZD', icon: '✨' },
