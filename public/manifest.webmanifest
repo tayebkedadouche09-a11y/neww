@@ -1,0 +1,11 @@
+{
+  "name": "VYBE — Find Your Next Vibe",
+  "short_name": "VYBE",
+  "description": "Discover real places, build outings, match vibes and share plans.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#090A0F",
+  "theme_color": "#CCFF00",
+  "lang": "en",
+  "categories": ["travel", "lifestyle", "social"]
+}
