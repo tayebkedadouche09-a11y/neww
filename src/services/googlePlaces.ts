@@ -10,7 +10,6 @@ const PLACE_FIELDS: string[] = [
   'regularOpeningHours', 'businessStatus', 'nationalPhoneNumber', 'websiteURI',
 ];
 
-const PHOTO_ONLY_FIELDS = ['photos'];
 const PRICE_LEVEL_ORDER = ['FREE', 'INEXPENSIVE', 'MODERATE', 'EXPENSIVE', 'VERY_EXPENSIVE'];
 
 async function importPlacesLibrary(): Promise<google.maps.PlacesLibrary> {
@@ -20,15 +19,6 @@ async function importPlacesLibrary(): Promise<google.maps.PlacesLibrary> {
     throw new Error('Google Maps JavaScript API did not provide importLibrary');
   }
   return window.google.maps.importLibrary('places');
-}
-
-async function hydrateMissingPhotos(p: google.maps.places.Place): Promise<void> {
-  if (!p.id || (p.photos?.length ?? 0) > 0) return;
-  try {
-    await p.fetchFields({ fields: PHOTO_ONLY_FIELDS });
-  } catch (error) {
-    console.warn(`[Google Places] photo hydration failed for ${p.id}`, error);
-  }
 }
 
 async function libraryPlaceToResult(p: google.maps.places.Place): Promise<GooglePlaceResult> {
@@ -71,11 +61,8 @@ async function libraryPlaceToResult(p: google.maps.places.Place): Promise<Google
   };
 }
 
-async function toVybePlaces(places: google.maps.places.Place[] | null | undefined, hydratePhotos = false): Promise<Place[]> {
-  return Promise.all((places ?? []).map(async p => {
-    if (hydratePhotos) await hydrateMissingPhotos(p);
-    return googlePlaceToVybePlace(await libraryPlaceToResult(p));
-  }));
+async function toVybePlaces(places: google.maps.places.Place[] | null | undefined): Promise<Place[]> {
+  return Promise.all((places ?? []).map(async p => googlePlaceToVybePlace(await libraryPlaceToResult(p))));
 }
 
 const buildNearbyRequest = (
@@ -90,18 +77,19 @@ const buildNearbyRequest = (
   ...(includedTypes?.length ? { includedTypes } : {}),
 });
 
-async function searchNearbyGooglePlacesSingle(lat: number, lng: number, radiusKm: number, type?: string[]): Promise<Place[]> {
+async function searchNearbyGooglePlacesSingle(lat: number, lng: number, radiusKm: number, types?: string[]): Promise<Place[]> {
   const { Place } = await importPlacesLibrary();
-  const request = buildNearbyRequest(lat, lng, radiusKm, type);
+  const request = buildNearbyRequest(lat, lng, radiusKm, types);
   const { places } = await Place.searchNearby(request);
-  return toVybePlaces(places, true);
+  return toVybePlaces(places);
 }
 
 export async function searchNearbyGooglePlaces(lat: number, lng: number, radiusKm: number = 5, type?: string | string[], keyword?: string): Promise<Place[]> {
   if (keyword?.trim()) return searchGooglePlacesText(keyword, lat, lng, radiusKm);
 
-  // Nearby Search supports multiple included place types in ONE request.
-  // Do not split a category into one request per type: that can multiply quota usage dramatically.
+  // Nearby Search (New) accepts multiple includedTypes in a single request.
+  // Keep the type set in one call so category discovery does not fan out into
+  // many SearchNearbyRequest calls and burn the daily quota unnecessarily.
   const includedTypes = Array.isArray(type) ? [...new Set(type.filter(Boolean))] : type ? [type] : undefined;
   return searchNearbyGooglePlacesSingle(lat, lng, radiusKm, includedTypes);
 }
@@ -113,7 +101,7 @@ export async function searchGooglePlacesText(query: string, lat?: number, lng?: 
     request.locationBias = { center: { lat, lng }, radius: Math.min((radiusKm ?? 5) * 1000, 50000) };
   }
   const { places } = await Place.searchByText(request);
-  return toVybePlaces(places, true);
+  return toVybePlaces(places);
 }
 
 export async function getGooglePlaceDetails(placeId: string): Promise<Place | null> {
