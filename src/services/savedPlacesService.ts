@@ -3,6 +3,7 @@
  * RLS: strictly per-user rows (unique (user_id, place_id)).
  */
 import { supabase } from '../lib/supabase';
+import { newUuid } from './mappers';
 
 const assertBackend = () => {
   if (!supabase) throw new Error('VYBE backend is not configured');
@@ -14,7 +15,7 @@ export const savedPlacesService = {
     const db = assertBackend();
     if (saved) {
       const { error } = await db.from('saved_places').upsert(
-        { user_id: userId, place_id: placeId },
+        { id: newUuid(), user_id: userId, place_id: placeId },
         { ignoreDuplicates: true, onConflict: 'user_id,place_id' }
       );
       if (error) throw error;
