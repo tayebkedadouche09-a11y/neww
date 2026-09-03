@@ -22,6 +22,7 @@ const googleMap = read('src/components/map/GoogleMap.tsx');
 const placeCard = read('src/components/cards/PlaceCard.tsx');
 const discovery = read('src/services/discoveryService.ts');
 const googlePlaces = read('src/services/googlePlaces.ts');
+const googleAdapter = read('src/services/googlePlacesAdapter.ts');
 const indexHtml = read('index.html');
 const serviceWorker = read('public/sw.js');
 const main = read('src/main.tsx');
@@ -42,6 +43,9 @@ assert(!discovery.includes('unsplash.com'), 'Discovery service contains no fake 
 assert(googlePlaces.includes('Array.isArray(type)') && googlePlaces.includes('includedTypes') && !googlePlaces.includes('type.map(placeType => searchNearbyGooglePlacesSingle'), 'Google nearby discovery keeps multi-type searches inside one request instead of fanning out quota usage.');
 assert(discovery.includes('Promise.allSettled') && discovery.includes('[...googlePlaces, ...osmPlaces]'), 'Discovery merges Google and OpenStreetMap instead of stopping at the first provider.');
 assert(discovery.includes('function analyzePlace') && discovery.includes('.map(analyzePlace)'), 'Every discovered place is classified and analyzed before Explore/Map receive it.');
+assert(discovery.includes('isGooglePlaceValidForRequest') && discovery.includes('results.filter(place => isGooglePlaceValidForRequest'), 'Google discovery rejects results that fail place/type verification before Explore receives them.');
+assert(googleAdapter.includes('Google-provided place types are the authoritative discovery signal') && googleAdapter.includes('providerPlaceId') && googleAdapter.includes('QUERY_CATEGORY_EXPECTATIONS'), 'Google place validation requires a real Place ID and request-matching category.');
+assert(googleAdapter.includes("bowling_alley: 'arcade-gaming'") && googleAdapter.includes("miniature_golf_course: 'arcade-gaming'"), 'Gaming/arcade places are classified separately from generic entertainment.');
 assert(!googleMap.includes('maps.googleapis.com/maps/api/js?'), 'GoogleMap does not embed the legacy Maps JavaScript URL loader.');
 assert(indexHtml.includes('<link rel="manifest" href="/manifest.webmanifest" />'), 'PWA manifest is linked from the document head.');
 assert(main.includes("navigator.serviceWorker.register('/sw.js')"), 'Production registers the offline shell service worker.');
