@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useMemo, useRef } from "react";
 import { Navbar } from "./components/layout/Navbar";
 import { MobileNav } from "./components/layout/MobileNav";
 import { Footer } from "./components/layout/Footer";
@@ -20,6 +20,7 @@ import { CollectionsView } from "./components/profile/CollectionsView";
 import { ProfileView } from "./components/profile/ProfileView";
 import { AdminPortal } from "./components/admin/AdminPortal";
 import { useData } from "./context/DataContext";
+import { calculateVybeScore } from "./hooks/useVybeScore";
 import {
   Sparkles,
   MapPin,
@@ -37,6 +38,7 @@ export const App: React.FC = () => {
     filteredPlaces,
     places,
     activeHeroMood,
+    filters,
     userLocation,
     locationError,
     discoveryError,
@@ -67,6 +69,33 @@ export const App: React.FC = () => {
 
   // Late night subset
   const lateNightPlaces = places.filter((p) => p.features.isLateNight);
+
+  // The wizard's mood/companion preferences are ranking signals, not reasons
+  // to make every discovered place disappear. Explicit category/toggle filters
+  // remain hard filters in DataContext. When those soft signals would otherwise
+  // leave Explore empty, keep the discovered places visible and rank them with
+  // the user's exact setup.
+  const relaxedDiscoveryPlaces = useMemo(() => {
+    if (filteredPlaces.length > 0 || places.length === 0) return [];
+
+    const effectiveMoods = activeHeroMood
+      ? [activeHeroMood, ...filters.moods.filter(m => m !== activeHeroMood)]
+      : filters.moods;
+
+    return places
+      .map(place => ({
+        place,
+        scoreInfo: calculateVybeScore(place, {
+          selectedMoods: effectiveMoods,
+          budget: filters.maxBudget || (filters.priceLevels.length === 1 ? filters.priceLevels[0] : undefined),
+          duration: filters.duration,
+          companion: filters.companion,
+        }),
+      }))
+      .sort((a, b) => b.scoreInfo.score - a.scoreInfo.score);
+  }, [filteredPlaces, places, activeHeroMood, filters]);
+
+  const displayPlaces = filteredPlaces.length > 0 ? filteredPlaces : relaxedDiscoveryPlaces;
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F6F7FB] dark:bg-[#090A0F] text-slate-900 dark:text-slate-100 transition-colors duration-300">
@@ -122,7 +151,7 @@ export const App: React.FC = () => {
                 </button>
               </div>
 
-              {filteredPlaces.length === 0 ? (
+              {displayPlaces.length === 0 ? (
                 <div className="p-16 text-center rounded-3xl bg-white dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border space-y-3">
                   <span className="text-4xl">🛸</span>
                   <h3 className="font-display font-bold text-lg text-slate-900 dark:text-white">
@@ -161,15 +190,22 @@ export const App: React.FC = () => {
                   )}
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredPlaces.map(({ place, scoreInfo }) => (
-                    <PlaceCard
-                      key={place.id}
-                      place={place}
-                      scoreInfo={scoreInfo}
-                    />
-                  ))}
-                </div>
+                <>
+                  {relaxedDiscoveryPlaces.length > 0 && filteredPlaces.length === 0 && !discoveryError && (
+                    <div className="rounded-2xl border border-vybe-cyan/20 bg-vybe-cyan/5 px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
+                      <span className="font-bold text-vybe-cyan">VYBE relaxed the hard match.</span> Showing discovered places ranked by your time, budget, company and vibe instead of hiding them.
+                    </div>
+                  )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {displayPlaces.map(({ place, scoreInfo }) => (
+                      <PlaceCard
+                        key={place.id}
+                        place={place}
+                        scoreInfo={scoreInfo}
+                      />
+                    ))}
+                  </div>
+                </>
               )}
             </section>
 
