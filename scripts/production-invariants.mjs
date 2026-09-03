@@ -12,6 +12,8 @@ const assert = (condition, message) => {
 
 const dataContext = read('src/context/DataContext.tsx');
 const authContext = read('src/context/AuthContext.tsx');
+const app = read('src/App.tsx');
+const authModal = read('src/components/auth/AuthModal.tsx');
 const collections = read('src/components/profile/CollectionsView.tsx');
 const plans = read('src/components/plan/VybePlanBuilder.tsx');
 const routeSummary = read('src/components/plan/VybeRouteSummary.tsx');
@@ -34,9 +36,17 @@ const mappers = read('src/services/mappers.ts');
 const indexHtml = read('index.html');
 const serviceWorker = read('public/sw.js');
 const main = read('src/main.tsx');
+const envExample = read('.env.example');
 const ci = read('.github/workflows/ci.yml');
 const schema = read('supabase/migrations/0001_schema.sql');
 const googlePersistenceMigration = read('supabase/migrations/0007_google_place_persistence.sql');
+
+assert(!app.includes('ModeBadge'), 'Legacy demo-mode indicator is not part of the shipped app shell.');
+assert(!authModal.includes('Demo') && !authModal.includes('demo'), 'Authentication UI contains no demo login or persona controls.');
+assert(!authContext.includes('DEMO_PROFILES') && !authContext.includes("mode === 'demo'") && !authContext.includes('enterDemoMode'), 'Authentication state contains no demo profile runtime.');
+assert(!envExample.includes('VITE_DEMO_MODE') && !envExample.includes('local demo'), 'Environment template exposes no demo-mode switch.');
+assert(!app.includes('<CollectionsView />') || app.includes('privateReady ? <CollectionsView />'), 'Saved collections are behind a real authenticated session.');
+assert(!app.includes('<VybePlanBuilder />') || app.includes('privateReady ? <><VybePlanBuilder />'), 'Plans are behind a real authenticated session.');
 
 assert(dataContext.includes('getGooglePlaceDetails'), 'Public place deep links use the current Google Places details path.');
 assert(collections.includes('!activeCol.isPublic'), 'Private collections cannot accidentally publish broken public links.');
@@ -59,7 +69,7 @@ assert(googleAdapter.includes('Google-provided place types are the authoritative
 assert(googleAdapter.includes("bowling_alley: 'arcade-gaming'") && googleAdapter.includes("miniature_golf_course: 'arcade-gaming'"), 'Gaming/arcade places are classified separately from generic entertainment.');
 assert(authContext.includes('toggleLikePlace') && authContext.includes('likesService.setLiked'), 'Like actions update both local UI state and the per-user backend row.');
 assert(authContext.includes('toggleSavePlace') && authContext.includes('savedPlacesService.setSaved'), 'Save actions update both local UI state and the per-user backend row.');
-assert(authContext.includes("if (session.mode === 'auth') return isBackendConfigured ? remoteProfile") && authContext.includes('savedPlacesService.listSavedPlaceIds(userId)') && authContext.includes('likesService.listLikedPlaceIds(userId)'), 'Authenticated users rehydrate persisted backend preferences instead of demo profiles.');
+assert(authContext.includes('savedPlacesService.listSavedPlaceIds(userId)') && authContext.includes('likesService.listLikedPlaceIds(userId)'), 'Authenticated users rehydrate persisted backend preferences.');
 assert(savedPlaces.includes("from('saved_places')") && savedPlaces.includes('id: newUuid()') && savedPlaces.includes('ensureGooglePlaceStored(placeId)'), 'Saved places have stable row ids and materialize Google places before FK writes.');
 assert(likes.includes("from('likes')") && likes.includes('id: newUuid()') && likes.includes('ensureGooglePlaceStored(placeId)'), 'Likes have stable row ids and materialize Google places before FK writes.');
 assert(plansService.includes("from('plan_items')") && plansService.includes('plan_id') && plansService.includes('ensureGooglePlaceStored(item.placeId)'), 'Plan items persist against the owning plan and materialize external Google places.');
