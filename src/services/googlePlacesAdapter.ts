@@ -66,11 +66,11 @@ const GOOGLE_TYPE_TO_MOOD: Record<string, MoodType> = {
 };
 
 const NAME_RULES: Array<{ category: CategoryType; mood: MoodType; words: string[] }> = [
-  { category: 'arcade-gaming', mood: 'gaming', words: ['arcade', 'gaming', 'gamer', 'video game', 'video games', 'playstation', 'xbox', 'espace jeux', 'salle de jeux', 'jeux video', 'jeux vidéos', 'jeux', 'gaming lounge', 'game room', 'bowling'] },
+  { category: 'arcade-gaming', mood: 'gaming', words: ['arcade', 'gaming', 'gamer', 'video game', 'video games', 'playstation', 'xbox', 'espace jeux', 'salle de jeux', 'jeux video', 'jeux vidéos', 'jeux', 'gaming lounge', 'game room'] },
   { category: 'food-drink', mood: 'hungry', words: ['restaurant', 'resto', 'pizzeria', 'pizza', 'burger', 'grill', 'tacos', 'snack', 'fast food', 'café', 'cafe', 'coffee', 'coffee shop', 'bakery', 'boulangerie', 'patisserie', 'pâtisserie', 'tea room', 'salon de thé'] },
   { category: 'nightlife', mood: 'party', words: ['bar', 'pub', 'club', 'nightclub', 'boite de nuit', 'discothèque', 'disco', 'karaoke', 'lounge', 'cocktail'] },
   { category: 'outdoors-nature', mood: 'outdoor', words: ['park', 'parc', 'jardin', 'garden', 'forêt', 'forest', 'plage', 'beach', 'promenade', 'hiking', 'randonnée', 'nature'] },
-  { category: 'entertainment', mood: 'energetic', words: ['cinema', 'cinéma', 'theatre', 'théâtre', 'amusement', 'manège', 'karting', 'paintball', 'bowling'] },
+  { category: 'entertainment', mood: 'energetic', words: ['cinema', 'cinéma', 'theatre', 'théâtre', 'amusement', 'manège', 'karting', 'paintball'] },
   { category: 'shopping-vintage', mood: 'explore', words: ['mall', 'centre commercial', 'shopping', 'boutique', 'store', 'magasin', 'marché', 'market', 'friperie', 'bookstore', 'librairie'] },
   { category: 'arts-culture', mood: 'curious', words: ['mosquée', 'mosquee', 'mosque', 'مسجد', 'جامع', 'église', 'eglise', 'church', 'temple', 'synagogue', 'museum', 'musée', 'musee', 'gallery', 'galerie', 'library', 'bibliothèque', 'bibliotheque'] },
   { category: 'chill-spots', mood: 'lazy', words: ['spa', 'hotel', 'hôtel', 'resort', 'wellness', 'relax'] },
@@ -83,8 +83,17 @@ function normalizeName(value?: string): string {
 export function classifyPlace(types?: string[], name?: string): { category: CategoryType; mood: MoodType } {
   const normalized = normalizeName(name);
   const typeSet = new Set(types ?? []);
-  for (const rule of NAME_RULES) if (rule.words.some(word => normalized.includes(normalizeName(word)))) return { category: rule.category, mood: rule.mood };
-  for (const type of typeSet) if (GOOGLE_TYPE_TO_CATEGORY[type]) return { category: GOOGLE_TYPE_TO_CATEGORY[type], mood: GOOGLE_TYPE_TO_MOOD[type] ?? 'explore' };
+
+  // Google-provided place types are the authoritative discovery signal. Name keywords
+  // are only a fallback for providers/results that do not expose a recognized type.
+  for (const type of typeSet) {
+    if (GOOGLE_TYPE_TO_CATEGORY[type]) return { category: GOOGLE_TYPE_TO_CATEGORY[type], mood: GOOGLE_TYPE_TO_MOOD[type] ?? 'explore' };
+  }
+
+  for (const rule of NAME_RULES) {
+    if (rule.words.some(word => normalized.includes(normalizeName(word)))) return { category: rule.category, mood: rule.mood };
+  }
+
   return { category: 'hidden-gems', mood: 'explore' };
 }
 
@@ -95,7 +104,7 @@ const QUERY_CATEGORY_EXPECTATIONS: Record<string, CategoryType[]> = {
 export function isGooglePlaceValidForRequest(place: Place, request?: { query?: string; categories?: CategoryType[] }): boolean {
   if (place.provider !== 'google' || !place.providerPlaceId || !place.name.trim()) return false;
   if (!Number.isFinite(place.location.lat) || !Number.isFinite(place.location.lng) || (place.location.lat === 0 && place.location.lng === 0)) return false;
-  const expected = new Set<CategoryType>([...(request?.categories ?? [])].flatMap(category => [category]));
+  const expected = new Set<CategoryType>(request?.categories ?? []);
   const normalizedQuery = normalizeName(request?.query);
   if (normalizedQuery && QUERY_CATEGORY_EXPECTATIONS[normalizedQuery]) QUERY_CATEGORY_EXPECTATIONS[normalizedQuery].forEach(category => expected.add(category));
   if (!expected.size) return true;
