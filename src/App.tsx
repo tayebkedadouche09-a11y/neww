@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { ArrowRight, Lock, MapPin } from "lucide-react";
 import { Navbar } from "./components/layout/Navbar";
 import { MobileNav } from "./components/layout/MobileNav";
@@ -28,7 +28,7 @@ const SelectedPlaceMapAction: React.FC = () => {
   if (!selectedPlace || !isDetailOpen || activeTab === "map") return null;
   const openOnMap = () => { setIsDetailOpen(false); setActiveTab("map"); };
   return (
-    <button type="button" onClick={openOnMap} aria-label={`Show ${selectedPlace.name} on the map`} className="fixed bottom-24 sm:bottom-8 left-1/2 -translate-x-1/2 z-[60] inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-vybe-lime text-black font-display font-extrabold text-sm shadow-neon-lime border-2 border-black/10 hover:scale-105 active:scale-95 transition-all">
+    <button type="button" onClick={openOnMap} aria-label={`Show ${selectedPlace.name} on the map`} className="fixed bottom-24 sm:bottom-8 left-1/2 -translate-x-1/2 z-40 inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-vybe-lime text-black font-display font-extrabold text-sm shadow-neon-lime border-2 border-black/10 hover:scale-105 active:scale-95 transition-all">
       <MapPin className="w-4 h-4" /><span>View {selectedPlace.name} on Map</span>
     </button>
   );
@@ -49,9 +49,13 @@ const RealAccountRequired: React.FC<{ title: string; body: string }> = ({ title,
 };
 
 export const App: React.FC = () => {
-  const { activeTab } = useData();
+  const { activeTab, isDetailOpen, setIsDetailOpen } = useData();
   const { currentUser, loading: authLoading } = useAuth();
   const privateReady = !!currentUser && !authLoading;
+
+  useEffect(() => {
+    if (activeTab !== 'explore' && isDetailOpen) setIsDetailOpen(false);
+  }, [activeTab, isDetailOpen, setIsDetailOpen]);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F6F7FB] dark:bg-[#090A0F] text-slate-900 dark:text-slate-100 transition-colors duration-300">
