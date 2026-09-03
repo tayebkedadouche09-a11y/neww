@@ -1,207 +1,22 @@
 export type VybeCategory = 'gaming' | 'food' | 'cafe' | 'nightlife' | 'culture' | 'outdoors' | 'shopping' | 'sports' | 'family' | 'wellness' | 'services' | 'stay' | 'other';
 export type VybeMood = 'gaming' | 'chill' | 'party' | 'hungry' | 'curious' | 'outdoor' | 'energetic' | 'romantic' | 'creative' | 'explore' | 'lazy';
 export type VybeSource = 'OpenStreetMap' | 'Google Places';
-
-export interface VybeAnalysis {
-  category: VybeCategory;
-  mood: VybeMood;
-  confidence: number;
-  labels: string[];
-  reasons: string[];
-  score: number;
-}
-
-export interface VybePlace {
-  id: string;
-  source: VybeSource;
-  sourceId: string;
-  name: string;
-  address: string;
-  city: string;
-  lat: number;
-  lng: number;
-  distanceKm: number;
-  phone?: string;
-  website?: string;
-  image?: string;
-  rating?: number;
-  reviewCount?: number;
-  openingHours?: string;
-  tags: string[];
-  analysis: VybeAnalysis;
-}
-
-export interface DiscoverOptions {
-  lat: number;
-  lng: number;
-  radiusKm?: number;
-  query?: string;
-  category?: VybeCategory | 'all';
-}
-
-const SEARCH_LIMIT = 1000;
-const CATEGORY_QUERIES: Record<Exclude<VybeCategory, 'other'>, string[]> = {
-  gaming: ['leisure="amusement_arcade"', 'amenity="internet_cafe"', 'leisure="bowling_alley"', 'shop="video_games"', 'amenity="games_centre"', 'name~"arcade|gaming|game|jeux|salle de jeux|video game|playstation|xbox|cyber",i'],
-  food: ['amenity~"restaurant|fast_food|food_court|food_stall"', 'shop~"bakery|confectionery|butcher"'],
-  cafe: ['amenity="cafe"', 'amenity="ice_cream"', 'name~"cafe|café|coffee|tea|salon de thé",i'],
-  nightlife: ['amenity~"bar|pub|nightclub"', 'amenity="biergarten"', 'name~"club|discotheque|discothèque|lounge|karaoke",i'],
-  culture: ['amenity~"theatre|arts_centre|library|place_of_worship"', 'tourism~"museum|gallery"'],
-  outdoors: ['leisure~"park|garden|playground|nature_reserve|beach_resort|sports_centre"', 'natural="beach"', 'tourism~"zoo|aquarium|attraction"'],
-  shopping: ['shop~"mall|department_store|supermarket|clothes|shoes|books|video_games|gift|toys|second_hand|furniture|electronics"', 'shop="market"'],
-  sports: ['leisure~"sports_centre|stadium|pitch|fitness_centre|track|swimming_pool"', 'sport'],
-  family: ['leisure~"playground|sports_centre|park"', 'tourism~"zoo|aquarium"', 'amenity="family_centre"'],
-  wellness: ['leisure="fitness_centre"', 'amenity~"clinic|hospital|dentist|pharmacy"', 'shop="health_food"', 'name~"spa|wellness|relax",i'],
-  services: ['amenity~"bank|post_office|police|fire_station|library"', 'office'],
-  stay: ['tourism~"hotel|hostel|guest_house|motel|apartment"'],
-};
-
-const BROAD_QUERIES = Object.values(CATEGORY_QUERIES).flat();
-
-const CITY_WORDS = ['béjaïa', 'bejaia', 'bougie', 'alger', 'oran', 'setif', 'sétif', 'constantine'];
-
-function clean(value: unknown): string {
-  return String(value ?? '').replace(/\s+/g, ' ').trim();
-}
-
-function normalize(value: string): string {
-  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-}
-
-function escapeOverpassRegex(value: string): string {
-  return value.replace(/[\\"\n\r\[\]{}()^$.*+?|]/g, ' ');
-}
-
-function haversineKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
-  const r = 6371;
-  const dLat = ((bLat - aLat) * Math.PI) / 180;
-  const dLng = ((bLng - aLng) * Math.PI) / 180;
-  const x = Math.sin(dLat / 2) ** 2 + Math.cos((aLat * Math.PI) / 180) * Math.cos((bLat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
-  return r * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
-}
-
-function inferCategory(tags: Record<string, string>, name: string): { category: VybeCategory; mood: VybeMood; labels: string[]; reasons: string[] } {
-  const hay = normalize([name, ...Object.values(tags)].join(' '));
-  const has = (...words: string[]) => words.some(word => hay.includes(normalize(word)));
-
-  if (has('arcade', 'gaming', 'game room', 'salle de jeux', 'jeux video', 'video games', 'playstation', 'xbox', 'cyber')) return { category: 'gaming', mood: 'gaming', labels: ['Gaming', 'Social', 'Fun'], reasons: ['The place name or tags indicate gaming or play.'] };
-  if (has('restaurant', 'resto', 'pizzeria', 'pizza', 'burger', 'tacos', 'grill', 'snack', 'fast food', 'food court')) return { category: 'food', mood: 'hungry', labels: ['Food', 'Group-friendly'], reasons: ['Food-service signals were found in the place metadata.'] };
-  if (has('cafe', 'coffee', 'café', 'tea room', 'salon de thé', 'bakery', 'patisserie')) return { category: 'cafe', mood: 'chill', labels: ['Chill', 'Coffee'], reasons: ['Cafe, coffee or tea signals were found.'] };
-  if (has('bar', 'pub', 'club', 'nightclub', 'discotheque', 'karaoke', 'lounge')) return { category: 'nightlife', mood: 'party', labels: ['Nightlife', 'Social'], reasons: ['Nightlife keywords or venue types were found.'] };
-  if (has('museum', 'gallery', 'theatre', 'theater', 'library', 'mosque', 'mosquée', 'church', 'église', 'cultural', 'heritage')) return { category: 'culture', mood: 'curious', labels: ['Culture', 'Explore'], reasons: ['Cultural, heritage or learning signals were found.'] };
-  if (has('park', 'garden', 'beach', 'plage', 'forest', 'forêt', 'nature', 'promenade', 'hiking', 'randonnée', 'zoo', 'aquarium')) return { category: 'outdoors', mood: 'outdoor', labels: ['Outdoor', 'Fresh air'], reasons: ['Outdoor, nature or attraction signals were found.'] };
-  if (has('mall', 'centre commercial', 'shopping', 'boutique', 'store', 'shop', 'market', 'marché', 'friperie')) return { category: 'shopping', mood: 'explore', labels: ['Shopping', 'Explore'], reasons: ['Retail or shopping signals were found.'] };
-  if (has('gym', 'fitness', 'stadium', 'sports', 'sport', 'pool', 'piscine', 'tennis', 'football')) return { category: 'sports', mood: 'energetic', labels: ['Active', 'Sports'], reasons: ['Sports or fitness signals were found.'] };
-  if (has('spa', 'wellness', 'relax', 'yoga', 'massage')) return { category: 'wellness', mood: 'lazy', labels: ['Wellness', 'Relax'], reasons: ['Wellness or relaxation signals were found.'] };
-  if (has('hotel', 'hostel', 'guest house', 'motel', 'resort', 'apartment')) return { category: 'stay', mood: 'chill', labels: ['Stay', 'Chill'], reasons: ['Accommodation signals were found.'] };
-  if (has('school', 'university', 'bank', 'post office', 'police', 'hospital', 'clinic', 'pharmacy')) return { category: 'services', mood: 'explore', labels: ['Service'], reasons: ['A service or essential facility signal was found.'] };
-
-  return { category: 'other', mood: 'explore', labels: ['Discover'], reasons: ['No stronger category signal was found, so VYBE keeps the place discoverable instead of hiding it.'] };
-}
-
-function analyzePlace(tags: Record<string, string>, name: string, rating = 0, reviews = 0): VybeAnalysis {
-  const inference = inferCategory(tags, name);
-  const hasPhoto = Boolean(tags.image || tags.wikimedia_commons);
-  const hasHours = Boolean(tags.opening_hours);
-  const hasAddress = Boolean(tags['addr:street'] || tags['addr:suburb'] || tags['addr:city']);
-  let score = 55 + Math.min(20, rating * 4) + Math.min(10, Math.log10(reviews + 1) * 4);
-  if (hasPhoto) score += 4;
-  if (hasHours) score += 3;
-  if (hasAddress) score += 3;
-  score = Math.max(1, Math.min(99, Math.round(score)));
-  const confidence = Math.max(0.55, Math.min(0.99, (inference.category === 'other' ? 0.55 : 0.78) + (hasHours ? 0.05 : 0) + (hasAddress ? 0.05 : 0) + (rating > 0 ? 0.05 : 0)));
-  return { ...inference, confidence, score };
-}
-
-function elementToPlace(element: any, lat: number, lng: number): VybePlace | null {
-  const tags: Record<string, string> = element?.tags ?? {};
-  const name = clean(tags.name || tags['name:fr'] || tags['name:ar']);
-  if (!name) return null;
-  const point = Number.isFinite(element?.lat) && Number.isFinite(element?.lon)
-    ? { lat: Number(element.lat), lng: Number(element.lon) }
-    : Number.isFinite(element?.center?.lat) && Number.isFinite(element?.center?.lon)
-      ? { lat: Number(element.center.lat), lng: Number(element.center.lon) }
-      : null;
-  if (!point || !Number.isFinite(point.lat) || !Number.isFinite(point.lng)) return null;
-  const analysis = analyzePlace(tags, name, Number(tags.stars ?? 0), 0);
-  const address = [tags['addr:housenumber'], tags['addr:street'], tags['addr:suburb'], tags['addr:city']].filter(Boolean).join(', ');
-  const sourceId = `osm:${element.type}:${element.id}`;
-  return {
-    id: sourceId,
-    source: 'OpenStreetMap',
-    sourceId,
-    name,
-    address: address || tags['addr:street'] || tags['addr:suburb'] || tags['addr:city'] || name,
-    city: clean(tags['addr:city']),
-    lat: point.lat,
-    lng: point.lng,
-    distanceKm: haversineKm(lat, lng, point.lat, point.lng),
-    phone: clean(tags.phone) || undefined,
-    website: clean(tags.website) || undefined,
-    image: /^https?:\/\//i.test(tags.image || '') ? tags.image : undefined,
-    rating: Number(tags.stars) || undefined,
-    reviewCount: undefined,
-    openingHours: clean(tags.opening_hours) || undefined,
-    tags: [...new Set([tags.amenity, tags.leisure, tags.tourism, tags.shop, tags.sport, tags.cuisine, name].filter(Boolean))].slice(0, 12),
-    analysis,
-  };
-}
-
-function buildQuery(lat: number, lng: number, radiusMeters: number, clauses: string[]): string {
-  return `[out:json][timeout:30];(${clauses.map(clause => `nwr(around:${radiusMeters},${lat},${lng})[${clause}];`).join('')});out center tags;`;
-}
-
-async function fetchOverpass(url: string, query: string): Promise<any[]> {
-  const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }, body: new URLSearchParams({ data: query }) });
-  if (!response.ok) throw new Error(`Discovery provider returned ${response.status}`);
-  const payload = await response.json();
-  return Array.isArray(payload?.elements) ? payload.elements : [];
-}
-
-async function searchOsm(options: DiscoverOptions): Promise<VybePlace[]> {
-  const radiusMeters = Math.min(Math.max((options.radiusKm ?? 8) * 1000, 1000), 15000);
-  const rawQuery = clean(options.query);
-  const normalized = normalize(rawQuery);
-  let clauses: string[];
-  if (options.category && options.category !== 'all') clauses = CATEGORY_QUERIES[options.category] ?? BROAD_QUERIES;
-  else if (rawQuery) clauses = [`name~"${escapeOverpassRegex(normalized)}",i`, `brand~"${escapeOverpassRegex(normalized)}",i`];
-  else clauses = BROAD_QUERIES;
-
-  const query = buildQuery(options.lat, options.lng, radiusMeters, clauses);
-  const endpoints = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
-  let lastError: unknown = null;
-  for (const endpoint of endpoints) {
-    try {
-      const elements = await fetchOverpass(endpoint, query);
-      const map = new Map<string, VybePlace>();
-      for (const element of elements) {
-        const place = elementToPlace(element, options.lat, options.lng);
-        if (place) map.set(place.id, place);
-      }
-      return [...map.values()].sort((a, b) => a.distanceKm - b.distanceKm).slice(0, SEARCH_LIMIT);
-    } catch (error) {
-      lastError = error;
-    }
-  }
-  throw lastError instanceof Error ? lastError : new Error('No discovery provider is available.');
-}
-
-export async function discoverEverything(options: DiscoverOptions): Promise<VybePlace[]> {
-  const radius = options.radiusKm ?? 8;
-  if (!Number.isFinite(options.lat) || !Number.isFinite(options.lng)) throw new Error('Invalid discovery coordinates.');
-  const results = await searchOsm({ ...options, radiusKm: radius });
-  const category = options.category;
-  const query = normalize(clean(options.query));
-  return results
-    .filter(place => !category || category === 'all' || place.analysis.category === category || (category === 'gaming' && place.tags.some(tag => normalize(tag).includes('game'))))
-    .filter(place => !query || normalize(`${place.name} ${place.address} ${place.tags.join(' ')}`).includes(query))
-    .sort((a, b) => (b.analysis.score - a.analysis.score) || (a.distanceKm - b.distanceKm));
-}
-
-export function getCityLabel(lat: number, lng: number): string {
-  if (Math.abs(lat - 36.75) < 0.5 && Math.abs(lng - 5.05) < 0.7) return 'Béjaïa';
-  if (Math.abs(lat - 36.75) < 0.7 && Math.abs(lng - 3.05) < 0.7) return 'Algiers';
-  if (Math.abs(lat - 35.70) < 0.6 && Math.abs(lng - 0.65) < 0.6) return 'Oran';
-  if (Math.abs(lat - 36.19) < 0.5 && Math.abs(lng - 5.40) < 0.6) return 'Sétif';
-  if (Math.abs(lat - 36.36) < 0.5 && Math.abs(lng - 6.60) < 0.6) return 'Constantine';
-  return 'Your area';
-}
+export interface VybeAnalysis { category: VybeCategory; mood: VybeMood; confidence: number; labels: string[]; reasons: string[]; score: number; }
+export interface VybePlace { id:string; source:VybeSource; sourceId:string; name:string; address:string; city:string; lat:number; lng:number; distanceKm:number; phone?:string; website?:string; image?:string; rating?:number; reviewCount?:number; openingHours?:string; tags:string[]; analysis:VybeAnalysis; }
+export interface DiscoverOptions { lat:number; lng:number; radiusKm?:number; query?:string; category?:VybeCategory|'all'; }
+const SEARCH_LIMIT=1000;
+const CATEGORY_QUERIES:Record<Exclude<VybeCategory,'other'>,string[]>={gaming:['leisure="amusement_arcade"','amenity="internet_cafe"','leisure="bowling_alley"','shop="video_games"','amenity="games_centre"','name~"arcade|gaming|game|jeux|salle de jeux|video game|playstation|xbox|cyber",i'],food:['amenity~"restaurant|fast_food|food_court|food_stall"','shop~"bakery|confectionery|butcher"'],cafe:['amenity="cafe"','amenity="ice_cream"','name~"cafe|café|coffee|tea|salon de thé",i'],nightlife:['amenity~"bar|pub|nightclub"','amenity="biergarten"','name~"club|discotheque|discothèque|lounge|karaoke",i'],culture:['amenity~"theatre|arts_centre|library|place_of_worship"','tourism~"museum|gallery"'],outdoors:['leisure~"park|garden|playground|nature_reserve|beach_resort|sports_centre"','natural="beach"','tourism~"zoo|aquarium|attraction"'],shopping:['shop~"mall|department_store|supermarket|clothes|shoes|books|video_games|gift|toys|second_hand|furniture|electronics"','shop="market"'],sports:['leisure~"sports_centre|stadium|pitch|fitness_centre|track|swimming_pool"','sport'],family:['leisure~"playground|sports_centre|park"','tourism~"zoo|aquarium"','amenity="family_centre"'],wellness:['leisure="fitness_centre"','amenity~"clinic|hospital|dentist|pharmacy"','shop="health_food"','name~"spa|wellness|relax",i'],services:['amenity~"bank|post_office|police|fire_station|library"','office'],stay:['tourism~"hotel|hostel|guest_house|motel|apartment"']};
+const BROAD_QUERIES=Object.values(CATEGORY_QUERIES).flat();
+const CITY_WORDS=['béjaïa','bejaia','bougie','alger','oran','setif','sétif','constantine'];
+function clean(value:unknown):string{return String(value??'').replace(/\s+/g,' ').trim();}
+function normalize(value:string):string{return value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();}
+function escapeOverpassRegex(value:string):string{return value.replace(/[\\"\n\r\[\]{}()^$.*+?|]/g,' ');}
+function haversineKm(aLat:number,aLng:number,bLat:number,bLng:number):number{const r=6371,dLat=((bLat-aLat)*Math.PI)/180,dLng=((bLng-aLng)*Math.PI)/180,x=Math.sin(dLat/2)**2+Math.cos((aLat*Math.PI)/180)*Math.cos((bLat*Math.PI)/180)*Math.sin(dLng/2)**2;return r*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));}
+function inferCategory(tags:Record<string,string>,name:string):{category:VybeCategory;mood:VybeMood;labels:string[];reasons:string[]}{const hay=normalize([name,...Object.values(tags)].join(' '));const has=(...words:string[])=>words.some(word=>hay.includes(normalize(word)));if(has('arcade','gaming','game room','salle de jeux','jeux video','video games','playstation','xbox','cyber'))return{category:'gaming',mood:'gaming',labels:['Gaming','Social','Fun'],reasons:['The place name or tags indicate gaming or play.']};if(has('restaurant','resto','pizzeria','pizza','burger','tacos','grill','snack','fast food','food court'))return{category:'food',mood:'hungry',labels:['Food','Group-friendly'],reasons:['Food-service signals were found in the place metadata.']};if(has('cafe','coffee','café','tea room','salon de thé','bakery','patisserie'))return{category:'cafe',mood:'chill',labels:['Chill','Coffee'],reasons:['Cafe, coffee or tea signals were found.']};if(has('bar','pub','club','nightclub','discotheque','karaoke','lounge'))return{category:'nightlife',mood:'party',labels:['Nightlife','Social'],reasons:['Nightlife keywords or venue types were found.']};if(has('museum','gallery','theatre','theater','library','mosque','mosquée','church','église','cultural','heritage'))return{category:'culture',mood:'curious',labels:['Culture','Explore'],reasons:['Cultural, heritage or learning signals were found.']};if(has('park','garden','beach','plage','forest','forêt','nature','promenade','hiking','randonnée','zoo','aquarium'))return{category:'outdoors',mood:'outdoor',labels:['Outdoor','Fresh air'],reasons:['Outdoor, nature or attraction signals were found.']};if(has('mall','centre commercial','shopping','boutique','store','shop','market','marché','friperie'))return{category:'shopping',mood:'explore',labels:['Shopping','Explore'],reasons:['Retail or shopping signals were found.']};if(has('gym','fitness','stadium','sports','sport','pool','piscine','tennis','football'))return{category:'sports',mood:'energetic',labels:['Active','Sports'],reasons:['Sports or fitness signals were found.']};if(has('spa','wellness','relax','yoga','massage'))return{category:'wellness',mood:'lazy',labels:['Wellness','Relax'],reasons:['Wellness or relaxation signals were found.']};if(has('hotel','hostel','guest house','motel','resort','apartment'))return{category:'stay',mood:'chill',labels:['Stay','Chill'],reasons:['Accommodation signals were found.']};if(has('school','university','bank','post office','police','hospital','clinic','pharmacy'))return{category:'services',mood:'explore',labels:['Service'],reasons:['A service or essential facility signal was found.']};return{category:'other',mood:'explore',labels:['Discover'],reasons:['No stronger category signal was found, so VYBE keeps the place discoverable instead of hiding it.']};}
+function analyzePlace(tags:Record<string,string>,name:string,rating=0,reviews=0):VybeAnalysis{const inference=inferCategory(tags,name),hasPhoto=Boolean(tags.image||tags.wikimedia_commons),hasHours=Boolean(tags.opening_hours),hasAddress=Boolean(tags['addr:street']||tags['addr:suburb']||tags['addr:city']);let score=55+Math.min(20,rating*4)+Math.min(10,Math.log10(reviews+1)*4);if(hasPhoto)score+=4;if(hasHours)score+=3;if(hasAddress)score+=3;score=Math.max(1,Math.min(99,Math.round(score)));const confidence=Math.max(.55,Math.min(.99,(inference.category==='other'?.55:.78)+(hasHours?.05:0)+(hasAddress?.05:0)+(rating>0?.05:0)));return{...inference,confidence,score};}
+function elementToPlace(element:any,lat:number,lng:number):VybePlace|null{const tags:Record<string,string>=element?.tags??{},name=clean(tags.name||tags['name:fr']||tags['name:ar']);if(!name)return null;const point=Number.isFinite(element?.lat)&&Number.isFinite(element?.lon)?{lat:Number(element.lat),lng:Number(element.lon)}:Number.isFinite(element?.center?.lat)&&Number.isFinite(element?.center?.lon)?{lat:Number(element.center.lat),lng:Number(element.center.lon)}:null;if(!point||!Number.isFinite(point.lat)||!Number.isFinite(point.lng))return null;const analysis=analyzePlace(tags,name,Number(tags.stars??0),0),address=[tags['addr:housenumber'],tags['addr:street'],tags['addr:suburb'],tags['addr:city']].filter(Boolean).join(', '),sourceId=`osm:${element.type}:${element.id}`;return{id:sourceId,source:'OpenStreetMap',sourceId,name,address:address||tags['addr:street']||tags['addr:suburb']||tags['addr:city']||name,city:clean(tags['addr:city']),lat:point.lat,lng:point.lng,distanceKm:haversineKm(lat,lng,point.lat,point.lng),phone:clean(tags.phone)||undefined,website:clean(tags.website)||undefined,image:/^https?:\/\//i.test(tags.image||'')?tags.image:undefined,rating:Number(tags.stars)||undefined,reviewCount:undefined,openingHours:clean(tags.opening_hours)||undefined,tags:[...new Set([tags.amenity,tags.leisure,tags.tourism,tags.shop,tags.sport,tags.cuisine,name].filter(Boolean))].slice(0,12),analysis};}
+function buildQuery(lat:number,lng:number,radiusMeters:number,clauses:string[]):string{return`[out:json][timeout:30];(${clauses.map(clause=>`nwr(around:${radiusMeters},${lat},${lng})[${clause}];`).join('')});out center tags;`;}
+async function fetchOverpass(url:string,query:string):Promise<any[]>{const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},body:new URLSearchParams({data:query})});if(!response.ok)throw new Error(`Discovery provider returned ${response.status}`);const payload=await response.json();return Array.isArray(payload?.elements)?payload.elements:[];}
+async function searchOsm(options:DiscoverOptions):Promise<VybePlace[]>{const radiusMeters=Math.min(Math.max((options.radiusKm??8)*1000,1000),15000),rawQuery=clean(options.query),normalized=normalize(rawQuery);let clauses:string[];if(options.category&&options.category!=='all')clauses=options.category==='other'?BROAD_QUERIES:CATEGORY_QUERIES[options.category];else if(rawQuery)clauses=[`name~"${escapeOverpassRegex(normalized)}",i`,`brand~"${escapeOverpassRegex(normalized)}",i`];else clauses=BROAD_QUERIES;const query=buildQuery(options.lat,options.lng,radiusMeters,clauses),endpoints=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];let lastError:unknown=null;for(const endpoint of endpoints){try{const elements=await fetchOverpass(endpoint,query),map=new Map<string,VybePlace>();for(const element of elements){const place=elementToPlace(element,options.lat,options.lng);if(place)map.set(place.id,place);}return[...map.values()].sort((a,b)=>a.distanceKm-b.distanceKm).slice(0,SEARCH_LIMIT);}catch(error){lastError=error;}}throw lastError instanceof Error?lastError:new Error('No discovery provider is available.');}
+export async function discoverEverything(options:DiscoverOptions):Promise<VybePlace[]>{const radius=options.radiusKm??8;if(!Number.isFinite(options.lat)||!Number.isFinite(options.lng))throw new Error('Invalid discovery coordinates.');const results=await searchOsm({...options,radiusKm:radius}),category=options.category,query=normalize(clean(options.query));return results.filter(place=>!category||category==='all'||place.analysis.category===category||(category==='gaming'&&place.tags.some(tag=>normalize(tag).includes('game')))).filter(place=>!query||normalize(`${place.name} ${place.address} ${place.tags.join(' ')}`).includes(query)).sort((a,b)=>(b.analysis.score-a.analysis.score)||(a.distanceKm-b.distanceKm));}
+export function getCityLabel(lat:number,lng:number):string{if(Math.abs(lat-36.75)<.5&&Math.abs(lng-5.05)<.7)return'Béjaïa';if(Math.abs(lat-36.75)<.7&&Math.abs(lng-3.05)<.7)return'Algiers';if(Math.abs(lat-35.70)<.6&&Math.abs(lng-.65)<.6)return'Oran';if(Math.abs(lat-36.19)<.5&&Math.abs(lng-5.40)<.6)return'Sétif';if(Math.abs(lat-36.36)<.5&&Math.abs(lng-6.60)<.6)return'Constantine';return'Your area';}
