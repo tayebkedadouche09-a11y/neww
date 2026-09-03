@@ -1,23 +1,10 @@
 import { isBackendConfigured } from './env';
 
-/**
- * Which data backend the application is running on.
- *
- *  - 'supabase': VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY are configured
- *                AND VITE_DEMO_MODE is not enabled. Real accounts write to
- *                PostgreSQL; demo users stay local.
- *  - 'local':    VITE_DEMO_MODE=true, or no backend configured. The app boots
- *                on bundled demo data and localStorage persistence
- *                (development fallback — Phase 10).
- */
-export type DataMode = 'supabase' | 'local';
+/** VYBE uses the real Supabase backend. There is no local/demo data mode. */
+export type DataMode = 'supabase';
+export const dataMode: DataMode = 'supabase';
 
-export const dataMode: DataMode = isBackendConfigured ? 'supabase' : 'local';
-
-/**
- * localStorage keys owned by the LOCAL demo backend.
- * In 'supabase' mode these keys are only used by demo-mode sessions.
- */
+/** Legacy storage namespace retained only for theme/session migration safety. */
 export const LOCAL_STORAGE_KEYS = {
   session: 'vybe_session',
   profiles: 'vybe_profiles',
@@ -26,3 +13,7 @@ export const LOCAL_STORAGE_KEYS = {
   plans: 'vybe_plans',
   theme: 'vybe_theme'
 } as const;
+
+if (!isBackendConfigured) {
+  console.warn('[VYBE] Configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY before production use.');
+}
