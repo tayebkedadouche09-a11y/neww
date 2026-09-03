@@ -92,7 +92,7 @@ create table public.collections (
 
 create table public.collection_items (
   id            text primary key,
-  collection_id text not null references public.collections(id) on delete cascade,
+  collection_id uuid not null references public.collections(id) on delete cascade,
   place_id      text not null references public.places(id) on delete cascade,
   created_at    timestamptz not null default now(),
   unique (collection_id, place_id)
@@ -157,4 +157,3 @@ create table public.likes (
   created_at timestamptz not null default now(),
   unique (user_id, place_id)
 );
-
