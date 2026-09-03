@@ -1,302 +1,64 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet';
-import {
-  Bookmark,
-  BookmarkCheck,
-  ClipboardList,
-  Compass,
-  Heart,
-  LocateFixed,
-  Map as MapIcon,
-  Navigation,
-  Plus,
-  Route,
-  Search,
-  Share2,
-  SlidersHorizontal,
-  Sparkles,
-  Trash2,
-  X,
-} from 'lucide-react';
+import { Bookmark, BookmarkCheck, ClipboardList, Compass, Heart, LocateFixed, Map as MapIcon, Navigation, Plus, Route, Search, Share2, SlidersHorizontal, Sparkles, ThumbsUp, Trash2, X } from 'lucide-react';
 import { CITIES, discover, type Category, type City, type Mood, type Place } from './engine';
 import PlacePhoto from './PlacePhoto';
 import { googlePhotosEnabled } from './googlePlaces';
 
-const cats: Array<{ id: Category; label: string; icon: string }> = [
-  ['all', 'Tout', '✦'],
-  ['gaming', 'Gaming', '🎮'],
-  ['food', 'Food', '🍔'],
-  ['cafe', 'Cafés', '☕'],
-  ['nightlife', 'Nightlife', '🌙'],
-  ['outdoors', 'Outdoor', '🌿'],
-  ['culture', 'Culture', '🎭'],
-  ['shopping', 'Shopping', '🛍️'],
-  ['sports', 'Sport', '⚡'],
-  ['family', 'Famille', '👨‍👩‍👧'],
-  ['wellness', 'Wellness', '🧘'],
-].map(([id, label, icon]) => ({ id: id as Category, label, icon }));
+const cats:Array<{id:Category;label:string;icon:string}>=[['all','Tout','✦'],['gaming','Gaming','🎮'],['food','Food','🍔'],['cafe','Cafés','☕'],['nightlife','Nightlife','🌙'],['outdoors','Outdoor','🌿'],['culture','Culture','🎭'],['shopping','Shopping','🛍️'],['sports','Sport','⚡'],['family','Famille','👨‍👩‍👧'],['wellness','Wellness','🧘'],['stay','Stay','🛏️'],['services','Services','🧰']].map(([id,label,icon])=>({id:id as Category,label,icon}));
+const moods:Array<{id:Mood;label:string}>=[['all','Tous'],['gaming','Gaming'],['chill','Chill'],['party','Party'],['hungry','Hungry'],['curious','Curious'],['outdoor','Outdoor'],['energetic','Énergique'],['romantic','Romantic'],['creative','Créatif'],['explore','Explorer']].map(([id,label])=>({id:id as Mood,label}));
 
-const moods: Array<{ id: Mood; label: string }> = [
-  ['all', 'Tous'],
-  ['gaming', 'Gaming'],
-  ['chill', 'Chill'],
-  ['party', 'Party'],
-  ['hungry', 'Hungry'],
-  ['curious', 'Curious'],
-  ['outdoor', 'Outdoor'],
-  ['energetic', 'Énergique'],
-  ['romantic', 'Romantic'],
-  ['creative', 'Créatif'],
-  ['explore', 'Explorer'],
-].map(([id, label]) => ({ id: id as Mood, label }));
+function Fly({city}:{city:City}){const map=useMap();useEffect(()=>{map.flyTo([city.lat,city.lng],13,{duration:.6});},[city,map]);return null;}
+function read<T>(key:string,fallback:T):T{try{return JSON.parse(localStorage.getItem(key)||'null')??fallback;}catch{return fallback;}}
+function route(place:Place){window.open(`https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lng}`,'_blank','noopener,noreferrer');}
+function togglePlace(current:Place[],place:Place){return current.some((item)=>item.id===place.id)?current.filter((item)=>item.id!==place.id):[...current,place];}
 
-function Fly({ city }: { city: City }) {
-  const map = useMap();
-  useEffect(() => {
-    map.flyTo([city.lat, city.lng], 13, { duration: 0.6 });
-  }, [city, map]);
-  return null;
-}
-
-function read<T>(key: string, fallback: T): T {
-  try {
-    return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function route(place: Place) {
-  window.open(
-    `https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lng}`,
-    '_blank',
-    'noopener,noreferrer',
-  );
-}
-
-function savePlace(current: Place[], place: Place): Place[] {
-  return current.some((item) => item.id === place.id)
-    ? current.filter((item) => item.id !== place.id)
-    : [...current, place];
-}
-
-function Card({
-  place,
-  saved,
-  planned,
-  onOpen,
-  onSave,
-  onPlan,
-  notify,
-}: {
-  place: Place;
-  saved: boolean;
-  planned: boolean;
-  onOpen: () => void;
-  onSave: () => void;
-  onPlan: () => void;
-  notify: (message: string) => void;
-}) {
-  return (
-    <article className="card" onClick={onOpen}>
-      <div className="card-media">
-        <PlacePhoto place={place} />
-        <div className="score overlay">
-          <span>VYBE</span>
-          <b>{Math.round(place.score)}</b>
-        </div>
+function Card({place,saved,planned,liked,onOpen,onSave,onPlan,onLike,notify}:{place:Place;saved:boolean;planned:boolean;liked:boolean;onOpen:()=>void;onSave:()=>void;onPlan:()=>void;onLike:()=>void;notify:(message:string)=>void}){
+  return <article className="card" onClick={onOpen}>
+    <div className="card-media"><PlacePhoto place={place}/><div className="score overlay"><span>VYBE</span><b>{Math.round(place.score)}</b></div></div>
+    <div className="card-body"><div className="tagline"><span>{place.category}</span><span>•</span><span>{place.mood}</span><span>•</span><span>{place.distanceKm.toFixed(1)} km</span></div>
+      <h3>{place.name}</h3><p>{place.address}</p>
+      <div className="meta-row">{place.rating?<span>★ {place.rating.toFixed(1)}{place.reviews?` · ${place.reviews}`:''}</span>:<span>Pas de note fiable</span>}<span>{Math.round(place.confidence*100)}% analyse</span></div>
+      <small>{place.reason}</small>
+      <div className="actions">
+        <button onClick={(event)=>{event.stopPropagation();onLike();notify(liked?'Like retiré':'Liked')}}>{liked?<ThumbsUp size={17} fill="currentColor"/>:<ThumbsUp size={17}/>} {liked?'Liked':'Like'}</button>
+        <button onClick={(event)=>{event.stopPropagation();onSave();notify(saved?'Retiré des favoris':'Ajouté aux favoris')}}>{saved?<BookmarkCheck size={17}/>:<Bookmark size={17}/>} {saved?'Saved':'Save'}</button>
+        <button onClick={(event)=>{event.stopPropagation();onPlan();notify(planned?'Retiré du plan':'Ajouté au plan')}}><Plus size={17}/>{planned?'Plan ✓':'Plan'}</button>
+        <button onClick={(event)=>{event.stopPropagation();route(place)}}><Route size={17}/>Route</button>
       </div>
-      <div className="card-body">
-        <div className="tagline">
-          <span>{place.category}</span><span>•</span><span>{place.mood}</span><span>•</span><span>{place.distanceKm.toFixed(1)} km</span>
-        </div>
-        <h3>{place.name}</h3>
-        <p>{place.address}</p>
-        <div className="meta-row">
-          {place.rating ? <span>★ {place.rating.toFixed(1)}{place.reviews ? ` · ${place.reviews}` : ''}</span> : <span>Pas de note fiable</span>}
-          <span>{Math.round(place.confidence * 100)}% analyse</span>
-        </div>
-        <small>{place.reason}</small>
-        <div className="actions">
-          <button onClick={(event) => { event.stopPropagation(); onSave(); notify(saved ? 'Retiré des favoris' : 'Ajouté aux favoris'); }}>
-            {saved ? <BookmarkCheck size={17} /> : <Bookmark size={17} />} {saved ? 'Saved' : 'Save'}
-          </button>
-          <button onClick={(event) => { event.stopPropagation(); onPlan(); notify(planned ? 'Retiré du plan' : 'Ajouté au plan'); }}>
-            <Plus size={17} /> {planned ? 'Plan ✓' : 'Plan'}
-          </button>
-          <button onClick={(event) => { event.stopPropagation(); route(place); }}><Route size={17} /> Route</button>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-export default function App() {
-  const [tab, setTab] = useState<'explore' | 'map' | 'plan' | 'saved'>('explore');
-  const [city, setCity] = useState<City>(() => read('vybe_city', CITIES[0]));
-  const [radius, setRadius] = useState(8);
-  const [category, setCategory] = useState<Category>('all');
-  const [mood, setMood] = useState<Mood>('all');
-  const [search, setSearch] = useState('');
-  const [places, setPlaces] = useState<Place[]>([]);
-  const [savedPlaces, setSavedPlaces] = useState<Place[]>(() => read('vybe_saved_places', []));
-  const [planPlaces, setPlanPlaces] = useState<Place[]>(() => read('vybe_plan_places', []));
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [selected, setSelected] = useState<Place | null>(null);
-  const [toast, setToast] = useState('');
-
-  async function load() {
-    setLoading(true);
-    setError('');
-    try {
-      setPlaces(await discover(city, radius, search, category));
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Discovery indisponible');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => { void load(); }, [city.id, city.lat, city.lng, radius, category]);
-  useEffect(() => { localStorage.setItem('vybe_saved_places', JSON.stringify(savedPlaces)); }, [savedPlaces]);
-  useEffect(() => { localStorage.setItem('vybe_plan_places', JSON.stringify(planPlaces)); }, [planPlaces]);
-  useEffect(() => { localStorage.setItem('vybe_city', JSON.stringify(city)); }, [city]);
-
-  const visible = useMemo(
-    () => places.filter((place) => mood === 'all' || place.mood === mood),
-    [places, mood],
-  );
-
-  function notify(message: string) {
-    setToast(message);
-    window.setTimeout(() => setToast(''), 2200);
-  }
-
-  function share() {
-    const payload = btoa(unescape(encodeURIComponent(JSON.stringify({ city: city.id, places: planPlaces }))));
-    const url = `${location.origin}${location.pathname}?plan=${encodeURIComponent(payload)}`;
-    navigator.clipboard?.writeText(url);
-    notify('Plan copié');
-  }
-
-  useEffect(() => {
-    const encoded = new URLSearchParams(location.search).get('plan');
-    if (!encoded) return;
-    try {
-      const data = JSON.parse(decodeURIComponent(escape(atob(encoded)))) as { places?: Place[] };
-      if (Array.isArray(data.places) && data.places.length) {
-        setPlanPlaces(data.places);
-        setPlaces(data.places);
-        setTab('plan');
-      }
-    } catch {
-      // Ignore malformed shared plans.
-    }
-  }, []);
-
-  return (
-    <div className="app">
-      <header className="top">
-        <div className="brand"><span className="mark">V</span><div><strong>VYBE</strong><small>DISCOVER YOUR NEXT MOVE</small></div></div>
-        <div className="city-row">
-          {CITIES.map((item) => <button className={item.id === city.id ? 'city active' : 'city'} onClick={() => { setCity(item); setPlaces([]); }} key={item.id}>{item.label}</button>)}
-        </div>
-        <button className="loc" aria-label="Ma position" onClick={() => navigator.geolocation?.getCurrentPosition((position) => setCity({ id: 'me', label: 'Ma position', lat: position.coords.latitude, lng: position.coords.longitude }))}><LocateFixed size={18} /></button>
-      </header>
-
-      <main>
-        <section className="hero">
-          <div>
-            <span className="eyebrow"><Sparkles size={15} /> REAL-WORLD DISCOVERY</span>
-            <h1>Qu’est-ce que<br /><em>tu fais</em> maintenant ?</h1>
-            <p>VYBE découvre les lieux autour de toi, les analyse, les classe par vibe et les enrichit avec des photos Google quand elles sont disponibles.</p>
-            <div className="integrations">
-              <span className="source-pill">OpenStreetMap · découverte</span>
-              <span className={googlePhotosEnabled() ? 'source-pill live' : 'source-pill'}>{googlePhotosEnabled() ? 'Google Photos · actif' : 'Google Photos · clé à configurer'}</span>
-            </div>
-          </div>
-          <div className="hero-card"><Compass size={26} /><b>{loading ? 'Scanning…' : `${visible.length} places trouvées`}</b><span>jusqu’à {radius} km · {city.label}</span></div>
-        </section>
-
-        <section className="searchbar">
-          <Search size={20} />
-          <input value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void load(); }} placeholder="Rechercher un lieu, une marque, une activité…" />
-          <select value={radius} onChange={(event) => setRadius(Number(event.target.value))}>
-            <option value={5}>5 km</option><option value={8}>8 km</option><option value={12}>12 km</option><option value={15}>15 km</option><option value={20}>20 km</option>
-          </select>
-          <button onClick={() => void load()} className="primary"><Search size={17} /> Chercher</button>
-        </section>
-
-        <div className="filter-head"><span><SlidersHorizontal size={16} /> Catégories</span><div className="chips">{cats.map((item) => <button className={category === item.id ? 'chip active' : 'chip'} onClick={() => setCategory(item.id)} key={item.id}>{item.icon} {item.label}</button>)}</div></div>
-        <div className="filter-head"><span>MOOD</span><div className="chips">{moods.map((item) => <button className={mood === item.id ? 'mini active' : 'mini'} onClick={() => setMood(item.id)} key={item.id}>{item.label}</button>)}</div></div>
-
-        {error && <div className="error"><X size={18} />{error}<button onClick={() => void load()}>Réessayer</button></div>}
-
-        {tab === 'explore' && (
-          <section className="results">
-            {loading ? [1, 2, 3, 4, 5, 6].map((item) => <div className="skeleton" key={item} />) : visible.map((place) => (
-              <Card
-                key={place.id}
-                place={place}
-                saved={savedPlaces.some((item) => item.id === place.id)}
-                planned={planPlaces.some((item) => item.id === place.id)}
-                onOpen={() => setSelected(place)}
-                onSave={() => setSavedPlaces((current) => savePlace(current, place))}
-                onPlan={() => setPlanPlaces((current) => savePlace(current, place))}
-                notify={notify}
-              />
-            ))}
-          </section>
-        )}
-
-        {tab === 'saved' && (
-          <section className="results">
-            {savedPlaces.length ? savedPlaces.map((place) => <Card key={place.id} place={place} saved planned={planPlaces.some((item) => item.id === place.id)} onOpen={() => setSelected(place)} onSave={() => setSavedPlaces((current) => savePlace(current, place))} onPlan={() => setPlanPlaces((current) => savePlace(current, place))} notify={notify} />) : <div className="empty"><Heart size={38} /><h3>Pas encore de favoris</h3><p>Save les lieux qui te donnent envie.</p></div>}
-          </section>
-        )}
-
-        {tab === 'map' && (
-          <section className="map-wrap">
-            <MapContainer center={[city.lat, city.lng]} zoom={13} scrollWheelZoom style={{ height: '100%', width: '100%' }}>
-              <Fly city={city} />
-              <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-              {visible.map((place) => <CircleMarker key={place.id} center={[place.lat, place.lng]} radius={selected?.id === place.id ? 10 : 7} pathOptions={{ color: '#ccff00', fillColor: '#ccff00', fillOpacity: 0.9 }} eventHandlers={{ click: () => setSelected(place) }}><Popup><b>{place.name}</b><br />{place.category} · {place.distanceKm.toFixed(1)} km<br /><button onClick={() => route(place)}>Route</button></Popup></CircleMarker>)}
-            </MapContainer>
-            <div className="map-count">{visible.length} markers · {city.label}</div>
-          </section>
-        )}
-
-        {tab === 'plan' && (
-          <section className="plan">
-            <div className="plan-head"><div><span className="eyebrow"><Sparkles size={15} /> MY VYBE PLAN</span><h2>{city.label} — {planPlaces.length} stops</h2><p>Un parcours construit à partir des lieux que tu as sélectionnés.</p></div><div className="plan-buttons"><button onClick={share}><Share2 size={17} /> Partager</button><button onClick={() => { setPlanPlaces([]); notify('Plan vidé'); }}><Trash2 size={17} /> Vider</button></div></div>
-            {planPlaces.length ? <div className="timeline">{planPlaces.map((place, index) => <div className="stop" key={place.id}><div className="num">{index + 1}</div><PlacePhoto place={place} compact /><div><span>{place.category} · {place.distanceKm.toFixed(1)} km</span><h3>{place.name}</h3><p>{place.address}</p></div><button onClick={() => route(place)}><Navigation size={18} /></button></div>)}</div> : <div className="empty"><ClipboardList size={42} /><h3>Ton plan est vide</h3><p>Ajoute des lieux depuis Explore pour construire ta sortie.</p><button className="primary" onClick={() => setTab('explore')}>Explorer</button></div>}
-          </section>
-        )}
-      </main>
-
-      <nav className="bottom">
-        <button className={tab === 'explore' ? 'active' : ''} onClick={() => setTab('explore')}><Sparkles size={19} />Explore</button>
-        <button className={tab === 'map' ? 'active' : ''} onClick={() => setTab('map')}><MapIcon size={19} />Map</button>
-        <button className={tab === 'plan' ? 'active' : ''} onClick={() => setTab('plan')}><ClipboardList size={19} />Plan <i>{planPlaces.length}</i></button>
-        <button className={tab === 'saved' ? 'active' : ''} onClick={() => setTab('saved')}><Heart size={19} />Saved <i>{savedPlaces.length}</i></button>
-      </nav>
-
-      {selected && (
-        <aside className="drawer">
-          <button className="close" onClick={() => setSelected(null)}><X /></button>
-          <PlacePhoto place={selected} />
-          <span className="eyebrow">{selected.category} · {selected.mood}</span>
-          <h2>{selected.name}</h2>
-          <p>{selected.address}</p>
-          <div className="metrics"><div><b>{Math.round(selected.score)}</b><span>VYBE score</span></div><div><b>{selected.distanceKm.toFixed(1)}</b><span>km</span></div><div><b>{Math.round(selected.confidence * 100)}%</b><span>confidence</span></div></div>
-          <div className="analysis"><Sparkles size={18} /><div><b>Pourquoi ce lieu ?</b><p>{selected.reason}</p></div></div>
-          <div className="drawer-actions"><button onClick={() => setSavedPlaces((current) => savePlace(current, selected))}>{savedPlaces.some((item) => item.id === selected.id) ? <BookmarkCheck size={18} /> : <Bookmark size={18} />} {savedPlaces.some((item) => item.id === selected.id) ? 'Saved' : 'Save'}</button><button onClick={() => setPlanPlaces((current) => savePlace(current, selected))}><Plus size={18} /> Plan</button></div>
-          <button className="primary wide" onClick={() => route(selected)}><Route size={18} /> Ouvrir les directions</button>
-        </aside>
-      )}
-
-      {toast && <div className="toast">{toast}</div>}
     </div>
-  );
+  </article>;
+}
+
+function Empty({search,reset}:{search:string;reset:()=>void}){return <div className="empty"><Search size={40}/><h3>{search?'Aucun résultat':'Aucun lieu dans cette zone'}</h3><p>{search?`Rien ne correspond à « ${search} ».`:'Essaie une autre catégorie ou augmente le rayon.'}</p><button className="primary" onClick={reset}>Réinitialiser</button></div>;}
+
+export default function App(){
+  const[tab,setTab]=useState<'explore'|'map'|'plan'|'saved'>('explore');const[city,setCity]=useState<City>(()=>read('vybe_city',CITIES[0]));const[radius,setRadius]=useState(8);const[category,setCategory]=useState<Category>('all');const[mood,setMood]=useState<Mood>('all');const[search,setSearch]=useState('');const[places,setPlaces]=useState<Place[]>([]);const[savedPlaces,setSavedPlaces]=useState<Place[]>(()=>read('vybe_saved_places',[]));const[planPlaces,setPlanPlaces]=useState<Place[]>(()=>read('vybe_plan_places',[]));const[likedIds,setLikedIds]=useState<string[]>(()=>read('vybe_likes',[]));const[loading,setLoading]=useState(false);const[error,setError]=useState('');const[selected,setSelected]=useState<Place|null>(null);const[toast,setToast]=useState('');
+  async function load(){setLoading(true);setError('');try{setPlaces(await discover(city,radius,search,category));}catch(cause){setPlaces([]);setError(cause instanceof Error?cause.message:'Discovery indisponible');}finally{setLoading(false);}}
+  useEffect(()=>{void load();},[city.id,city.lat,city.lng,radius,category]);
+  useEffect(()=>{localStorage.setItem('vybe_saved_places',JSON.stringify(savedPlaces));},[savedPlaces]);useEffect(()=>{localStorage.setItem('vybe_plan_places',JSON.stringify(planPlaces));},[planPlaces]);useEffect(()=>{localStorage.setItem('vybe_likes',JSON.stringify(likedIds));},[likedIds]);useEffect(()=>{localStorage.setItem('vybe_city',JSON.stringify(city));},[city]);
+  useEffect(()=>{const encoded=new URLSearchParams(location.search).get('plan');if(!encoded)return;try{const data=JSON.parse(decodeURIComponent(escape(atob(encoded)))) as {places?:Place[]};if(Array.isArray(data.places)&&data.places.length){setPlanPlaces(data.places);setPlaces(data.places);setTab('plan');}}catch{setError('Lien de plan invalide');}},[]);
+  const visible=useMemo(()=>places.filter((place)=>mood==='all'||place.mood===mood),[places,mood]);
+  function notify(message:string){setToast(message);window.setTimeout(()=>setToast(''),2200);}
+  function share(){const payload=btoa(unescape(encodeURIComponent(JSON.stringify({city:city.id,places:planPlaces}))));const url=`${location.origin}${location.pathname}?plan=${encodeURIComponent(payload)}`;void navigator.clipboard?.writeText(url).then(()=>notify('Plan copié')).catch(()=>notify(url));}
+  function resetFilters(){setSearch('');setCategory('all');setMood('all');setRadius(8);}
+  function locate(){if(!navigator.geolocation){setError('La géolocalisation n’est pas disponible dans ce navigateur.');return;}navigator.geolocation.getCurrentPosition((position)=>{setCity({id:'me',label:'Ma position',lat:position.coords.latitude,lng:position.coords.longitude});setPlaces([]);},()=>setError('Position refusée ou indisponible.'));}
+  const save=(place:Place)=>setSavedPlaces((current)=>togglePlace(current,place));const plan=(place:Place)=>setPlanPlaces((current)=>togglePlace(current,place));const like=(id:string)=>setLikedIds((current)=>current.includes(id)?current.filter((item)=>item!==id):[...current,id]);
+  return <div className="app">
+    <header className="top"><div className="brand"><span className="mark">V</span><div><strong>VYBE</strong><small>DISCOVER YOUR NEXT MOVE</small></div></div><div className="city-row">{CITIES.map((item)=><button className={item.id===city.id?'city active':'city'} onClick={()=>{setCity(item);setPlaces([])}} key={item.id}>{item.label}</button>)}</div><button className="loc" aria-label="Ma position" onClick={locate}><LocateFixed size={18}/></button></header>
+    <main>
+      <section className="hero"><div><span className="eyebrow"><Sparkles size={15}/>REAL-WORLD DISCOVERY</span><h1>Qu’est-ce que<br/><em>tu fais</em> maintenant ?</h1><p>VYBE découvre les lieux autour de toi, les analyse, les classe par vibe et les enrichit avec des photos Google quand elles sont disponibles.</p><div className="integrations"><span className="source-pill">OpenStreetMap · découverte</span><span className={googlePhotosEnabled()?'source-pill live':'source-pill'}>{googlePhotosEnabled()?'Google Photos · actif':'Google Photos · clé à configurer'}</span></div></div><div className="hero-card"><Compass size={26}/><b>{loading?'Scanning…':`${visible.length} places trouvées`}</b><span>jusqu’à {radius} km · {city.label}</span></div></section>
+      <section className="searchbar"><Search size={20}/><input value={search} onChange={(event)=>setSearch(event.target.value)} onKeyDown={(event)=>{if(event.key==='Enter')void load();}} placeholder="Rechercher un lieu, une marque, une activité…"/><select value={radius} onChange={(event)=>setRadius(Number(event.target.value))}><option value={5}>5 km</option><option value={8}>8 km</option><option value={12}>12 km</option><option value={15}>15 km</option><option value={20}>20 km</option></select><button onClick={()=>void load()} className="primary"><Search size={17}/>Chercher</button></section>
+      <div className="filter-head"><span><SlidersHorizontal size={16}/>Catégories</span><div className="chips">{cats.map((item)=><button className={category===item.id?'chip active':'chip'} onClick={()=>setCategory(item.id)} key={item.id}>{item.icon} {item.label}</button>)}</div></div>
+      <div className="filter-head"><span>MOOD</span><div className="chips">{moods.map((item)=><button className={mood===item.id?'mini active':'mini'} onClick={()=>setMood(item.id)} key={item.id}>{item.label}</button>)}</div></div>
+      {error&&<div className="error"><X size={18}/><span>{error}</span><button onClick={()=>void load()}>Réessayer</button></div>}
+      {tab==='explore'&&<section className="results">{loading?[1,2,3,4,5,6].map((item)=><div className="skeleton" key={item}/>):visible.length?visible.map((place)=><Card key={place.id} place={place} saved={savedPlaces.some((item)=>item.id===place.id)} planned={planPlaces.some((item)=>item.id===place.id)} liked={likedIds.includes(place.id)} onOpen={()=>setSelected(place)} onSave={()=>save(place)} onPlan={()=>plan(place)} onLike={()=>like(place.id)} notify={notify}/>):<Empty search={search} reset={resetFilters}/>}</section>}
+      {tab==='saved'&&<section className="results">{savedPlaces.length?savedPlaces.map((place)=><Card key={place.id} place={place} saved planned={planPlaces.some((item)=>item.id===place.id)} liked={likedIds.includes(place.id)} onOpen={()=>setSelected(place)} onSave={()=>save(place)} onPlan={()=>plan(place)} onLike={()=>like(place.id)} notify={notify}/>):<div className="empty"><Heart size={40}/><h3>Pas encore de favoris</h3><p>Save les lieux qui te donnent envie.</p></div>}</section>}
+      {tab==='map'&&<section className="map-wrap"><MapContainer center={[city.lat,city.lng]} zoom={13} scrollWheelZoom style={{height:'100%',width:'100%'}}><Fly city={city}/><TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/>{visible.map((place)=><CircleMarker key={place.id} center={[place.lat,place.lng]} radius={selected?.id===place.id?10:7} pathOptions={{color:'#ccff00',fillColor:'#ccff00',fillOpacity:.9}} eventHandlers={{click:()=>setSelected(place)}}><Popup><b>{place.name}</b><br/>{place.category} · {place.distanceKm.toFixed(1)} km<br/><button onClick={()=>route(place)}>Route</button></Popup></CircleMarker>)}</MapContainer><div className="map-count">{visible.length} markers · {city.label}</div></section>}
+      {tab==='plan'&&<section className="plan"><div className="plan-head"><div><span className="eyebrow"><Sparkles size={15}/>MY VYBE PLAN</span><h2>{city.label} — {planPlaces.length} stops</h2><p>Un parcours construit à partir des lieux sélectionnés.</p></div><div className="plan-buttons"><button onClick={share}><Share2 size={17}/>Partager</button><button onClick={()=>{setPlanPlaces([]);notify('Plan vidé')}}><Trash2 size={17}/>Vider</button></div></div>{planPlaces.length?<div className="timeline">{planPlaces.map((place,index)=><div className="stop" key={place.id}><div className="num">{index+1}</div><PlacePhoto place={place} compact/><div><span>{place.category} · {place.distanceKm.toFixed(1)} km</span><h3>{place.name}</h3><p>{place.address}</p></div><button onClick={()=>route(place)}><Navigation size={18}/></button></div>)}</div>:<div className="empty"><ClipboardList size={42}/><h3>Ton plan est vide</h3><p>Ajoute des lieux depuis Explore pour construire ta sortie.</p><button className="primary" onClick={()=>setTab('explore')}>Explorer</button></div>}</section>}
+    </main>
+    <nav className="bottom"><button className={tab==='explore'?'active':''} onClick={()=>setTab('explore')}><Sparkles size={19}/>Explore</button><button className={tab==='map'?'active':''} onClick={()=>setTab('map')}><MapIcon size={19}/>Map</button><button className={tab==='plan'?'active':''} onClick={()=>setTab('plan')}><ClipboardList size={19}/>Plan <i>{planPlaces.length}</i></button><button className={tab==='saved'?'active':''} onClick={()=>setTab('saved')}><Heart size={19}/>Saved <i>{savedPlaces.length}</i></button></nav>
+    {selected&&<aside className="drawer"><button className="close" onClick={()=>setSelected(null)}><X/></button><PlacePhoto place={selected}/><span className="eyebrow">{selected.category} · {selected.mood}</span><h2>{selected.name}</h2><p>{selected.address}</p><div className="metrics"><div><b>{Math.round(selected.score)}</b><span>VYBE score</span></div><div><b>{selected.distanceKm.toFixed(1)}</b><span>km</span></div><div><b>{Math.round(selected.confidence*100)}%</b><span>confidence</span></div></div><div className="analysis"><Sparkles size={18}/><div><b>Pourquoi ce lieu ?</b><p>{selected.reason}</p></div></div><div className="drawer-links">{selected.website&&<a href={selected.website} target="_blank" rel="noreferrer">Site</a>}{selected.phone&&<a href={`tel:${selected.phone}`}>Téléphone</a>}<a href={selected.osmUrl} target="_blank" rel="noreferrer">OpenStreetMap</a></div><div className="drawer-actions"><button onClick={()=>like(selected.id)}>{likedIds.includes(selected.id)?<ThumbsUp size={18} fill="currentColor"/>:<ThumbsUp size={18}/>} {likedIds.includes(selected.id)?'Liked':'Like'}</button><button onClick={()=>save(selected)}>{savedPlaces.some((item)=>item.id===selected.id)?<BookmarkCheck size={18}/>:<Bookmark size={18}/>} {savedPlaces.some((item)=>item.id===selected.id)?'Saved':'Save'}</button><button onClick={()=>plan(selected)}><Plus size={18}/>Plan</button></div><button className="primary wide" onClick={()=>route(selected)}><Route size={18}/>Ouvrir les directions</button></aside>}
+    {toast&&<div className="toast">{toast}</div>}
+  </div>;
 }
