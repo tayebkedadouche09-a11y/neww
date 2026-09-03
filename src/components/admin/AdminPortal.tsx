@@ -26,6 +26,8 @@ export const AdminPortal: React.FC = () => {
   const [primaryMood, setPrimaryMood] = useState<MoodType>('hungry');
   const [address, setAddress] = useState('');
   const [neighborhood, setNeighborhood] = useState('');
+  const [latitude, setLatitude] = useState(0);
+  const [longitude, setLongitude] = useState(0);
   const [priceLevel, setPriceLevel] = useState<PriceLevel>('$$');
   const [approxCost, setApproxCost] = useState(20);
   const [imageUrl, setImageUrl] = useState('');
@@ -51,6 +53,8 @@ export const AdminPortal: React.FC = () => {
     setPrimaryMood('hungry');
     setAddress('');
     setNeighborhood('');
+    setLatitude(0);
+    setLongitude(0);
     setPriceLevel('$$');
     setApproxCost(20);
     setImageUrl('');
@@ -63,9 +67,13 @@ export const AdminPortal: React.FC = () => {
 
   const handleCreateOrUpdate = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || !tagline.trim() || !description.trim()) return;
+    if (!editingPlaceId && (!address.trim() || !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 || (latitude === 0 && longitude === 0))) {
+      showToast('New places need a real address and valid map coordinates.', '📍', 'info');
+      return;
+    }
 
-    const img = imageUrl.trim() || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80';
+    const img = imageUrl.trim();
 
     if (editingPlaceId) {
       const existing = places.find(place => place.id === editingPlaceId);
@@ -83,7 +91,7 @@ export const AdminPortal: React.FC = () => {
         priceLevel,
         approxCostUsd: Number(approxCost),
         location: existing.location,
-        images: [img],
+        images: img ? [img] : existing.images,
         features: {
           ...existing.features,
           isFree: priceLevel === 'free',
@@ -106,12 +114,12 @@ export const AdminPortal: React.FC = () => {
           address: address.trim(),
           neighborhood: neighborhood.trim(),
           city: '',
-          lat: 0,
-          lng: 0,
+          lat: latitude,
+          lng: longitude,
         },
         priceLevel,
         approxCostUsd: Number(approxCost),
-        images: imageUrl.trim() ? [img] : [],
+        images: img ? [img] : [],
         tags: ['New Spot', 'Community Pick'],
         estimatedDuration: '1h - 2h',
         openingHours: {
@@ -148,6 +156,8 @@ export const AdminPortal: React.FC = () => {
     setPrimaryMood(place.primaryMood);
     setAddress(place.location.address);
     setNeighborhood(place.location.neighborhood);
+    setLatitude(place.location.lat);
+    setLongitude(place.location.lng);
     setPriceLevel(place.priceLevel);
     setApproxCost(place.approxCostUsd);
     setImageUrl(place.images[0] || '');
@@ -208,6 +218,11 @@ export const AdminPortal: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Address</label><input type="text" required={!editingPlaceId} placeholder="Real street address" value={address} onChange={e => setAddress(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white" /></div>
               <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Image URL (optional)</label><input type="url" placeholder="https://..." value={imageUrl} onChange={e => setImageUrl(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white" /></div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Latitude</label><input name="latitude" type="number" required={!editingPlaceId} min="-90" max="90" step="any" placeholder="e.g. 36.7538" value={latitude} onChange={e => setLatitude(Number(e.target.value))} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white" /></div>
+              <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Longitude</label><input name="longitude" type="number" required={!editingPlaceId} min="-180" max="180" step="any" placeholder="e.g. 3.0588" value={longitude} onChange={e => setLongitude(Number(e.target.value))} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white" /></div>
             </div>
 
             <div className="flex flex-wrap gap-4 pt-2">
