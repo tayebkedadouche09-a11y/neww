@@ -6,7 +6,7 @@ import { googlePlaceToVybePlace } from './googlePlacesAdapter';
 
 const PLACE_FIELDS: string[] = [
   'id', 'displayName', 'formattedAddress', 'shortFormattedAddress', 'location',
-  'types', 'rating', 'userRatingCount', 'priceLevel', 'photos',
+  'types', 'primaryType', 'rating', 'userRatingCount', 'priceLevel', 'photos',
   'regularOpeningHours', 'businessStatus', 'nationalPhoneNumber', 'websiteURI',
 ];
 
@@ -34,8 +34,6 @@ async function libraryPlaceToResult(p: google.maps.places.Place): Promise<Google
     }
   }
 
-  // Google photo URIs are ephemeral. We only keep the fresh URI and attribution
-  // in the in-memory Place object returned from this fresh Place instance.
   const photos = (p.photos ?? []).slice(0, 5).flatMap(photo => {
     try {
       const uri = photo.getURI({ maxWidth: 1200, maxHeight: 750 });
@@ -58,12 +56,14 @@ async function libraryPlaceToResult(p: google.maps.places.Place): Promise<Google
     }
   });
 
+  const placeWithPrimary = p as google.maps.places.Place & { primaryType?: string };
   return {
     place_id: p.id,
     name: p.displayName ?? '',
     formatted_address: p.formattedAddress ?? undefined,
     geometry: loc ? { location: { lat: loc.lat(), lng: loc.lng() } } : undefined,
     types: p.types ?? undefined,
+    primary_type: placeWithPrimary.primaryType ?? undefined,
     rating: p.rating ?? undefined,
     user_ratings_total: p.userRatingCount ?? undefined,
     price_level: priceIndex >= 0 ? priceIndex : undefined,
@@ -101,17 +101,24 @@ async function searchNearbyGooglePlacesSingle(lat: number, lng: number, radiusKm
 
 export async function searchNearbyGooglePlaces(lat: number, lng: number, radiusKm: number = 5, type?: string | string[], keyword?: string): Promise<Place[]> {
   if (keyword?.trim()) return searchGooglePlacesText(keyword, lat, lng, radiusKm);
-
-  // Nearby Search (New) accepts multiple includedTypes in a single request.
-  // Keep the type set in one call so category discovery does not fan out into
-  // many SearchNearbyRequest calls and burn the daily quota unnecessarily.
   const includedTypes = Array.isArray(type) ? [...new Set(type.filter(Boolean))] : type ? [type] : undefined;
   return searchNearbyGooglePlacesSingle(lat, lng, radiusKm, includedTypes);
 }
 
-export async function searchGooglePlacesText(query: string, lat?: number, lng?: number, radiusKm?: number): Promise<Place[]> {
+export async function searchGooglePlacesText(
+  query: string,
+  lat?: number,
+  lng?: number,
+  radiusKm?: number,
+  includedType?: string,
+): Promise<Place[]> {
   const { Place } = await importPlacesLibrary();
-  const request: google.maps.places.SearchByTextRequest = { textQuery: query, fields: PLACE_FIELDS, maxResultCount: 20 };
+  const request: google.maps.places.SearchByTextRequest = {
+    textQuery: query,
+    fields: PLACE_FIELDS,
+    maxResultCount: 20,
+    ...(includedType ? { includedType, strictTypeFiltering: true } : {}),
+  };
   if (lat !== undefined && lng !== undefined) {
     request.locationBias = { center: { lat, lng }, radius: Math.min((radiusKm ?? 5) * 1000, 50000) };
   }
