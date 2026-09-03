@@ -3,7 +3,7 @@ import { Place, MoodType, FilterState, Collection, VybePlan, PlanItem, PlaceRevi
 import { calculateVybeScore } from '../hooks/useVybeScore';
 import { useGeolocation, GeoLocation } from '../hooks/useGeolocation';
 import { useAuth } from './AuthContext';
-import { dataMode, LOCAL_STORAGE_KEYS } from '../lib/dataMode';
+import { dataMode } from '../lib/dataMode';
 import { newUuid } from '../services/mappers';
 import { placesService } from '../services/placesService';
 import { collectionsService } from '../services/collectionsService';
@@ -37,16 +37,6 @@ interface DataContextType {
 }
 
 const DEFAULT_FILTERS: FilterState = { searchQuery: '', moods: [], categories: [], priceLevels: [], maxBudget: undefined, maxDistanceKm: undefined, duration: undefined, companion: undefined, onlyOpenNow: false, onlyFree: false, onlyHiddenGems: false, onlyLateNight: false, sortBy: 'vybe-score' };
-const INITIAL_COLLECTIONS: Collection[] = [
-  { id: 'col-1', userId: 'u-1', name: 'Weekend Hype & Sunsets', description: 'Golden hour rooftops, neon arcades & late night street tacos', emoji: '🌆', color: '#CCFF00', isPublic: true, placeIds: ['place-1', 'place-2', 'place-15'], createdAt: '2025-01-10T10:00:00Z', updatedAt: '2025-01-15T10:00:00Z' },
-  { id: 'col-2', userId: 'u-1', name: 'Lo-Fi Chill & Matcha Nooks', description: 'Best spots to read, draw or listen to ambient vinyl', emoji: '🍵', color: '#00F0FF', isPublic: true, placeIds: ['place-3', 'place-12', 'place-16'], createdAt: '2025-01-12T14:00:00Z', updatedAt: '2025-01-18T16:00:00Z' },
-  { id: 'col-3', userId: 'u-1', name: 'Date Night Magic', description: 'Aesthetic speakeasies, pottery workshops & LED glowing kayaks', emoji: '✨', color: '#FF007F', isPublic: false, placeIds: ['place-4', 'place-5', 'place-11', 'place-18'], createdAt: '2025-01-14T19:00:00Z', updatedAt: '2025-01-20T21:00:00Z' }
-];
-const INITIAL_PLANS: VybePlan[] = [{ id: 'plan-1', userId: 'u-1', title: 'Epic Friday Night Outing', date: 'Tonight', mood: 'party', targetBudgetUsd: 65, coverImage: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80', isPublic: true, createdAt: '2025-01-20T18:00:00Z', items: [
-  { id: 'item-1', placeId: 'place-15', startTime: '19:00', durationMinutes: 60, customNote: 'Fuel up on al pastor tacos & fresh agua fresca 🌮', order: 1 },
-  { id: 'item-2', placeId: 'place-2', startTime: '20:30', durationMinutes: 90, customNote: 'DDR battle and Mario Kart tournament with the squad 🕹️', order: 2 },
-  { id: 'item-3', placeId: 'place-1', startTime: '22:30', durationMinutes: 120, customNote: 'Rooftop cocktail lounge under city lights 🌃', order: 3 }
-] }];
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -65,9 +55,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [shareTargetPlace, setShareTargetPlace] = useState<Place | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register' | 'profile' | 'forgot'>('login');
-  const [collections, setCollections] = useState<Collection[]>(() => { const saved = localStorage.getItem(LOCAL_STORAGE_KEYS.collections); if (saved) { try { return JSON.parse(saved); } catch (e) { console.error('Failed to parse collections', e); } } return INITIAL_COLLECTIONS; });
-  const [plans, setPlans] = useState<VybePlan[]>(() => { const saved = localStorage.getItem(LOCAL_STORAGE_KEYS.plans); if (saved) { try { return JSON.parse(saved); } catch (e) { console.error('Failed to parse plans', e); } } return INITIAL_PLANS; });
-  const [activePlan, setActivePlan] = useState<VybePlan | null>(plans[0] || null);
+  const [collections, setCollections] = useState<Collection[]>([]);
+  const [plans, setPlans] = useState<VybePlan[]>([]);
+  const [activePlan, setActivePlan] = useState<VybePlan | null>(null);
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
   const deepLinkHandledRef = useRef<string | null>(null);
   type GoogleHydrationState = { status: 'pending' | 'success' | 'failed'; nextAttemptAt: number };
@@ -75,9 +65,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const GOOGLE_HYDRATION_SUCCESS_COOLDOWN_MS = 10_000;
   const GOOGLE_HYDRATION_FAILURE_COOLDOWN_MS = 60_000;
 
-  useEffect(() => { if (dataMode === 'local') localStorage.setItem(LOCAL_STORAGE_KEYS.places, JSON.stringify(places)); }, [places]);
-  useEffect(() => { if (dataMode === 'local') localStorage.setItem(LOCAL_STORAGE_KEYS.collections, JSON.stringify(collections)); }, [collections]);
-  useEffect(() => { if (dataMode === 'local') localStorage.setItem(LOCAL_STORAGE_KEYS.plans, JSON.stringify(plans)); }, [plans]);
   const removeToast = useCallback((id: string) => setToasts(prev => prev.filter(t => t.id !== id)), []);
   const showToast = useCallback((message: string, emoji = '⚡', type: 'success' | 'info' | 'vibe' = 'vibe') => { const id = `toast-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`; setToasts(prev => [...prev, { id, message, emoji, type }]); setTimeout(() => removeToast(id), 4000); }, [removeToast]);
 
@@ -101,17 +88,30 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => { if (!geo.location && !geo.loading && !geo.error) geo.requestLocation(); }, [geo.location, geo.loading, geo.error, geo.requestLocation]);
   useEffect(() => { if (geo.location) discover(); }, [geo.location]);
 
-  const realUserId = dataMode === 'supabase' && sessionMode === 'auth' ? currentUser?.id ?? null : null;
+  const realUserId = sessionMode === 'auth' ? currentUser?.id ?? null : null;
   useEffect(() => {
-    if (!realUserId) return; let cancelled = false;
-    (async () => { try { const [remoteCollections, remotePlans] = await Promise.all([collectionsService.list(realUserId), plansService.list(realUserId)]); if (cancelled) return; setCollections(remoteCollections); setPlans(remotePlans); setActivePlan(prev => remotePlans.find(p => p.id === prev?.id) ?? remotePlans[0] ?? null); } catch (e) { console.error('[DataContext] User data hydration failed', e); } })();
+    let cancelled = false;
+    if (!realUserId) {
+      setCollections([]);
+      setPlans([]);
+      setActivePlan(null);
+      return () => { cancelled = true; };
+    }
+    (async () => {
+      try {
+        const [remoteCollections, remotePlans] = await Promise.all([collectionsService.list(realUserId), plansService.list(realUserId)]);
+        if (cancelled) return;
+        setCollections(remoteCollections);
+        setPlans(remotePlans);
+        setActivePlan(prev => remotePlans.find(p => p.id === prev?.id) ?? remotePlans[0] ?? null);
+      } catch (e) {
+        console.error('[DataContext] User data hydration failed', e);
+        if (!cancelled) { setCollections([]); setPlans([]); setActivePlan(null); }
+      }
+    })();
     return () => { cancelled = true; };
   }, [realUserId]);
 
-  // Keep persisted Google places usable after discovery replaces the current result set.
-  // Plans and collections store stable place IDs; details are restored on demand.
-  // The per-place state machine prevents duplicate/infinite requests while still
-  // allowing a later retry when a discovery refresh has removed a previously restored place.
   useEffect(() => {
     let cancelled = false;
     const now = Date.now();
@@ -201,6 +201,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (planId) {
+        if (!realUserId) {
+          if (dataMode === 'supabase') {
+            try {
+              const publicPlan = await plansService.getPublic(planId);
+              if (!publicPlan || cancelled) return;
+              deepLinkHandledRef.current = routeKey;
+              setPlans(prev => [publicPlan, ...prev.filter(item => item.id !== publicPlan.id)]);
+              setActivePlan(publicPlan);
+              setActiveTab('plan');
+            } catch (error) {
+              console.warn('[DataContext] Public plan deep link could not be resolved', error);
+            }
+          }
+          return;
+        }
         const localPlan = plans.find(item => item.id === planId);
         if (localPlan) {
           if (cancelled) return;
@@ -225,6 +240,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (collectionId) {
+        if (!realUserId) {
+          if (dataMode === 'supabase') {
+            try {
+              const publicCollection = await collectionsService.getPublic(collectionId);
+              if (!publicCollection || cancelled) return;
+              deepLinkHandledRef.current = routeKey;
+              setCollections(prev => [publicCollection, ...prev.filter(item => item.id !== publicCollection.id)]);
+              setActiveTab('saved');
+            } catch (error) {
+              console.warn('[DataContext] Public collection deep link could not be resolved', error);
+            }
+          }
+          return;
+        }
         const localCollection = collections.find(item => item.id === collectionId);
         if (localCollection) {
           if (cancelled) return;
@@ -248,35 +277,52 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     void resolveDeepLink();
     return () => { cancelled = true; };
-  }, [places, plans, collections]);
+  }, [places, plans, collections, realUserId]);
 
   const resetFilters = () => { setFilters(DEFAULT_FILTERS); setActiveHeroMood(null); };
   const openPlaceDetail = (place: Place) => { setSelectedPlace(place); setIsDetailOpen(true); };
   const openShareModal = (place?: Place) => { setShareTargetPlace(place || selectedPlace || null); setIsShareModalOpen(true); };
 
-  const createPlan = (title: string, mood: MoodType, targetBudgetUsd = 50) => { const newPlan: VybePlan = { id: dataMode === 'supabase' ? newUuid() : `plan-${Date.now()}`, userId: currentUser?.id || 'u-1', title, date: 'Upcoming Outing', mood, targetBudgetUsd, isPublic: true, createdAt: new Date().toISOString(), items: [] }; setPlans(prev => [newPlan, ...prev]); setActivePlan(newPlan); if (realUserId) void plansService.create(newPlan).catch(e => console.error(e)); return newPlan; };
+  const createPlan = (title: string, mood: MoodType, targetBudgetUsd = 50) => {
+    const newPlan: VybePlan = { id: newUuid(), userId: currentUser?.id || '', title, date: 'Upcoming Outing', mood, targetBudgetUsd, isPublic: true, createdAt: new Date().toISOString(), items: [] };
+    if (!realUserId) return newPlan;
+    setPlans(prev => [newPlan, ...prev]);
+    setActivePlan(newPlan);
+    void plansService.create(newPlan).catch(e => console.error(e));
+    return newPlan;
+  };
+
   const addPlaceToPlan = (planId: string, placeId: string, customTime = '20:00', placeOverride?: Place) => {
     const plan = plans.find(p => p.id === planId);
     const place = places.find(p => p.id === placeId) ?? placeOverride;
-    if (!plan || !place || plan.items.some(item => item.placeId === placeId)) return;
-    const newItem: PlanItem = { id: dataMode === 'supabase' ? newUuid() : `item-${Date.now()}`, placeId, startTime: customTime, durationMinutes: 90, customNote: `Experience ${place.name} (${place.tagline})`, order: plan.items.length + 1 };
+    if (!realUserId || !plan || plan.userId !== realUserId || !place || plan.items.some(item => item.placeId === placeId)) return;
+    const newItem: PlanItem = { id: newUuid(), placeId, startTime: customTime, durationMinutes: 90, customNote: `Experience ${place.name} (${place.tagline})`, order: plan.items.length + 1 };
     const updatedPlans = plans.map(p => p.id === planId ? { ...p, items: [...p.items, newItem] } : p);
     setPlans(updatedPlans);
     setActivePlan(prev => prev?.id === planId ? updatedPlans.find(p => p.id === planId) || null : prev);
     if (placeOverride && !places.some(p => p.id === placeOverride.id)) setPlaces(prev => [placeOverride, ...prev]);
-    if (realUserId) void plansService.addItem(planId, newItem).catch(e => console.error(e));
+    void plansService.addItem(planId, newItem).catch(e => console.error(e));
   };
-  const removePlaceFromPlan = (planId: string, planItemId: string) => { const updatedPlans = plans.map(p => p.id === planId ? { ...p, items: p.items.filter(item => item.id !== planItemId) } : p); setPlans(updatedPlans); if (activePlan?.id === planId) setActivePlan(updatedPlans.find(p => p.id === planId) || null); if (realUserId) void plansService.removeItem(planItemId).catch(e => console.error(e)); };
-  const updatePlanItem = (planId: string, planItemId: string, updates: { startTime?: string; customNote?: string; durationMinutes?: number }) => { const updatedPlans = plans.map(p => p.id === planId ? { ...p, items: p.items.map(item => item.id === planItemId ? { ...item, ...updates } : item) } : p); setPlans(updatedPlans); if (activePlan?.id === planId) setActivePlan(updatedPlans.find(p => p.id === planId) || null); if (realUserId) void plansService.updateItem(planItemId, updates).catch(e => console.error(e)); };
-  const deletePlan = (planId: string) => { setPlans(prev => { const nextPlans = prev.filter(p => p.id !== planId); if (activePlan?.id === planId) setActivePlan(nextPlans[0] || null); return nextPlans; }); if (realUserId) void plansService.remove(planId).catch(e => console.error(e)); };
-  const createCollection = (name: string, emoji: string, color: string, description = '') => { const nowIso = new Date().toISOString(); const newCol: Collection = { id: dataMode === 'supabase' ? newUuid() : `col-${Date.now()}`, userId: currentUser?.id || 'u-1', name, description, emoji, color, isPublic: true, placeIds: [], createdAt: nowIso, updatedAt: nowIso }; setCollections(prev => [newCol, ...prev]); if (realUserId) void collectionsService.create(newCol).catch(e => console.error(e)); return newCol; };
-  const addPlaceToCollection = (collectionId: string, placeId: string) => { const col = collections.find(c => c.id === collectionId); if (!col || !places.some(p => p.id === placeId) || col.placeIds.includes(placeId)) return; setCollections(prev => prev.map(c => c.id === collectionId ? { ...c, placeIds: [...c.placeIds, placeId], updatedAt: new Date().toISOString() } : c)); if (realUserId) void collectionsService.addPlace(collectionId, placeId).catch(e => console.error(e)); };
-  const removePlaceFromCollection = (collectionId: string, placeId: string) => { setCollections(prev => prev.map(c => c.id === collectionId ? { ...c, placeIds: c.placeIds.filter(id => id !== placeId) } : c)); if (realUserId) void collectionsService.removePlace(collectionId, placeId).catch(e => console.error(e)); };
-  const deleteCollection = (collectionId: string) => { setCollections(prev => prev.filter(c => c.id !== collectionId)); if (realUserId) void collectionsService.remove(collectionId).catch(e => console.error(e)); };
-  const addReview = (placeId: string, reviewData: Omit<PlaceReview, 'id' | 'createdAt' | 'likesCount'>) => { const target = places.find(p => p.id === placeId); if (!target) return; const newReview: PlaceReview = { ...reviewData, id: dataMode === 'supabase' ? newUuid() : `rev-${Date.now()}`, createdAt: 'Just now', likesCount: 0 }; const updatedPlace = { ...target, reviews: [newReview, ...target.reviews], rating: Number(((target.rating * target.reviewCount + reviewData.rating) / (target.reviewCount + 1)).toFixed(1)), reviewCount: target.reviewCount + 1 }; setPlaces(prev => prev.map(p => p.id === placeId ? updatedPlace : p)); setSelectedPlace(cur => cur?.id === placeId ? updatedPlace : cur); if (realUserId) void reviewsService.create({ placeId, userId: reviewData.userId, rating: reviewData.rating, vibeRating: reviewData.vibeRating, moodTags: reviewData.moodTags, comment: reviewData.comment, id: newReview.id }).catch(e => console.error(e)); };
-  const addPlace = (placeData: Omit<Place, 'id' | 'rating' | 'reviewCount' | 'baseVybeScore' | 'reviews'>) => { const newPlace: Place = { ...placeData, id: dataMode === 'supabase' ? newUuid() : `place-${Date.now()}`, rating: 4.8, reviewCount: 1, baseVybeScore: 92, reviews: [] }; setPlaces(prev => [newPlace, ...prev]); if (realUserId) void placesService.create(newPlace).catch(e => console.error(e)); return newPlace; };
-  const updatePlace = (placeId: string, updates: Partial<Place>) => { setPlaces(prev => prev.map(p => p.id === placeId ? { ...p, ...updates } : p)); if (selectedPlace?.id === placeId) setSelectedPlace(prev => prev ? { ...prev, ...updates } : null); if (realUserId) void placesService.update(placeId, updates).catch(e => console.error(e)); };
-  const deletePlace = (placeId: string) => { setPlaces(prev => prev.filter(p => p.id !== placeId)); if (selectedPlace?.id === placeId) { setSelectedPlace(null); setIsDetailOpen(false); } if (realUserId) void placesService.remove(placeId).catch(e => console.error(e)); };
+  const removePlaceFromPlan = (planId: string, planItemId: string) => { const plan = plans.find(p => p.id === planId); if (!realUserId || !plan || plan.userId !== realUserId) return; const updatedPlans = plans.map(p => p.id === planId ? { ...p, items: p.items.filter(item => item.id !== planItemId) } : p); setPlans(updatedPlans); if (activePlan?.id === planId) setActivePlan(updatedPlans.find(p => p.id === planId) || null); void plansService.removeItem(planItemId).catch(e => console.error(e)); };
+  const updatePlanItem = (planId: string, planItemId: string, updates: { startTime?: string; customNote?: string; durationMinutes?: number }) => { const plan = plans.find(p => p.id === planId); if (!realUserId || !plan || plan.userId !== realUserId) return; const updatedPlans = plans.map(p => p.id === planId ? { ...p, items: p.items.map(item => item.id === planItemId ? { ...item, ...updates } : item) } : p); setPlans(updatedPlans); if (activePlan?.id === planId) setActivePlan(updatedPlans.find(p => p.id === planId) || null); void plansService.updateItem(planItemId, updates).catch(e => console.error(e)); };
+  const deletePlan = (planId: string) => { const plan = plans.find(p => p.id === planId); if (!realUserId || !plan || plan.userId !== realUserId) return; setPlans(prev => { const nextPlans = prev.filter(p => p.id !== planId); if (activePlan?.id === planId) setActivePlan(nextPlans[0] || null); return nextPlans; }); void plansService.remove(planId).catch(e => console.error(e)); };
+
+  const createCollection = (name: string, emoji: string, color: string, description = '') => {
+    const nowIso = new Date().toISOString();
+    const newCol: Collection = { id: newUuid(), userId: currentUser?.id || '', name, description, emoji, color, isPublic: true, placeIds: [], createdAt: nowIso, updatedAt: nowIso };
+    if (!realUserId) return newCol;
+    setCollections(prev => [newCol, ...prev]);
+    void collectionsService.create(newCol).catch(e => console.error(e));
+    return newCol;
+  };
+  const addPlaceToCollection = (collectionId: string, placeId: string) => { const col = collections.find(c => c.id === collectionId); if (!realUserId || !col || col.userId !== realUserId || !places.some(p => p.id === placeId) || col.placeIds.includes(placeId)) return; setCollections(prev => prev.map(c => c.id === collectionId ? { ...c, placeIds: [...c.placeIds, placeId], updatedAt: new Date().toISOString() } : c)); void collectionsService.addPlace(collectionId, placeId).catch(e => console.error(e)); };
+  const removePlaceFromCollection = (collectionId: string, placeId: string) => { const col = collections.find(c => c.id === collectionId); if (!realUserId || !col || col.userId !== realUserId) return; setCollections(prev => prev.map(c => c.id === collectionId ? { ...c, placeIds: c.placeIds.filter(id => id !== placeId) } : c)); void collectionsService.removePlace(collectionId, placeId).catch(e => console.error(e)); };
+  const deleteCollection = (collectionId: string) => { const col = collections.find(c => c.id === collectionId); if (!realUserId || !col || col.userId !== realUserId) return; setCollections(prev => prev.filter(c => c.id !== collectionId)); void collectionsService.remove(collectionId).catch(e => console.error(e)); };
+
+  const addReview = (placeId: string, reviewData: Omit<PlaceReview, 'id' | 'createdAt' | 'likesCount'>) => { const target = places.find(p => p.id === placeId); if (!realUserId || !target || reviewData.userId !== realUserId) return; const newReview: PlaceReview = { ...reviewData, id: newUuid(), createdAt: 'Just now', likesCount: 0 }; const updatedPlace = { ...target, reviews: [newReview, ...target.reviews], rating: Number(((target.rating * target.reviewCount + reviewData.rating) / (target.reviewCount + 1)).toFixed(1)), reviewCount: target.reviewCount + 1 }; setPlaces(prev => prev.map(p => p.id === placeId ? updatedPlace : p)); setSelectedPlace(cur => cur?.id === placeId ? updatedPlace : cur); void reviewsService.create({ placeId, userId: reviewData.userId, rating: reviewData.rating, vibeRating: reviewData.vibeRating, moodTags: reviewData.moodTags, comment: reviewData.comment, id: newReview.id }).catch(e => console.error(e)); };
+  const addPlace = (placeData: Omit<Place, 'id' | 'rating' | 'reviewCount' | 'baseVybeScore' | 'reviews'>) => { if (!realUserId) return { ...placeData, id: newUuid(), rating: 4.8, reviewCount: 1, baseVybeScore: 92, reviews: [] } as Place; const newPlace: Place = { ...placeData, id: newUuid(), rating: 4.8, reviewCount: 1, baseVybeScore: 92, reviews: [] }; setPlaces(prev => [newPlace, ...prev]); void placesService.create(newPlace).catch(e => console.error(e)); return newPlace; };
+  const updatePlace = (placeId: string, updates: Partial<Place>) => { if (!realUserId) return; setPlaces(prev => prev.map(p => p.id === placeId ? { ...p, ...updates } : p)); if (selectedPlace?.id === placeId) setSelectedPlace(prev => prev ? { ...prev, ...updates } : null); void placesService.update(placeId, updates).catch(e => console.error(e)); };
+  const deletePlace = (placeId: string) => { if (!realUserId) return; setPlaces(prev => prev.filter(p => p.id !== placeId)); if (selectedPlace?.id === placeId) { setSelectedPlace(null); setIsDetailOpen(false); } void placesService.remove(placeId).catch(e => console.error(e)); };
 
   const filteredPlaces = useMemo(() => {
     const effectiveMoods = activeHeroMood ? [activeHeroMood, ...filters.moods.filter(m => m !== activeHeroMood)] : filters.moods;
