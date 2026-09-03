@@ -25,6 +25,8 @@ jobs:
         run: node scripts/production-invariants.mjs
       - name: Real-only runtime invariants
         run: node scripts/real-only-invariants.mjs
+      - name: Security invariants
+        run: node scripts/security-invariants.mjs
       - name: Typecheck
         run: npm run typecheck
       - name: Production build
