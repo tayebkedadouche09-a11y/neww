@@ -1,10 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App';
+import App from './vybe-next/App';
 import './index.css';
-import { ThemeProvider } from './context/ThemeContext';
-import { AuthProvider } from './context/AuthContext';
-import { DataProvider } from './context/DataContext';
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
@@ -14,14 +11,11 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
   });
 }
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
+const root = document.getElementById('root');
+if (!root) throw new Error('VYBE root element was not found.');
+
+ReactDOM.createRoot(root).render(
   <React.StrictMode>
-    <ThemeProvider>
-      <AuthProvider>
-        <DataProvider>
-          <App />
-        </DataProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    <App />
   </React.StrictMode>,
 );
