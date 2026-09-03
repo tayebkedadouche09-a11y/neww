@@ -26,3 +26,4 @@ jobs:
         run: npm run typecheck
       - name: Production build
         run: npm run build
+      # Keep deployment verification tied to the same main-branch build.
