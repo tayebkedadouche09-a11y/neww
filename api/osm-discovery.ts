@@ -15,6 +15,24 @@ const MAX_REQUESTS_PER_WINDOW = 30;
 const MAX_RADIUS_METERS = 50_000;
 const requestBuckets = new Map<string, { count: number; resetAt: number }>();
 
+const ALLOWED_STATIC_CLAUSES = new Set([
+  'amenity="restaurant"', 'amenity="fast_food"', 'amenity="cafe"', 'leisure="park"', 'leisure="garden"',
+  'amenity="cinema"', 'leisure="fitness_centre"', 'amenity="gym"', 'tourism="hotel"', 'tourism="hostel"',
+  'tourism="guest_house"', 'shop="mall"', 'shop="department_store"', 'shop="supermarket"', 'shop="clothes"',
+  'amenity="library"', 'tourism="museum"', 'amenity="museum"', 'leisure="sports_centre"', 'leisure="stadium"',
+  'leisure="pitch"', 'amenity="bar"', 'amenity="pub"', 'amenity="nightclub"', 'leisure="amusement_arcade"',
+  'leisure="bowling_alley"', 'amenity="internet_cafe"', 'amenity="game_centre"', 'amenity="music_venue"',
+  'amenity="theatre"', 'amenity="hospital"', 'amenity="clinic"', 'leisure="playground"', 'natural="beach"'
+]);
+
+const ALLOWED_BROAD_CLAUSES = new Set([
+  'amenity~"restaurant|fast_food|cafe|bar|pub|nightclub|cinema|theatre|library|hospital|clinic|place_of_worship|music_venue|internet_cafe|game_centre"',
+  'leisure~"park|garden|playground|fitness_centre|sports_centre|stadium|pitch|amusement_arcade|bowling_alley"',
+  'tourism~"hotel|hostel|guest_house|museum|attraction"',
+  'shop~"mall|department_store|supermarket|clothes|books|second_hand|toys|gift"',
+  'natural="beach"'
+]);
+
 function text(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value.trim() : fallback;
 }
@@ -48,12 +66,13 @@ function buildQuery(lat: number, lng: number, radiusMeters: number, clauses: str
   return `[out:json][timeout:20];(${clauses.map(clause => `nwr(around:${radiusMeters},${lat},${lng})[${clause}];`).join('')});out center tags;`;
 }
 
+function isSafeNameClause(clause: string): boolean {
+  return /^name~"[A-Za-z0-9 .,_'()&+\-/\u00C0-\u024F\u0600-\u06FF]{1,100}",i$/.test(clause);
+}
+
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -69,7 +88,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   const lng = Number(payload.lng);
   const radiusMeters = Number(payload.radiusMeters);
   const clauses = Array.isArray(payload.clauses)
-    ? payload.clauses.filter((value): value is string => typeof value === 'string' && value.length > 0 && value.length <= 300).slice(0, 6)
+    ? payload.clauses
+      .filter((value): value is string => typeof value === 'string' && value.length > 0 && value.length <= 300)
+      .filter(clause => ALLOWED_STATIC_CLAUSES.has(clause) || ALLOWED_BROAD_CLAUSES.has(clause) || isSafeNameClause(clause))
+      .slice(0, 6)
     : [];
 
   if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lng) || lng < -180 || lng > 180) {
@@ -78,7 +100,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (!Number.isFinite(radiusMeters) || radiusMeters <= 0 || radiusMeters > MAX_RADIUS_METERS) {
     return res.status(400).json({ error: 'Invalid radius.' });
   }
-  if (!clauses.length) return res.status(400).json({ error: 'No discovery filters supplied.' });
+  if (!clauses.length) return res.status(400).json({ error: 'No supported discovery filters supplied.' });
 
   const query = buildQuery(lat, lng, radiusMeters, clauses);
   const endpoints = [
