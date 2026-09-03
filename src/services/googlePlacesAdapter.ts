@@ -1,4 +1,4 @@
-import { Place, CategoryType, MoodType, PriceLevel, CompanionType, PlaceOpeningHours, ProviderType } from '../types';
+import { Place, CategoryType, MoodType, PriceLevel, CompanionType, PlaceOpeningHours, ProviderType, PlacePhotoAttribution } from '../types';
 import { GooglePlaceResult } from './googlePlacesTypes';
 
 function googlePriceLevelToVybe(priceLevel?: number): PriceLevel {
@@ -17,6 +17,23 @@ function googlePhotosToUrls(photos?: { photo_reference?: string }[]): string[] {
   return photos
     .map(photo => photo.photo_reference?.trim())
     .filter((uri): uri is string => Boolean(uri && /^https?:\/\//i.test(uri)));
+}
+
+function googlePhotoAttributions(photos?: Array<{ author_attributions?: Array<{ displayName: string; uri?: string }> }>): PlacePhotoAttribution[] {
+  if (!photos?.length) return [];
+  const seen = new Set<string>();
+  const result: PlacePhotoAttribution[] = [];
+  for (const photo of photos) {
+    for (const author of photo.author_attributions ?? []) {
+      const displayName = author.displayName?.trim();
+      if (!displayName) continue;
+      const key = `${displayName}|${author.uri ?? ''}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push({ displayName, uri: author.uri });
+    }
+  }
+  return result.slice(0, 3);
 }
 
 function googleWeekdayToOpeningHours(weekdayText?: string[]): Partial<PlaceOpeningHours> {
@@ -132,6 +149,7 @@ export function googlePlaceToVybePlace(gp: GooglePlaceResult): Place {
   const providerPlaceId = gp.place_id?.trim();
   const { category, mood: primaryMood } = classifyPlace(gp.types, gp.name);
   const photoUrls = googlePhotosToUrls(gp.photos);
+  const photoAttributions = googlePhotoAttributions(gp.photos);
   const openingHours = googleWeekdayToOpeningHours(gp.opening_hours?.weekday_text);
   const lat = gp.geometry?.location?.lat;
   const lng = gp.geometry?.location?.lng;
@@ -154,6 +172,7 @@ export function googlePlaceToVybePlace(gp: GooglePlaceResult): Place {
     reviewCount: gp.user_ratings_total ?? 0,
     baseVybeScore: 75,
     images: photoUrls,
+    photoAttributions,
     tags: gp.types?.slice(0, 10).map(t => t.replace(/_/g, ' ')) ?? [],
     estimatedDuration: '',
     openingHours: { monday: '', tuesday: '', wednesday: '', thursday: '', friday: '', saturday: '', sunday: '', isOpenNow: gp.opening_hours?.open_now, ...openingHours },
