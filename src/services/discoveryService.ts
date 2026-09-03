@@ -18,24 +18,12 @@ const CATEGORY_TYPES: Record<CategoryType, string[]> = {
   'shopping-vintage': ['shopping_mall', 'store', 'clothing_store', 'book_store', 'thrift_store', 'flea_market', 'toy_store', 'gift_shop'],
 };
 
-function deduplicate(places: Place[]): Place[] {
-  return [...new Map(places.map(place => [place.providerPlaceId || place.id, place])).values()];
-}
-
+function deduplicate(places: Place[]): Place[] { return [...new Map(places.map(place => [place.providerPlaceId || place.id, place])).values()]; }
 function withDistance(places: Place[], userLat?: number, userLng?: number): Place[] {
   if (userLat === undefined || userLng === undefined) return places;
-  return places.map(place =>
-    !Number.isFinite(place.location.lat) || !Number.isFinite(place.location.lng)
-      ? place
-      : { ...place, distanceKm: haversineDistanceKm(userLat, userLng, place.location.lat, place.location.lng) }
-  );
+  return places.map(place => !Number.isFinite(place.location.lat) || !Number.isFinite(place.location.lng) ? place : { ...place, distanceKm: haversineDistanceKm(userLat, userLng, place.location.lat, place.location.lng) });
 }
-
-function applySmartClassification(place: Place): Place {
-  const { category, mood } = classifyPlace(place.tags, place.name);
-  return { ...place, category, primaryMood: mood };
-}
-
+function applySmartClassification(place: Place): Place { const { category, mood } = classifyPlace(place.tags, place.name); return { ...place, category, primaryMood: mood }; }
 function matchesFilters(place: Place, filters?: Partial<FilterState>): boolean {
   if (!filters) return true;
   const classified = applySmartClassification(place);
@@ -51,10 +39,7 @@ function matchesFilters(place: Place, filters?: Partial<FilterState>): boolean {
   if (filters.maxDistanceKm !== undefined && (classified.distanceKm === undefined || classified.distanceKm > filters.maxDistanceKm)) return false;
   return true;
 }
-
-function normalize(value: string): string {
-  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-}
+function normalize(value: string): string { return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
 
 const OSM_PLACE_QUERIES: Record<string, string[]> = {
   mosque: ['amenity="place_of_worship"[religion="muslim"]', 'amenity="place_of_worship"[name~"mosque|mosquee|mosquée|masjid|مسجد|جامع",i]'],
@@ -76,7 +61,6 @@ const OSM_PLACE_QUERIES: Record<string, string[]> = {
   playground: ['leisure="playground"'],
   beach: ['natural="beach"'],
 };
-
 const OSM_BROAD_QUERIES = [
   'amenity~"restaurant|fast_food|cafe|bar|pub|nightclub|cinema|theatre|library|hospital|clinic|place_of_worship|music_venue"',
   'leisure~"park|garden|playground|fitness_centre|sports_centre|stadium|pitch|amusement_arcade|bowling_alley"',
@@ -84,53 +68,35 @@ const OSM_BROAD_QUERIES = [
   'shop~"mall|department_store|supermarket|clothes|books|second_hand|toys|gift"',
   'natural="beach"',
 ];
-
 function buildOsmQuery(lat: number, lng: number, radiusMeters: number, clauses: string[]): string {
   return `[out:json][timeout:20];(${clauses.map(clause => `nwr(around:${radiusMeters},${lat},${lng})[${clause}];`).join('')});out center tags;`;
 }
-
 function pickOsmCoordinates(element: any): { lat: number; lng: number } | null {
   if (Number.isFinite(element?.lat) && Number.isFinite(element?.lon)) return { lat: element.lat, lng: element.lon };
   if (Number.isFinite(element?.center?.lat) && Number.isFinite(element?.center?.lon)) return { lat: element.center.lat, lng: element.center.lon };
   return null;
 }
-
 function estimateOsmPrice(tags: Record<string, string>): PriceLevel {
   if (tags.amenity === 'place_of_worship' || tags.leisure === 'park' || tags.leisure === 'playground' || tags.natural === 'beach' || tags.amenity === 'library') return 'free';
   return '$$';
 }
-
 function osmOpeningHours(tags: Record<string, string>): PlaceOpeningHours {
   const weekday = tags.opening_hours || '';
-  const isOpenNow = undefined;
-  return { monday: weekday, tuesday: weekday, wednesday: weekday, thursday: weekday, friday: weekday, saturday: weekday, sunday: weekday, isOpenNow };
+  return { monday: weekday, tuesday: weekday, wednesday: weekday, thursday: weekday, friday: weekday, saturday: weekday, sunday: weekday, isOpenNow: undefined };
 }
-
 function osmElementToPlace(element: any): Place | null {
   const tags: Record<string, string> = element?.tags || {};
   const name = String(tags.name || '').trim();
   const coords = pickOsmCoordinates(element);
   if (!name || !coords) return null;
-
-  const categoryHint = [
-    tags.amenity,
-    tags.leisure,
-    tags.tourism,
-    tags.shop,
-    tags.sport,
-    tags.natural,
-    tags.religion,
-    tags.theatre\:type,
-  ].filter(Boolean) as string[];
-
+  const categoryHint = [tags.amenity, tags.leisure, tags.tourism, tags.shop, tags.sport, tags.natural, tags.religion, tags['theatre:type']].filter(Boolean) as string[];
   const extraNames = [tags.name, tags['name:fr'], tags['name:ar']].filter(Boolean).join(' ');
   const tagsForClassifier = [...categoryHint, ...Object.values(tags).filter(v => typeof v === 'string').slice(0, 8), extraNames].filter(Boolean);
   if (tags.religion === 'muslim' || normalize(name).includes('mosque') || normalize(name).includes('mosquee') || name.includes('مسجد') || name.includes('جامع')) tagsForClassifier.push('mosque');
-
   const { category, mood } = classifyPlace(tagsForClassifier, name);
   const address = [tags['addr:housenumber'], tags['addr:street'], tags['addr:suburb'], tags['addr:city']].filter(Boolean).join(', ');
-  const isFree = estimateOsmPrice(tags) === 'free';
-
+  const priceLevel = estimateOsmPrice(tags);
+  const isFree = priceLevel === 'free';
   return {
     id: `osm:${element.type}:${element.id}`,
     providerPlaceId: `osm:${element.type}:${element.id}`,
@@ -141,8 +107,8 @@ function osmElementToPlace(element: any): Place | null {
     primaryMood: mood,
     secondaryMoods: [],
     location: { address: address || name, neighborhood: tags['addr:suburb'] || '', city: tags['addr:city'] || '', lat: coords.lat, lng: coords.lng },
-    priceLevel: estimateOsmPrice(tags),
-    approxCostUsd: isFree ? 0 : 0,
+    priceLevel,
+    approxCostUsd: 0,
     rating: 0,
     reviewCount: 0,
     baseVybeScore: 70,
@@ -172,50 +138,28 @@ function osmElementToPlace(element: any): Place | null {
     reviews: [],
   };
 }
-
 async function fetchOsmPlaces(userLat: number, userLng: number, radiusKm: number, searchQuery?: string): Promise<Place[]> {
   const normalizedQuery = normalize(searchQuery || '');
-  const clauses = normalizedQuery && OSM_PLACE_QUERIES[normalizedQuery]
-    ? OSM_PLACE_QUERIES[normalizedQuery]
-    : normalizedQuery
-      ? [`name~"${normalizedQuery.replace(/[\\"\n\r]/g, ' ')}",i`]
-      : OSM_BROAD_QUERIES;
-
+  const clauses = normalizedQuery && OSM_PLACE_QUERIES[normalizedQuery] ? OSM_PLACE_QUERIES[normalizedQuery] : normalizedQuery ? [`name~"${normalizedQuery.replace(/[\\"\n\r]/g, ' ')}",i`] : OSM_BROAD_QUERIES;
   const query = buildOsmQuery(userLat, userLng, Math.min(radiusKm * 1000, 5000), clauses);
-  const endpoints = [
-    'https://overpass-api.de/api/interpreter',
-    'https://overpass.kumi.systems/api/interpreter',
-  ];
-
+  const endpoints = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
   let lastError: unknown = null;
   for (const endpoint of endpoints) {
     try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-        body: new URLSearchParams({ data: query }),
-      });
+      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }, body: new URLSearchParams({ data: query }) });
       if (!response.ok) throw new Error(`OSM discovery failed (${response.status})`);
       const payload = await response.json();
       const converted = (payload.elements || []).map(osmElementToPlace).filter(Boolean) as Place[];
-      return withDistance(deduplicate(converted), userLat, userLng)
-        .sort((a, b) => (a.distanceKm ?? 999) - (b.distanceKm ?? 999))
-        .slice(0, 120);
-    } catch (error) {
-      lastError = error;
-    }
+      return withDistance(deduplicate(converted), userLat, userLng).sort((a, b) => (a.distanceKm ?? 999) - (b.distanceKm ?? 999)).slice(0, 120);
+    } catch (error) { lastError = error; }
   }
-
   throw lastError instanceof Error ? lastError : new Error('OSM discovery is unavailable right now.');
 }
-
 export async function discoverPlaces(options: DiscoveryOptions): Promise<Place[]> {
   const { userLat, userLng, radiusKm = 5, filters } = options;
   if (userLat === undefined || userLng === undefined) return [];
-
   const query = options.searchQuery?.trim();
   let googleError: unknown = null;
-
   if (isGoogleMapsConfigured) {
     try {
       let places: Place[];
@@ -223,20 +167,14 @@ export async function discoverPlaces(options: DiscoveryOptions): Promise<Place[]
       else if (filters?.categories?.length) {
         const types = [...new Set(filters.categories.flatMap(category => CATEGORY_TYPES[category]))];
         places = await searchNearbyGooglePlaces(userLat, userLng, radiusKm, types);
-      } else {
-        places = await searchNearbyGooglePlaces(userLat, userLng, radiusKm);
-      }
-
-      const result = deduplicate(withDistance(places, userLat, userLng))
-        .map(applySmartClassification)
-        .filter(place => matchesFilters(place, filters));
+      } else places = await searchNearbyGooglePlaces(userLat, userLng, radiusKm);
+      const result = deduplicate(withDistance(places, userLat, userLng)).map(applySmartClassification).filter(place => matchesFilters(place, filters));
       if (result.length > 0) return result;
     } catch (error) {
       googleError = error;
       console.warn('[discovery] Google provider failed; falling back to OpenStreetMap.', error);
     }
   }
-
   try {
     const osmPlaces = await fetchOsmPlaces(userLat, userLng, radiusKm, query);
     const result = osmPlaces.map(applySmartClassification).filter(place => matchesFilters(place, filters));
