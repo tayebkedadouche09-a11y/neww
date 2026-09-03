@@ -5,6 +5,7 @@
 import { supabase } from '../lib/supabase';
 import { Collection } from '../types';
 import { DbCollectionItemRow, DbCollectionRow, newUuid, rowToCollection } from './mappers';
+import { ensureGooglePlaceStored } from './placesService';
 
 const assertBackend = () => {
   if (!supabase) throw new Error('VYBE backend is not configured');
@@ -64,6 +65,7 @@ export const collectionsService = {
 
   async addPlace(collectionId: string, placeId: string): Promise<void> {
     const db = assertBackend();
+    await ensureGooglePlaceStored(placeId);
     const { error } = await db
       .from('collection_items')
       .upsert(
