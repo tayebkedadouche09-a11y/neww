@@ -2,11 +2,9 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { env, isBackendConfigured } from './env';
 
 /**
- * Supabase client singleton.
- *
- * When VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are not configured the app
- * runs in LOCAL DEMO MODE (see src/lib/dataMode.ts) and this stays null.
- * All service-layer code must check `isBackendConfigured()` before use.
+ * Supabase client singleton. VYBE uses Supabase for real authentication and
+ * cloud persistence; missing configuration is a deployment/setup error, not a
+ * local or demo data mode.
  */
 let client: SupabaseClient | null = null;
 
@@ -21,5 +19,4 @@ if (isBackendConfigured) {
 }
 
 export const supabase = client;
-
 export { isBackendConfigured };
