@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Heart, Bookmark, MapPin, Clock, Share2, Plus, Sparkles, ArrowUpRight, Gem, Utensils, Coffee, Music, Landmark, Trees, Gamepad2, ShoppingBag, Dumbbell, Film, Church, Waves, BookOpen, Hotel, Stethoscope } from 'lucide-react';
+import { Heart, Bookmark, MapPin, Clock, Share2, Plus, Navigation, Sparkles, ArrowUpRight, Gem, Utensils, Coffee, Music, Landmark, Trees, Gamepad2, ShoppingBag, Dumbbell, Film, Church, BookOpen, Hotel, Stethoscope } from 'lucide-react';
 import { Place } from '../../types';
 import { VybeScoreBadge } from '../common/VybeScoreBadge';
 import { calculateVybeScore } from '../../hooks/useVybeScore';
@@ -47,13 +47,11 @@ function formatCategory(category: Place['category']): string {
 
 export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
   const { toggleLikePlace, toggleSavePlace, isPlaceLiked, isPlaceSaved } = useAuth();
-  const { openPlaceDetail, openShareModal, addPlaceToPlan, plans, showToast } = useData();
+  const { openPlaceDetail, openShareModal, addPlaceToPlan, plans, showToast, setActiveTab, setSelectedPlace } = useData();
   const requireAuth = useRequireAuth();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [failedImageIndexes, setFailedImageIndexes] = useState<number[]>([]);
 
-  // Re-apply the same source-of-truth classifier used by Google discovery.
-  // This protects Explorer when a cached/legacy Place has a stale category.
   const classified = classifyPlace(place.tags, place.name);
   const displayCategory = classified.category;
   const displayMood = classified.mood;
@@ -74,6 +72,12 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
     if (!requireAuth()) return;
     if (plans.length > 0) addPlaceToPlan(plans[0].id, place.id);
     else showToast('Create a plan first in the Plans tab!', '📋', 'info');
+  };
+
+  const handleOpenMap = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedPlace({ ...place, category: displayCategory, primaryMood: displayMood });
+    setActiveTab('map');
   };
 
   return (
@@ -110,7 +114,10 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
         </div>
         {calculatedScore.reasons.length > 0 ? <div className="p-2 rounded-xl bg-slate-100 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-[11px] text-slate-700 dark:text-slate-300 flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5 text-vybe-lime shrink-0" /><span className="truncate font-medium">{calculatedScore.reasons[0]}</span></div> : place.estimatedDuration && <div className="flex items-center gap-2 text-xs text-slate-500 font-mono"><Clock className="w-3.5 h-3.5" /><span>Est. {place.estimatedDuration}</span></div>}
         <div className="pt-3 border-t border-slate-100 dark:border-white/5 flex items-center justify-between gap-2">
-          <button onClick={handleQuickAddPlan} className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 dark:bg-vybe-dark-surface hover:bg-vybe-lime hover:text-black dark:hover:bg-vybe-lime dark:hover:text-black transition-all" title="Add to current outing plan"><Plus className="w-3.5 h-3.5" /><span>Add to Plan</span></button>
+          <div className="flex items-center gap-1.5">
+            <button onClick={handleQuickAddPlan} className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 dark:bg-vybe-dark-surface hover:bg-vybe-lime hover:text-black dark:hover:bg-vybe-lime dark:hover:text-black transition-all" title="Add to current outing plan"><Plus className="w-3.5 h-3.5" /><span>Add to Plan</span></button>
+            <button onClick={handleOpenMap} className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 dark:bg-vybe-dark-surface text-slate-700 dark:text-slate-200 hover:bg-vybe-cyan hover:text-black transition-all" title={`Open ${place.name} on map`} aria-label={`Open ${place.name} on map`}><Navigation className="w-3.5 h-3.5" /><span>Map</span></button>
+          </div>
           <div className="flex items-center gap-1"><button onClick={(e) => { e.stopPropagation(); openShareModal(place); }} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors" title="Share Place Card" aria-label={`Share ${place.name}`}><Share2 className="w-4 h-4" /></button><span className="flex items-center text-xs font-bold text-slate-900 dark:text-white group-hover:translate-x-1 transition-transform" aria-hidden="true"><ArrowUpRight className="w-4 h-4 text-vybe-lime" /></span></div>
         </div>
       </div>
