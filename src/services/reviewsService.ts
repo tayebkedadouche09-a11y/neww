@@ -5,6 +5,7 @@
 import { supabase } from '../lib/supabase';
 import { PlaceReview } from '../types';
 import { DbReviewRow, newUuid, rowToReview } from './mappers';
+import { ensureGooglePlaceStored } from './placesService';
 
 const assertBackend = () => {
   if (!supabase) throw new Error('VYBE backend is not configured');
@@ -24,6 +25,7 @@ export interface NewReviewInput {
 export const reviewsService = {
   async create(input: NewReviewInput): Promise<void> {
     const db = assertBackend();
+    await ensureGooglePlaceStored(input.placeId);
     const { error } = await db.from('reviews').insert({
       id: input.id || newUuid(),
       user_id: input.userId,
