@@ -23,10 +23,10 @@ assert(app.includes("setPlaces(result)"), 'Discovery results enter one shared st
 assert(app.includes('selectedForPlan') && app.includes('savePlan') && app.includes('sharePlan'), 'Planning, local persistence and share flows are wired in the new shell.');
 assert(engine.includes('SEARCH_LIMIT = 1000'), 'Discovery supports a large result set for dense cities.');
 assert(engine.includes('CATEGORY_QUERIES') && engine.includes("gaming:"), 'Discovery has dedicated provider queries for place categories including gaming.');
-assert(engine.includes('Promise.all') || engine.includes('endpoints ='), 'The engine has provider fallback rather than depending on one request path.');
+assert(engine.includes('endpoints ='), 'The engine has provider fallback rather than depending on one request path.');
 assert(engine.includes('analyzePlace') && engine.includes('analysis: VybeAnalysis'), 'Every discovered place is analyzed before it becomes a VYBE place.');
-assert(engine.includes('deduplic') || engine.includes('new Map<string, VybePlace>()'), 'Provider data is deduplicated by source identity.');
-assert(engine.includes('Béjaïa') && engine.includes('36.7525') && engine.includes('5.0556'), 'Béjaïa is a first-class discovery target.');
+assert(engine.includes('new Map<string, VybePlace>()'), 'Provider data is deduplicated by source identity.');
+assert(app.includes('Béjaïa') && app.includes('36.7525') && app.includes('5.0556'), 'Béjaïa is a first-class discovery target.');
 assert(app.includes('navigator.geolocation') && app.includes('Choose a city instead'), 'The app has browser-location fallback plus manual city discovery.');
 assert(app.includes('await navigator.clipboard.writeText(url)') && app.includes('window.prompt'), 'Share works with clipboard and a fallback prompt.');
 assert(app.includes('localStorage.setItem') && app.includes('localStorage.getItem'), 'Saved places, plans and profile data persist locally.');
