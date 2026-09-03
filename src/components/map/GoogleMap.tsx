@@ -55,33 +55,26 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({ places, onMarkerClick, sel
     let mapInstance: google.maps.Map | null = null;
 
     const initializeMap = async () => {
-      // Important: never leave VybeMap blank when the deployment has no Google key.
-      // VybeMap will immediately switch to its legacy Leaflet map in this case.
       if (!googleMapsConfig.apiKey) {
         const message = 'Google Maps API key is not configured; using the legacy map fallback.';
         setMapError(message);
         onError?.(message);
         return;
       }
-
       if (!mapRef.current) return;
-
       try {
         const { Map, AdvancedMarkerElement } = await loadGoogleMaps();
         advancedMarkerRef.current = AdvancedMarkerElement;
         if (cancelled || !mapRef.current) return;
-
-        const mapId = googleMapsConfig.mapId?.trim() || 'DEMO_MAP_ID';
         const map = new Map(mapRef.current, {
           center: userLocation || defaultCenter,
           zoom: userLocation ? 14 : 2,
-          mapId,
+          ...(googleMapsConfig.mapId?.trim() ? { mapId: googleMapsConfig.mapId.trim() } : {}),
           zoomControl: true,
           mapTypeControl: false,
           streetViewControl: false,
           fullscreenControl: true,
         });
-
         mapInstance = map;
         googleMapRef.current = map;
         setMapLoaded(true);
@@ -90,14 +83,11 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({ places, onMarkerClick, sel
         console.error('[GoogleMap] Google Maps initialization error:', message);
         if (!cancelled) {
           setMapError(message);
-          // Automatically hand control back to the original VYBE Leaflet map.
           onError?.(message);
         }
       }
     };
-
     initializeMap();
-
     return () => {
       cancelled = true;
       markersRef.current.forEach(marker => { marker.map = null; });
@@ -115,7 +105,6 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({ places, onMarkerClick, sel
     markersRef.current.forEach(marker => { marker.map = null; });
     markersRef.current = [];
     const AdvancedMarkerElement = advancedMarkerRef.current;
-
     places.forEach(place => {
       if (place.location?.lat == null || place.location?.lng == null) return;
       const { mood: classifiedMood } = classifyPlace(place.tags, place.name);
@@ -127,7 +116,6 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({ places, onMarkerClick, sel
       markerContent.className = `custom-map-marker group relative cursor-pointer${isSelected ? ' selected' : ''}`;
       markerContent.style.cssText = `width:46px;height:46px;border-radius:14px;overflow:hidden;border:2px solid #000;box-shadow:0 4px 14px rgba(0,0,0,.35);background:#111;position:relative;transform:${isSelected ? 'scale(1.25)' : 'scale(1)'};z-index:${isSelected ? '20' : '1'};transition:transform .2s ease;`;
       const imageUrl = place.images.find(image => image?.trim().toLowerCase().startsWith('http'))?.trim();
-
       if (imageUrl) {
         const image = document.createElement('img');
         image.src = imageUrl;
@@ -151,7 +139,6 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({ places, onMarkerClick, sel
         fallback.style.cssText = `position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:24px;background:${color};`;
         markerContent.appendChild(fallback);
       }
-
       const marker = new AdvancedMarkerElement({
         map: googleMapRef.current!,
         position: { lat: place.location.lat, lng: place.location.lng },
