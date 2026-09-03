@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const root = process.cwd();
-
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const checks = [];
 const assert = (condition, message) => {
@@ -22,6 +21,7 @@ const admin = read('src/components/admin/AdminPortal.tsx');
 const googleMap = read('src/components/map/GoogleMap.tsx');
 const placeCard = read('src/components/cards/PlaceCard.tsx');
 const discovery = read('src/services/discoveryService.ts');
+const googlePlaces = read('src/services/googlePlaces.ts');
 const indexHtml = read('index.html');
 const serviceWorker = read('public/sw.js');
 const main = read('src/main.tsx');
@@ -39,6 +39,9 @@ assert(squadVote.includes('?vote='), 'Squad voting creates shareable poll links.
 assert(placeCard.includes('Google verified') && placeCard.includes('VYBE curated'), 'Place cards explain their data trust source.');
 assert(admin.includes('latitude === 0 && longitude === 0'), 'Admin creation rejects invalid 0,0 coordinates.');
 assert(!discovery.includes('unsplash.com'), 'Discovery service contains no fake Unsplash place-image fallback.');
+assert(googlePlaces.includes('type.map(placeType => searchNearbyGooglePlacesSingle'), 'Google nearby discovery expands multi-type requests instead of sharing one 20-result cap.');
+assert(discovery.includes('Promise.allSettled') && discovery.includes('[...googlePlaces, ...osmPlaces]'), 'Discovery merges Google and OpenStreetMap instead of stopping at the first provider.');
+assert(discovery.includes('function analyzePlace') && discovery.includes('.map(analyzePlace)'), 'Every discovered place is classified and analyzed before Explore/Map receive it.');
 assert(!googleMap.includes('maps.googleapis.com/maps/api/js?'), 'GoogleMap does not embed the legacy Maps JavaScript URL loader.');
 assert(indexHtml.includes('<link rel="manifest" href="/manifest.webmanifest" />'), 'PWA manifest is linked from the document head.');
 assert(main.includes("navigator.serviceWorker.register('/sw.js')"), 'Production registers the offline shell service worker.');
