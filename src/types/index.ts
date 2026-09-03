@@ -40,6 +40,26 @@ export type CategoryType =
   | 'chill-spots' 
   | 'shopping-vintage';
 
+/** Canonical provider-neutral intent categories. Keep CategoryType for UI/database compatibility. */
+export type VybeCategory =
+  | 'restaurant'
+  | 'cafe'
+  | 'games'
+  | 'cinema'
+  | 'park'
+  | 'gym'
+  | 'shopping'
+  | 'nightlife'
+  | 'family-kids'
+  | 'tourist'
+  | 'arts-culture'
+  | 'outdoors'
+  | 'wellness'
+  | 'hotel'
+  | 'library'
+  | 'worship'
+  | 'entertainment';
+
 export interface PlaceReview {
   id: string;
   userId: string;
@@ -78,6 +98,8 @@ export interface Place {
   tagline: string;
   description: string;
   category: CategoryType;
+  /** Canonical provider-neutral intent used by discovery, matching and UI semantics. */
+  canonicalCategory?: VybeCategory;
   primaryMood: MoodType;
   secondaryMoods: MoodType[];
   location: {
@@ -96,6 +118,9 @@ export interface Place {
   images: string[];
   /** Fresh, in-memory Google photo attribution metadata. Never persisted. */
   photoAttributions?: PlacePhotoAttribution[];
+  /** Raw provider categories preserved for post-result validation and debugging. */
+  providerTypes?: string[];
+  providerPrimaryType?: string;
   tags: string[];
   estimatedDuration: string; // e.g. "1.5h - 2h"
   openingHours: PlaceOpeningHours;
