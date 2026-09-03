@@ -18,10 +18,11 @@ const DEFAULT_HOURS: PlaceOpeningHours = {
 
 /** Client-generated UUID used by Supabase UUID primary keys and text interaction rows. */
 export const newUuid = (): string => {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
-  if (typeof crypto !== 'undefined' && 'getRandomValues' in crypto) {
+  const webCrypto = globalThis.crypto;
+  if (webCrypto?.randomUUID) return webCrypto.randomUUID();
+  if (webCrypto?.getRandomValues) {
     const bytes = new Uint8Array(16);
-    crypto.getRandomValues(bytes);
+    webCrypto.getRandomValues(bytes);
     bytes[6] = (bytes[6] & 0x0f) | 0x40;
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
     return [...bytes].map((byte, index) => {
@@ -178,6 +179,18 @@ export function rowToPlan(row: DbPlanRow, items: DbPlanItemRow[]): VybePlan {
   };
 }
 
+export interface DbReviewRow {
+  id: string;
+  user_id: string;
+  place_id: string;
+  rating: number;
+  vibe_intensity: number;
+  mood_tags: string[] | null;
+  comment: string;
+  created_at: string;
+  profiles?: { display_name: string | null; avatar_url: string | null } | null;
+}
+
 export function rowToReview(row: DbReviewRow): PlaceReview {
   return {
     id: row.id,
@@ -191,16 +204,4 @@ export function rowToReview(row: DbReviewRow): PlaceReview {
     createdAt: timeAgo(row.created_at),
     likesCount: 0
   };
-}
-
-export interface DbReviewRow {
-  id: string;
-  user_id: string;
-  place_id: string;
-  rating: number;
-  vibe_intensity: number;
-  mood_tags: string[] | null;
-  comment: string;
-  created_at: string;
-  profiles?: { display_name: string | null; avatar_url: string | null } | null;
 }
