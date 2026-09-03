@@ -104,6 +104,37 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => { cancelled = true; };
   }, [realUserId]);
 
+  // Keep persisted Google places usable after discovery replaces the current result set.
+  // Plans and collections store stable place IDs; the details are restored on demand so
+  // opening Plan/Saved later does not turn a real saved place into a missing card.
+  useEffect(() => {
+    let cancelled = false;
+    const referencedIds = [...new Set([
+      ...plans.flatMap(plan => plan.items.map(item => item.placeId)),
+      ...collections.flatMap(collection => collection.placeIds),
+    ])];
+    const missingGoogleIds = referencedIds
+      .filter(id => id.startsWith('google:'))
+      .filter(id => !places.some(place => place.id === id))
+      .map(id => id.slice('google:'.length))
+      .filter(Boolean);
+    if (missingGoogleIds.length === 0) return;
+    void Promise.all(missingGoogleIds.map(async providerId => {
+      try { return await getGooglePlaceDetails(providerId); }
+      catch (error) { console.warn('[DataContext] failed to rehydrate Google place', providerId, error); return null; }
+    })).then(results => {
+      if (cancelled) return;
+      const restored = results.filter((place): place is Place => Boolean(place));
+      if (!restored.length) return;
+      setPlaces(prev => {
+        const byId = new Map(prev.map(place => [place.id, place]));
+        restored.forEach(place => byId.set(place.id, place));
+        return [...byId.values()];
+      });
+    });
+    return () => { cancelled = true; };
+  }, [plans, collections, places]);
+
   useEffect(() => {
     let cancelled = false;
     const params = new URLSearchParams(window.location.search);
