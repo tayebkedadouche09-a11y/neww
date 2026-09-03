@@ -95,10 +95,11 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({ places, onMarkerClick, sel
       const moodObj = INITIAL_MOODS.find(m => m.id === classifiedMood);
       const emoji = getPlaceMarkerEmoji(place);
       const color = moodObj?.accentColor || '#CCFF00';
+      const isSelected = selectedPlace?.id === place.id;
       const markerContent = document.createElement('div');
-      markerContent.className = 'custom-map-marker group relative cursor-pointer';
-      markerContent.style.cssText = 'width:46px;height:46px;border-radius:14px;overflow:hidden;border:2px solid #000;box-shadow:0 4px 14px rgba(0,0,0,.35);background:#111;position:relative;';
-      const imageUrl = place.images.find(image => /^https?:\/\//i.test(image?.trim()))?.trim();
+      markerContent.className = `custom-map-marker group relative cursor-pointer${isSelected ? ' selected' : ''}`;
+      markerContent.style.cssText = `width:46px;height:46px;border-radius:14px;overflow:hidden;border:2px solid #000;box-shadow:0 4px 14px rgba(0,0,0,.35);background:#111;position:relative;transform:${isSelected ? 'scale(1.25)' : 'scale(1)'};z-index:${isSelected ? '20' : '1'};transition:transform .2s ease;`;
+      const imageUrl = place.images.find(image => /^https?:\/\/i.test(image?.trim()))?.trim();
       if (imageUrl) {
         const image = document.createElement('img');
         image.src = imageUrl; image.alt = place.name; image.loading = 'lazy';
@@ -106,23 +107,24 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({ places, onMarkerClick, sel
         image.onerror = () => { image.remove(); const fallback = document.createElement('span'); fallback.textContent = emoji; fallback.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:24px;background:#111;'; markerContent.appendChild(fallback); };
         markerContent.appendChild(image);
         const tint = document.createElement('span');
-        tint.style.cssText = `position:absolute;inset:0;border:2px solid ${color};border-radius:12px;pointer-events:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);`;
+        tint.style.cssText = `position:absolute;inset:0;border:2px solid ${isSelected ? '#FFFFFF' : color};border-radius:12px;pointer-events:none;box-shadow:${isSelected ? '0 0 0 3px rgba(204,255,0,.65), 0 0 22px rgba(204,255,0,.7), ' : ''}inset 0 0 0 1px rgba(255,255,255,.18);`;
         markerContent.appendChild(tint);
       } else {
         const fallback = document.createElement('span');
         fallback.textContent = emoji; fallback.style.cssText = `position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:24px;background:${color};`; markerContent.appendChild(fallback);
       }
-      const marker = new AdvancedMarkerElement({ map: googleMapRef.current!, position: { lat: place.location.lat, lng: place.location.lng }, content: markerContent, title: place.name });
+      const marker = new AdvancedMarkerElement({ map: googleMapRef.current!, position: { lat: place.location.lat, lng: place.location.lng }, content: markerContent, title: place.name, zIndex: isSelected ? 1000 : 1 });
       marker.addEventListener('gmp-click', () => onLoadCallbackRef.current?.({ ...place, primaryMood: classifiedMood }));
       markersRef.current.push(marker);
     });
-  }, [places, mapLoaded]);
+  }, [places, mapLoaded, selectedPlace]);
 
   useEffect(() => {
     if (!googleMapRef.current || !selectedPlace?.location) return;
     const { lat, lng } = selectedPlace.location;
     if (lat == null || lng == null) return;
     googleMapRef.current.panTo({ lat, lng });
+    googleMapRef.current.setZoom(17);
   }, [selectedPlace]);
 
   if (mapError) return null;
