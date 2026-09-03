@@ -7,9 +7,16 @@ function googlePriceLevelToVybe(priceLevel?: number): PriceLevel {
   return levels[Math.min(Math.max(priceLevel, 0), 4)] ?? '$$';
 }
 
+function googleApproxCost(priceLevel?: number, isFree = false): number {
+  if (isFree || priceLevel === 0) return 0;
+  return [0, 10, 25, 50, 100][Math.min(Math.max(priceLevel ?? 2, 1), 4)] ?? 25;
+}
+
 function googlePhotosToUrls(photos?: { photo_reference?: string }[]): string[] {
   if (!photos?.length) return [];
-  return photos.map(photo => photo.photo_reference?.trim()).filter((uri): uri is string => Boolean(uri && /^https?:\/\//i.test(uri)));
+  return photos
+    .map(photo => photo.photo_reference?.trim())
+    .filter((uri): uri is string => Boolean(uri && /^https?:\/\//i.test(uri)));
 }
 
 function googleWeekdayToOpeningHours(weekdayText?: string[]): Partial<PlaceOpeningHours> {
@@ -76,6 +83,8 @@ const NAME_RULES: Array<{ category: CategoryType; mood: MoodType; words: string[
   { category: 'chill-spots', mood: 'lazy', words: ['spa', 'hotel', 'hôtel', 'resort', 'wellness', 'relax'] },
 ];
 
+const NON_VYBE_DISCOVERY_TYPES = new Set(['hospital', 'doctor', 'pharmacy', 'dentist', 'tv_station', 'government_office', 'train_station', 'transit_station', 'bus_station', 'airport', 'school', 'university', 'post_office', 'police', 'fire_station', 'courthouse']);
+
 function normalizeName(value?: string): string {
   return (value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ').trim();
 }
@@ -83,17 +92,12 @@ function normalizeName(value?: string): string {
 export function classifyPlace(types?: string[], name?: string): { category: CategoryType; mood: MoodType } {
   const normalized = normalizeName(name);
   const typeSet = new Set(types ?? []);
-
-  // Google-provided place types are the authoritative discovery signal. Name keywords
-  // are only a fallback for providers/results that do not expose a recognized type.
   for (const type of typeSet) {
     if (GOOGLE_TYPE_TO_CATEGORY[type]) return { category: GOOGLE_TYPE_TO_CATEGORY[type], mood: GOOGLE_TYPE_TO_MOOD[type] ?? 'explore' };
   }
-
   for (const rule of NAME_RULES) {
     if (rule.words.some(word => normalized.includes(normalizeName(word)))) return { category: rule.category, mood: rule.mood };
   }
-
   return { category: 'hidden-gems', mood: 'explore' };
 }
 
@@ -104,8 +108,12 @@ const QUERY_CATEGORY_EXPECTATIONS: Record<string, CategoryType[]> = {
 export function isGooglePlaceValidForRequest(place: Place, request?: { query?: string; categories?: CategoryType[] }): boolean {
   if (place.provider !== 'google' || !place.providerPlaceId || !place.name.trim()) return false;
   if (!Number.isFinite(place.location.lat) || !Number.isFinite(place.location.lng) || (place.location.lat === 0 && place.location.lng === 0)) return false;
-  const expected = new Set<CategoryType>(request?.categories ?? []);
   const normalizedQuery = normalizeName(request?.query);
+  const placeTypes = new Set(place.tags ?? []);
+  if (normalizedQuery !== 'hospital' && normalizedQuery !== 'hospital ') {
+    for (const blocked of NON_VYBE_DISCOVERY_TYPES) if (placeTypes.has(blocked)) return false;
+  }
+  const expected = new Set<CategoryType>(request?.categories ?? []);
   if (normalizedQuery && QUERY_CATEGORY_EXPECTATIONS[normalizedQuery]) QUERY_CATEGORY_EXPECTATIONS[normalizedQuery].forEach(category => expected.add(category));
   if (!expected.size) return true;
   return expected.has(place.category);
@@ -127,6 +135,7 @@ export function googlePlaceToVybePlace(gp: GooglePlaceResult): Place {
   const openingHours = googleWeekdayToOpeningHours(gp.opening_hours?.weekday_text);
   const lat = gp.geometry?.location?.lat;
   const lng = gp.geometry?.location?.lng;
+  const isFree = gp.price_level === 0 || gp.types?.some(type => ['park', 'playground', 'library', 'museum', 'place_of_worship'].includes(type)) === true;
 
   return {
     id: providerPlaceId ? `google:${providerPlaceId}` : `google:${encodeURIComponent(gp.name || 'place')}`,
@@ -139,17 +148,17 @@ export function googlePlaceToVybePlace(gp: GooglePlaceResult): Place {
     primaryMood,
     secondaryMoods: [],
     location: { address: gp.formatted_address || gp.vicinity || '', neighborhood: '', city: '', lat: Number.isFinite(lat) ? lat! : 0, lng: Number.isFinite(lng) ? lng! : 0 },
-    priceLevel: googlePriceLevelToVybe(gp.price_level),
-    approxCostUsd: 0,
+    priceLevel: isFree ? 'free' : googlePriceLevelToVybe(gp.price_level),
+    approxCostUsd: googleApproxCost(gp.price_level, isFree),
     rating: gp.rating ?? 0,
     reviewCount: gp.user_ratings_total ?? 0,
     baseVybeScore: 75,
     images: photoUrls,
-    tags: gp.types?.slice(0, 5).map(t => t.replace(/_/g, ' ')) ?? [],
+    tags: gp.types?.slice(0, 10).map(t => t.replace(/_/g, ' ')) ?? [],
     estimatedDuration: '',
     openingHours: { monday: '', tuesday: '', wednesday: '', thursday: '', friday: '', saturday: '', sunday: '', isOpenNow: gp.opening_hours?.open_now, ...openingHours },
     features: {
-      isFree: gp.price_level === 0,
+      isFree,
       isOutdoor: gp.types?.some(t => ['park', 'city_park', 'playground', 'indoor_playground', 'skateboard_park', 'water_park', 'campground', 'zoo', 'aquarium', 'botanical_garden', 'national_park', 'hiking_area', 'beach'].includes(t)) ?? false,
       isIndoor: gp.types?.some(t => ['restaurant', 'cafe', 'museum', 'art_gallery', 'art_museum', 'movie_theater', 'shopping_mall', 'library', 'gym', 'fitness_center', 'spa', 'indoor_playground', 'video_arcade', 'internet_cafe'].includes(t)) ?? false,
       hasFood: gp.types?.some(t => ['restaurant', 'cafe', 'bakery', 'meal_takeaway', 'meal_delivery', 'coffee_shop', 'dessert_shop'].includes(t)) ?? false,
