@@ -19,6 +19,8 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Dependency security audit
+        run: npm audit --omit=dev --audit-level=high
       - name: Production invariants
         run: node scripts/production-invariants.mjs
       - name: Real-only runtime invariants
