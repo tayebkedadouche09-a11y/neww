@@ -14,6 +14,7 @@ import { CustomCursor } from "./components/common/CustomCursor";
 import { ModeBadge } from "./components/common/ModeBadge";
 import { VybeMap } from "./components/map/VybeMap";
 import { VybePlanBuilder } from "./components/plan/VybePlanBuilder";
+import { VybeRouteSummary } from "./components/plan/VybeRouteSummary";
 import { CollectionsView } from "./components/profile/CollectionsView";
 import { ProfileView } from "./components/profile/ProfileView";
 import { AdminPortal } from "./components/admin/AdminPortal";
@@ -69,7 +70,12 @@ export const App: React.FC = () => {
           </div>
         )}
 
-        {activeTab === "plan" && <VybePlanBuilder />}
+        {activeTab === "plan" && (
+          <>
+            <VybePlanBuilder />
+            <VybeRouteSummary />
+          </>
+        )}
         {activeTab === "saved" && <CollectionsView />}
         {activeTab === "profile" && <ProfileView />}
         {activeTab === "admin" && <AdminPortal />}
