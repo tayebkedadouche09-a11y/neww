@@ -1,0 +1,55 @@
+name: Patch Place Detail Map Flow
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Patch PlaceDetailModal
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/components/place/PlaceDetailModal.tsx')
+          text = path.read_text(encoding='utf-8')
+
+          old = """    addPlaceToCollection,\n    showToast\n  } = useData();"""
+          new = """    addPlaceToCollection,\n    showToast,\n    setActiveTab,\n    setSelectedPlace\n  } = useData();"""
+          if old not in text:
+              raise SystemExit('DataContext destructure pattern not found')
+          text = text.replace(old, new, 1)
+
+          old = """  const openGoogleMaps = () => {"""
+          new = """  const openInAppMap = () => {\n    setSelectedPlace(selectedPlace);\n    setIsDetailOpen(false);\n    setActiveTab('map');\n    showToast(`${selectedPlace.name} is centered on the VYBE map`, '📍', 'success');\n  };\n\n  const openGoogleMaps = () => {"""
+          if old not in text:
+              raise SystemExit('openGoogleMaps anchor not found')
+          text = text.replace(old, new, 1)
+
+          old = """                <button\n                  onClick={openGoogleMaps}\n                  className=\"w-full py-2.5 px-4 rounded-xl bg-black text-white dark:bg-white dark:text-black font-display font-bold text-xs flex items-center justify-center gap-2 shadow-md hover:scale-[1.02] transition-all\"\n                >"""
+          new = """                <button\n                  onClick={openInAppMap}\n                  className=\"w-full py-2.5 px-4 rounded-xl bg-vybe-lime text-black font-display font-bold text-xs flex items-center justify-center gap-2 shadow-neon-lime hover:scale-[1.02] transition-all\"\n                >\n                  <MapPin className=\"w-4 h-4\" />\n                  <span>View on VYBE Map</span>\n                </button>\n\n                <button\n                  onClick={openGoogleMaps}\n                  className=\"w-full py-2.5 px-4 rounded-xl bg-black text-white dark:bg-white dark:text-black font-display font-bold text-xs flex items-center justify-center gap-2 shadow-md hover:scale-[1.02] transition-all\"\n                >"""
+          if old not in text:
+              raise SystemExit('Google Maps button pattern not found')
+          text = text.replace(old, new, 1)
+
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Commit patch and remove temporary workflow
+        shell: bash
+        run: |
+          rm -f .github/workflows/patch-place-detail-map.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/place/PlaceDetailModal.tsx .github/workflows/patch-place-detail-map.yml
+          git diff --cached --quiet && exit 0
+          git commit -m "feat: connect place details to in-app map [skip ci]"
+          git push origin HEAD:main
