@@ -17,11 +17,14 @@ interface AuthContextType {
   loading: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  isDemo: boolean;
+  isDemoMode: boolean;
   sessionMode: SessionMode;
   appDataMode: typeof dataMode;
   signIn: (email: string, password: string) => Promise<AuthResult>;
   signUp: (name: string, username: string, email: string, password: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
+  logout: () => void;
   resetPassword: (email: string) => Promise<AuthResult>;
   updateProfile: (updates: Partial<UserProfile>) => void;
   toggleLikePlace: (placeId: string) => void;
@@ -128,6 +131,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setSession(ANONYMOUS_SESSION);
   }, []);
 
+  const logout = () => { void signOut(); };
   const resetPassword = useCallback(async (email: string) => {
     if (!isBackendConfigured) return { ok: false, error: 'VYBE backend is not configured.' };
     return authService.resetPassword(email);
@@ -174,11 +178,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       loading: authLoading,
       isAuthenticated: session.mode === 'auth' && !!currentUser,
       isAdmin: currentUser?.isAdmin === true,
+      isDemo: false,
+      isDemoMode: false,
       sessionMode: session.mode,
       appDataMode: dataMode,
       signIn,
       signUp,
       signOut,
+      logout,
       resetPassword,
       updateProfile,
       toggleLikePlace,
