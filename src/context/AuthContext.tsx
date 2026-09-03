@@ -144,6 +144,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .catch(error => console.error('[VYBE auth] profile update failed', error));
   };
 
+  const announceFailure = (message: string) => {
+    try {
+      window.dispatchEvent(new CustomEvent('vybe:action-failed', { detail: { message } }));
+    } catch {
+      // Toast listener unavailable — the optimistic state was already reverted.
+    }
+  };
+
   const toggleLikePlace = (placeId: string) => {
     if (!realAuthUser) return;
     const previous = realAuthUser.likedPlaceIds || [];
@@ -153,6 +161,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     void likesService.setLiked(realAuthUser.id, placeId, !wasLiked).catch(error => {
       console.error('[VYBE auth] like sync failed', error);
       setRemoteProfile(prev => prev ? { ...prev, likedPlaceIds: previous } : prev);
+      announceFailure('Could not save your like right now. Please try again.');
     });
   };
 
@@ -165,6 +174,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     void savedPlacesService.setSaved(realAuthUser.id, placeId, !wasSaved).catch(error => {
       console.error('[VYBE auth] save sync failed', error);
       setRemoteProfile(prev => prev ? { ...prev, savedPlaceIds: previous } : prev);
+      announceFailure('Could not save that spot right now. Please try again.');
     });
   };
 

@@ -33,6 +33,22 @@ SQL editor → paste and run each file:
 3. `supabase/migrations/0003_rls.sql` — RLS part 1 (profiles, preferences,
    places, collections, saved places)
 4. `supabase/migrations/0004_rls_plans_reviews_likes.sql` — RLS part 2
+5. `supabase/migrations/0005_place_id_text_google_ids.sql` — `places.id` and
+   every `place_id` FK becomes TEXT so Google Place IDs (`google:ChIJ…`) can be
+   persisted (required for likes/saves/plans/reviews/collections)
+6. `supabase/migrations/0006_remove_demo_seed_places.sql` — removes the old
+   fictional demo rows (idempotent)
+7. `supabase/migrations/0007_google_place_persistence.sql` — SECURITY DEFINER
+   materializer (superseded by 0008/0009 for server-side-only materialization)
+8. `supabase/migrations/0008_security_hardening.sql` — strict shape validation
+9. `supabase/migrations/0009_lock_google_materializer.sql` — revoke the
+   client-callable RPC; materialization happens server-side only
+10. `supabase/migrations/0010_text_place_ids_forward.sql` — **forward migration
+    for live databases created from the older UUID schema variant.** Guarded
+    and idempotent: converts `places.id` + all `place_id` FKs from UUID to TEXT
+    and adds `provider`, restoring FKs afterwards. Safe to run on every
+    project (no-op when already TEXT). Run 0005–0009 first if they were never
+    applied, then 0010.
 
 Or with the Supabase CLI:
 
@@ -40,6 +56,13 @@ Or with the Supabase CLI:
 supabase link --project-ref <project-ref>
 supabase db push
 ```
+
+> **Why 0010 exists:** the repository baseline has always defined TEXT place
+> IDs, but some live projects were created from an older UUID variant. On those
+> projects every user-owned write (like, save, plan stop, collection item,
+> review) fails with `400 invalid input syntax for type uuid`. Run
+> `0010_text_place_ids_forward.sql` in the SQL editor to reconcile a drifted
+> database — the migration inspects the live schema and is safe to re-run.
 
 ## 4. Never load demo seed data
 

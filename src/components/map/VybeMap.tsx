@@ -103,7 +103,7 @@ const PlacePreview: React.FC<{
   const categoryLabel = MAP_CATEGORY_FILTERS.find(item => item.id === place.category)?.label ?? place.category;
 
   return (
-    <div className="absolute bottom-6 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-xl z-10 animate-fadeIn">
+    <div className="absolute bottom-6 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-xl z-[45] animate-fadeIn">
       <div className="rounded-3xl bg-white/95 dark:bg-vybe-dark-card/95 backdrop-blur-xl border border-slate-200 dark:border-vybe-dark-border shadow-2xl overflow-hidden">
         <div className="flex items-center gap-4 p-4 cursor-pointer hover:border-vybe-lime transition-all group" onClick={() => onOpen(place)}>
           <div className="w-24 h-24 rounded-2xl shrink-0 overflow-hidden border border-black/10 dark:border-white/10 bg-slate-900 flex items-center justify-center">

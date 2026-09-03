@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, MapPin, Clock, Heart, Bookmark, Share2, Plus, Star, Sparkles, ExternalLink, Navigation, MessageSquarePlus, Gem } from 'lucide-react';
 import { Place } from '../../types';
 import { VybeScoreBadge } from '../common/VybeScoreBadge';
@@ -9,11 +9,41 @@ import { INITIAL_MOODS } from '../../data/initialMoods';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { getGoogleMapsPlaceUrl, getGooglePlaceDetails } from '../../services/googlePlaces';
 
+function getPlaceFallbackEmoji(place: Place): string {
+  const haystack = `${place.name} ${place.tags.join(' ')}`.toLowerCase();
+  if (/mosque|masjid|مسجد|جامع/.test(haystack)) return '🕌';
+  if (/church|eglise|église|كنيسة/.test(haystack)) return '⛪';
+  if (/hospital|clinic|hôpital|مستشفى/.test(haystack)) return '🏥';
+  if (/hotel|hôtel|فندق/.test(haystack)) return '🏨';
+  if (/restaurant|food|bakery|مطعم|مخبزة/.test(haystack)) return '🍽️';
+  if (/coffee|cafe|café|قهوة|مقهى/.test(haystack)) return '☕';
+  if (/game|arcade|jeux|gaming|ألعاب|bowling/.test(haystack)) return '🎮';
+  if (/cinema|movie|theater|film|سينما|مسرح/.test(haystack)) return '🎬';
+  if (/gym|fitness|sport|stadium|رياضة|ملعب/.test(haystack)) return '🏋️';
+  if (/park|garden|playground|حديقة/.test(haystack)) return '🌳';
+  if (/shopping|mall|store|تسوق|سوق/.test(haystack)) return '🛍️';
+  if (/museum|gallery|library|متحف|مكتبة/.test(haystack)) return '🏛️';
+  if (/bar|club|nightlife|music|موسيقى/.test(haystack)) return '🎵';
+  switch (place.category) {
+    case 'food-drink': return '🍽️';
+    case 'nightlife': return '🎵';
+    case 'arcade-gaming': return '🎮';
+    case 'outdoors-nature': return '🌳';
+    case 'entertainment': return '🎬';
+    case 'arts-culture': return '🏛️';
+    case 'shopping-vintage': return '🛍️';
+    case 'chill-spots': return '☕';
+    default: return '📍';
+  }
+}
+
 export const PlaceDetailModal: React.FC = () => {
   const { selectedPlace, isDetailOpen, setIsDetailOpen, openShareModal, plans, addPlaceToPlan, setIsReviewModalOpen, collections, addPlaceToCollection, showToast, setActiveTab, setSelectedPlace } = useData();
   const { toggleLikePlace, toggleSavePlace, isPlaceLiked, isPlaceSaved } = useAuth();
   const requireAuth = useRequireAuth();
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [failedImages, setFailedImages] = useState<number[]>([]);
+  const refreshAttemptedRef = useRef(false);
   const [selectedPlanId, setSelectedPlanId] = useState(plans[0]?.id || '');
   const [selectedCollectionId, setSelectedCollectionId] = useState(collections[0]?.id || '');
 
@@ -24,7 +54,10 @@ export const PlaceDetailModal: React.FC = () => {
   }, [setIsDetailOpen]);
 
   useEffect(() => {
+    // Fresh gallery state every time a different place is opened.
     setActiveImageIndex(0);
+    setFailedImages([]);
+    refreshAttemptedRef.current = false;
     if (!isDetailOpen || !selectedPlace) return;
     const providerId = selectedPlace.providerPlaceId || (selectedPlace.id.startsWith('google:') ? selectedPlace.id.slice('google:'.length) : '');
     const isGoogle = selectedPlace.provider === 'google' || Boolean(providerId);
@@ -51,20 +84,54 @@ export const PlaceDetailModal: React.FC = () => {
   const moodObj = INITIAL_MOODS.find(m => m.id === selectedPlace.primaryMood);
   const detailScore = calculateVybeScore(selectedPlace, {});
   const imageUrls = selectedPlace.images.filter(image => /^https?:\/\//i.test(image?.trim())).map(image => image.trim());
-  const activeImage = imageUrls[activeImageIndex] || imageUrls[0];
+  // failedImages holds ORIGINAL indexes into imageUrls (never re-derived ones).
+  const availableIndexes = imageUrls.map((_, index) => index).filter(index => !failedImages.includes(index));
+  const activeImageIndexSafe = availableIndexes.includes(activeImageIndex) ? activeImageIndex : (availableIndexes[0] ?? -1);
+  const activeImage = activeImageIndexSafe >= 0 ? imageUrls[activeImageIndexSafe] : undefined;
   const hasDistance = typeof selectedPlace.distanceKm === 'number' && Number.isFinite(selectedPlace.distanceKm) && selectedPlace.distanceKm >= 0;
   const distanceText = hasDistance ? `${selectedPlace.distanceKm!.toFixed(1)} km away` : 'Distance unavailable';
+
+  // One photo may never take the modal down: a failed image is skipped, and if
+  // every photo fails for a Google place we refresh details once (covers
+  // expired photo URLs) before showing the graceful emoji placeholder.
+  const handleHeroImageError = async () => {
+    if (activeImageIndexSafe < 0) return;
+    if (refreshAttemptedRef.current) {
+      setFailedImages(prev => prev.includes(activeImageIndexSafe) ? prev : [...prev, activeImageIndexSafe]);
+      return;
+    }
+    refreshAttemptedRef.current = true;
+    const providerId = selectedPlace.providerPlaceId || (selectedPlace.id.startsWith('google:') ? selectedPlace.id.slice('google:'.length) : '');
+    const isGoogle = selectedPlace.provider === 'google' || Boolean(providerId);
+    if (isGoogle && providerId) {
+      try {
+        const freshPlace = await getGooglePlaceDetails(providerId);
+        const freshImages = freshPlace?.images?.filter(Boolean) ?? [];
+        if (freshImages.length && freshImages.some(img => /^https?:\/\//i.test(img?.trim()))) {
+          setSelectedPlace({ ...selectedPlace, ...freshPlace, images: freshImages });
+          setFailedImages([]);
+          setActiveImageIndex(0);
+          return;
+        }
+      } catch (error) {
+        console.warn('[PlaceDetailModal] Google photo refresh failed', providerId, error);
+      }
+    }
+    setFailedImages(prev => prev.includes(activeImageIndexSafe) ? prev : [...prev, activeImageIndexSafe]);
+  };
 
   const handleAddPlan = () => {
     if (!requireAuth()) return;
     const targetPlanId = selectedPlanId || plans[0]?.id;
-    if (targetPlanId) addPlaceToPlan(targetPlanId, selectedPlace.id);
-    else showToast('Create an outing plan first.', '📋', 'info');
+    if (targetPlanId) { addPlaceToPlan(targetPlanId, selectedPlace.id); return; }
+    showToast('Create an outing plan first.', '📋', 'info');
+    setActiveTab('plan');
   };
   const handleSaveCollection = () => {
     if (!requireAuth()) return;
-    if (selectedCollectionId) addPlaceToCollection(selectedCollectionId, selectedPlace.id);
-    else showToast('Create a collection first.', '📁', 'info');
+    if (selectedCollectionId) { addPlaceToCollection(selectedCollectionId, selectedPlace.id); return; }
+    showToast('Create a collection first.', '📁', 'info');
+    setActiveTab('saved');
   };
   const openInAppMap = () => { setIsDetailOpen(false); setActiveTab('map'); setSelectedPlace(selectedPlace); showToast(`${selectedPlace.name} is centered on the VYBE map`, '📍', 'success'); };
   const openGoogleMaps = () => {
@@ -78,11 +145,11 @@ export const PlaceDetailModal: React.FC = () => {
       <div className="relative w-full max-w-4xl rounded-3xl bg-white dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border shadow-2xl overflow-hidden my-auto max-h-[90vh] flex flex-col cursor-default" onClick={e => e.stopPropagation()}>
         <button onClick={() => setIsDetailOpen(false)} aria-label="Close place details" className="absolute top-4 right-4 z-30 p-2.5 rounded-full bg-black/70 hover:bg-black text-white backdrop-blur-md transition-all shadow-lg hover:scale-110"><X className="w-5 h-5" /></button>
         <div className="overflow-y-auto flex-1">
-          <div className="relative w-full h-80 sm:h-96 bg-black">
-            {activeImage ? <img src={activeImage} alt={selectedPlace.name} decoding="async" className="w-full h-full object-cover transition-opacity duration-300" onError={() => { setActiveImageIndex(prev => prev + 1); }} /> : <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-vybe-dark-surface"><div className="w-24 h-24 rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center"><MapPin className="w-10 h-10 text-vybe-lime" /></div></div>}
+          <div className="relative w-full h-80 sm:h-96 overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-vybe-dark-surface">
+            {activeImage ? <img src={activeImage} alt={selectedPlace.name} decoding="async" className="w-full h-full object-cover transition-opacity duration-300" onError={() => void handleHeroImageError()} /> : <div className="w-full h-full flex flex-col items-center justify-center gap-3" aria-label={`${selectedPlace.name} photo placeholder`}><span className="text-6xl">{moodObj?.emoji ?? getPlaceFallbackEmoji(selectedPlace)}</span><span className="px-3 py-1 rounded-full bg-white/10 text-white/80 text-[10px] font-mono uppercase tracking-[0.2em]">No photo yet — explore this vibe in person</span></div>}
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent pointer-events-none" />
             <div className="absolute top-4 left-4 flex items-center gap-2 z-10"><VybeScoreBadge score={detailScore.score} size="lg" showLabel />{moodObj && <span className="px-3 py-1.5 rounded-full bg-black/80 backdrop-blur-md text-white text-xs font-bold border border-white/10 flex items-center gap-1.5"><span>{moodObj.emoji}</span><span>{moodObj.label} Vibe</span></span>}</div>
-            {imageUrls.length > 1 && <div className="absolute bottom-4 left-4 right-4 flex items-center gap-2 overflow-x-auto no-scrollbar z-10">{imageUrls.map((img, idx) => <button key={img + idx} type="button" onClick={() => setActiveImageIndex(idx)} aria-label={`Show photo ${idx + 1} of ${imageUrls.length}`} className={`shrink-0 w-16 h-12 rounded-xl overflow-hidden border-2 transition-all ${idx === activeImageIndex ? 'border-vybe-lime scale-105 shadow-neon-lime' : 'border-white/30 opacity-70 hover:opacity-100'}`}><img src={img} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" /></button>)}</div>}
+            {availableIndexes.length > 1 && <div className="absolute bottom-4 left-4 right-4 flex items-center gap-2 overflow-x-auto no-scrollbar z-10">{availableIndexes.map(idx => <button key={idx} type="button" onClick={() => setActiveImageIndex(idx)} aria-label={`Show photo ${idx + 1} of ${imageUrls.length}`} className={`shrink-0 w-16 h-12 rounded-xl overflow-hidden border-2 transition-all ${idx === activeImageIndexSafe ? 'border-vybe-lime scale-105 shadow-neon-lime' : 'border-white/30 opacity-70 hover:opacity-100'}`}><img src={imageUrls[idx]} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" /></button>)}</div>}
           </div>
 
           <div className="p-6 sm:p-8 space-y-8">
@@ -96,7 +163,7 @@ export const PlaceDetailModal: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border"><span className="text-xs text-slate-400 font-mono">ESTIMATED COST</span><p className="font-display font-bold text-base text-slate-900 dark:text-white mt-1">{selectedPlace.features.isFree ? '100% FREE' : `~$${Math.round(selectedPlace.approxCostUsd)} (${selectedPlace.priceLevel})`}</p></div>
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border"><span className="text-xs text-slate-400 font-mono">ESTIMATED COST</span><p className="font-display font-bold text-base text-slate-900 dark:text-white mt-1">{selectedPlace.features.isFree ? '100% FREE' : selectedPlace.approxCostUsd > 0 ? `~$${Math.round(selectedPlace.approxCostUsd)} (${selectedPlace.priceLevel})` : selectedPlace.priceLevel}</p></div>
               <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border"><span className="text-xs text-slate-400 font-mono">IDEAL DURATION</span><p className="font-display font-bold text-base text-slate-900 dark:text-white mt-1">{selectedPlace.estimatedDuration || 'Flexible'}</p></div>
               <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border"><span className="text-xs text-slate-400 font-mono">STATUS NOW</span><p className="font-display font-bold text-base mt-1 flex items-center gap-1.5"><span className={`w-2.5 h-2.5 rounded-full ${selectedPlace.openingHours.isOpenNow === true ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} /><span className={selectedPlace.openingHours.isOpenNow === true ? 'text-emerald-500 dark:text-emerald-400' : 'text-slate-400'}>{selectedPlace.openingHours.isOpenNow === undefined ? 'Status unavailable' : selectedPlace.openingHours.isOpenNow ? 'Open Now' : 'Closed'}</span></p></div>
               <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border"><span className="text-xs text-slate-400 font-mono">SUITABLE FOR</span><p className="font-display font-bold text-base text-slate-900 dark:text-white mt-1 capitalize">{selectedPlace.suitableFor.join(', ') || 'Everyone'}</p></div>

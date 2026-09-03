@@ -20,7 +20,7 @@ export const Navbar: React.FC = () => {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-black/5 dark:border-white/10 bg-white/80 dark:bg-[#090A0F]/85 backdrop-blur-xl transition-colors duration-300">
+    <header className="sticky top-0 z-30 w-full border-b border-black/5 dark:border-white/10 bg-white/80 dark:bg-[#090A0F]/85 backdrop-blur-xl transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
         <div className="flex items-center gap-6">
           <button onClick={() => setActiveTab('explore')} className="flex items-center gap-2 group text-left focus:outline-none" data-cursor="VYBE">

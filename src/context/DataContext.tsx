@@ -68,6 +68,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const removeToast = useCallback((id: string) => setToasts(prev => prev.filter(t => t.id !== id)), []);
   const showToast = useCallback((message: string, emoji = '⚡', type: 'success' | 'info' | 'vibe' = 'vibe') => { const id = `toast-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`; setToasts(prev => [...prev, { id, message, emoji, type }]); setTimeout(() => removeToast(id), 4000); }, [removeToast]);
 
+  // Auth-owned sync failures (likes/saves live in AuthContext, toasts here in
+  // DataContext) are surfaced through a tiny window event so the user always
+  // sees a real error instead of a silent revert.
+  useEffect(() => {
+    const handleActionFailed = (event: Event) => {
+      const detail = (event as CustomEvent<{ message?: string }>).detail;
+      if (detail?.message) showToast(detail.message, '⚠️', 'info');
+    };
+    window.addEventListener('vybe:action-failed', handleActionFailed);
+    return () => window.removeEventListener('vybe:action-failed', handleActionFailed);
+  }, [showToast]);
+
   const discoverAtLocation = useCallback((location: GeoLocation, overrideFilters?: FilterState) => {
     const activeFilters = overrideFilters ?? filters;
     if (!Number.isFinite(location.lat) || !Number.isFinite(location.lng)) return;
@@ -283,12 +295,22 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const openPlaceDetail = (place: Place) => { setSelectedPlace(place); setIsDetailOpen(true); };
   const openShareModal = (place?: Place) => { setShareTargetPlace(place || selectedPlace || null); setIsShareModalOpen(true); };
 
+  /** Persistence contract: an action only stays in the UI after the database
+   *  accepts it. Every optimistic mutation below rolls back and surfaces a real
+   *  error toast when the server write fails — the UI never pretends success. */
+  const rollbackToast = (message: string) => { showToast(message, '⚠️', 'info'); };
+
   const createPlan = (title: string, mood: MoodType, targetBudgetUsd = 50) => {
     const newPlan: VybePlan = { id: newUuid(), userId: currentUser?.id || '', title, date: 'Upcoming Outing', mood, targetBudgetUsd, isPublic: true, createdAt: new Date().toISOString(), items: [] };
     if (!realUserId) return newPlan;
     setPlans(prev => [newPlan, ...prev]);
     setActivePlan(newPlan);
-    void plansService.create(newPlan).catch(e => console.error(e));
+    void plansService.create(newPlan).catch(e => {
+      console.error('[VYBE] create plan failed', e);
+      setPlans(prev => prev.filter(p => p.id !== newPlan.id));
+      setActivePlan(prev => prev?.id === newPlan.id ? null : prev);
+      rollbackToast(`Could not create “${title}”. Please try again.`);
+    });
     return newPlan;
   };
 
@@ -301,25 +323,34 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setPlans(updatedPlans);
     setActivePlan(prev => prev?.id === planId ? updatedPlans.find(p => p.id === planId) || null : prev);
     if (placeOverride && !places.some(p => p.id === placeOverride.id)) setPlaces(prev => [placeOverride, ...prev]);
-    void plansService.addItem(planId, newItem).catch(e => console.error(e));
+    void plansService.addItem(planId, newItem).catch(e => {
+      console.error('[VYBE] add plan item failed', e);
+      setPlans(plans);
+      setActivePlan(prev => prev?.id === planId ? plans.find(p => p.id === planId) || null : prev);
+      rollbackToast(`Could not add ${place.name} to your plan. Please try again.`);
+    });
   };
-  const removePlaceFromPlan = (planId: string, planItemId: string) => { const plan = plans.find(p => p.id === planId); if (!realUserId || !plan || plan.userId !== realUserId) return; const updatedPlans = plans.map(p => p.id === planId ? { ...p, items: p.items.filter(item => item.id !== planItemId) } : p); setPlans(updatedPlans); if (activePlan?.id === planId) setActivePlan(updatedPlans.find(p => p.id === planId) || null); void plansService.removeItem(planItemId).catch(e => console.error(e)); };
-  const updatePlanItem = (planId: string, planItemId: string, updates: { startTime?: string; customNote?: string; durationMinutes?: number }) => { const plan = plans.find(p => p.id === planId); if (!realUserId || !plan || plan.userId !== realUserId) return; const updatedPlans = plans.map(p => p.id === planId ? { ...p, items: p.items.map(item => item.id === planItemId ? { ...item, ...updates } : item) } : p); setPlans(updatedPlans); if (activePlan?.id === planId) setActivePlan(updatedPlans.find(p => p.id === planId) || null); void plansService.updateItem(planItemId, updates).catch(e => console.error(e)); };
-  const deletePlan = (planId: string) => { const plan = plans.find(p => p.id === planId); if (!realUserId || !plan || plan.userId !== realUserId) return; setPlans(prev => { const nextPlans = prev.filter(p => p.id !== planId); if (activePlan?.id === planId) setActivePlan(nextPlans[0] || null); return nextPlans; }); void plansService.remove(planId).catch(e => console.error(e)); };
+  const removePlaceFromPlan = (planId: string, planItemId: string) => { const plan = plans.find(p => p.id === planId); const removedItem = plan?.items.find(item => item.id === planItemId); if (!realUserId || !plan || plan.userId !== realUserId) return; const updatedPlans = plans.map(p => p.id === planId ? { ...p, items: p.items.filter(item => item.id !== planItemId) } : p); setPlans(updatedPlans); if (activePlan?.id === planId) setActivePlan(updatedPlans.find(p => p.id === planId) || null); void plansService.removeItem(planItemId).catch(e => { console.error('[VYBE] remove plan item failed', e); if (removedItem) { const restoredPlans = plans.map(p => p.id === planId ? { ...p, items: [...p.items, removedItem].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)) } : p); setPlans(restoredPlans); if (activePlan?.id === planId) setActivePlan(restoredPlans.find(p => p.id === planId) || null); } rollbackToast('Could not remove that stop. Please try again.'); }); };
+  const updatePlanItem = (planId: string, planItemId: string, updates: { startTime?: string; customNote?: string; durationMinutes?: number }) => { const plan = plans.find(p => p.id === planId); if (!realUserId || !plan || plan.userId !== realUserId) return; const updatedPlans = plans.map(p => p.id === planId ? { ...p, items: p.items.map(item => item.id === planItemId ? { ...item, ...updates } : item) } : p); setPlans(updatedPlans); if (activePlan?.id === planId) setActivePlan(updatedPlans.find(p => p.id === planId) || null); void plansService.updateItem(planItemId, updates).catch(e => { console.error('[VYBE] update plan item failed', e); setPlans(plans); if (activePlan?.id === planId) setActivePlan(plans.find(p => p.id === planId) || null); rollbackToast('Could not save that change. Please try again.'); }); };
+  const deletePlan = (planId: string) => { const plan = plans.find(p => p.id === planId); if (!realUserId || !plan || plan.userId !== realUserId) return; setPlans(prev => { const nextPlans = prev.filter(p => p.id !== planId); if (activePlan?.id === planId) setActivePlan(nextPlans[0] || null); return nextPlans; }); void plansService.remove(planId).catch(e => { console.error('[VYBE] delete plan failed', e); setPlans(prev => prev.some(p => p.id === planId) ? prev : [plan, ...prev]); rollbackToast('Could not delete that plan. Please try again.'); }); };
 
   const createCollection = (name: string, emoji: string, color: string, description = '') => {
     const nowIso = new Date().toISOString();
     const newCol: Collection = { id: newUuid(), userId: currentUser?.id || '', name, description, emoji, color, isPublic: true, placeIds: [], createdAt: nowIso, updatedAt: nowIso };
     if (!realUserId) return newCol;
     setCollections(prev => [newCol, ...prev]);
-    void collectionsService.create(newCol).catch(e => console.error(e));
+    void collectionsService.create(newCol).catch(e => {
+      console.error('[VYBE] create collection failed', e);
+      setCollections(prev => prev.filter(c => c.id !== newCol.id));
+      rollbackToast(`Could not create “${name}”. Please try again.`);
+    });
     return newCol;
   };
-  const addPlaceToCollection = (collectionId: string, placeId: string) => { const col = collections.find(c => c.id === collectionId); if (!realUserId || !col || col.userId !== realUserId || !places.some(p => p.id === placeId) || col.placeIds.includes(placeId)) return; setCollections(prev => prev.map(c => c.id === collectionId ? { ...c, placeIds: [...c.placeIds, placeId], updatedAt: new Date().toISOString() } : c)); void collectionsService.addPlace(collectionId, placeId).catch(e => console.error(e)); };
-  const removePlaceFromCollection = (collectionId: string, placeId: string) => { const col = collections.find(c => c.id === collectionId); if (!realUserId || !col || col.userId !== realUserId) return; setCollections(prev => prev.map(c => c.id === collectionId ? { ...c, placeIds: c.placeIds.filter(id => id !== placeId) } : c)); void collectionsService.removePlace(collectionId, placeId).catch(e => console.error(e)); };
-  const deleteCollection = (collectionId: string) => { const col = collections.find(c => c.id === collectionId); if (!realUserId || !col || col.userId !== realUserId) return; setCollections(prev => prev.filter(c => c.id !== collectionId)); void collectionsService.remove(collectionId).catch(e => console.error(e)); };
+  const addPlaceToCollection = (collectionId: string, placeId: string) => { const col = collections.find(c => c.id === collectionId); const place = places.find(p => p.id === placeId); if (!realUserId || !col || col.userId !== realUserId || !place || col.placeIds.includes(placeId)) return; setCollections(prev => prev.map(c => c.id === collectionId ? { ...c, placeIds: [...c.placeIds, placeId], updatedAt: new Date().toISOString() } : c)); void collectionsService.addPlace(collectionId, placeId).catch(e => { console.error('[VYBE] add collection item failed', e); setCollections(prev => prev.map(c => c.id === collectionId ? { ...c, placeIds: c.placeIds.filter(id => id !== placeId), updatedAt: new Date().toISOString() } : c)); rollbackToast(`Could not add ${place.name} to the collection. Please try again.`); }); };
+  const removePlaceFromCollection = (collectionId: string, placeId: string) => { const col = collections.find(c => c.id === collectionId); if (!realUserId || !col || col.userId !== realUserId) return; setCollections(prev => prev.map(c => c.id === collectionId ? { ...c, placeIds: c.placeIds.filter(id => id !== placeId) } : c)); void collectionsService.removePlace(collectionId, placeId).catch(e => { console.error('[VYBE] remove collection item failed', e); setCollections(prev => prev.map(c => c.id === collectionId ? { ...c, placeIds: c.placeIds.includes(placeId) ? c.placeIds : [...c.placeIds, placeId] } : c)); rollbackToast('Could not remove that spot. Please try again.'); }); };
+  const deleteCollection = (collectionId: string) => { const col = collections.find(c => c.id === collectionId); if (!realUserId || !col || col.userId !== realUserId) return; setCollections(prev => prev.filter(c => c.id !== collectionId)); void collectionsService.remove(collectionId).catch(e => { console.error('[VYBE] delete collection failed', e); setCollections(prev => prev.some(c => c.id === collectionId) ? prev : [col, ...prev]); rollbackToast('Could not delete that collection. Please try again.'); }); };
 
-  const addReview = (placeId: string, reviewData: Omit<PlaceReview, 'id' | 'createdAt' | 'likesCount'>) => { const target = places.find(p => p.id === placeId); if (!realUserId || !target || reviewData.userId !== realUserId) return; const newReview: PlaceReview = { ...reviewData, id: newUuid(), createdAt: 'Just now', likesCount: 0 }; const updatedPlace = { ...target, reviews: [newReview, ...target.reviews], rating: Number(((target.rating * target.reviewCount + reviewData.rating) / (target.reviewCount + 1)).toFixed(1)), reviewCount: target.reviewCount + 1 }; setPlaces(prev => prev.map(p => p.id === placeId ? updatedPlace : p)); setSelectedPlace(cur => cur?.id === placeId ? updatedPlace : cur); void reviewsService.create({ placeId, userId: reviewData.userId, rating: reviewData.rating, vibeRating: reviewData.vibeRating, moodTags: reviewData.moodTags, comment: reviewData.comment, id: newReview.id }).catch(e => console.error(e)); };
+  const addReview = (placeId: string, reviewData: Omit<PlaceReview, 'id' | 'createdAt' | 'likesCount'>) => { const target = places.find(p => p.id === placeId); if (!realUserId || !target || reviewData.userId !== realUserId) return; const newReview: PlaceReview = { ...reviewData, id: newUuid(), createdAt: 'Just now', likesCount: 0 }; const updatedPlace = { ...target, reviews: [newReview, ...target.reviews], rating: Number(((target.rating * target.reviewCount + reviewData.rating) / (target.reviewCount + 1)).toFixed(1)), reviewCount: target.reviewCount + 1 }; setPlaces(prev => prev.map(p => p.id === placeId ? updatedPlace : p)); setSelectedPlace(cur => cur?.id === placeId ? updatedPlace : cur); void reviewsService.create({ placeId, userId: reviewData.userId, rating: reviewData.rating, vibeRating: reviewData.vibeRating, moodTags: reviewData.moodTags, comment: reviewData.comment, id: newReview.id }).catch(e => { console.error('[VYBE] publish review failed', e); setPlaces(prev => prev.map(p => p.id === placeId ? target : p)); setSelectedPlace(cur => cur?.id === placeId ? target : cur); rollbackToast('Your review could not be published. Please try again.'); }); };
   const addPlace = (placeData: Omit<Place, 'id' | 'rating' | 'reviewCount' | 'baseVybeScore' | 'reviews'>) => { if (!realUserId) return { ...placeData, id: newUuid(), rating: 4.8, reviewCount: 1, baseVybeScore: 92, reviews: [] } as Place; const newPlace: Place = { ...placeData, id: newUuid(), rating: 4.8, reviewCount: 1, baseVybeScore: 92, reviews: [] }; setPlaces(prev => [newPlace, ...prev]); void placesService.create(newPlace).catch(e => console.error(e)); return newPlace; };
   const updatePlace = (placeId: string, updates: Partial<Place>) => { if (!realUserId) return; setPlaces(prev => prev.map(p => p.id === placeId ? { ...p, ...updates } : p)); if (selectedPlace?.id === placeId) setSelectedPlace(prev => prev ? { ...prev, ...updates } : null); void placesService.update(placeId, updates).catch(e => console.error(e)); };
   const deletePlace = (placeId: string) => { if (!realUserId) return; setPlaces(prev => prev.filter(p => p.id !== placeId)); if (selectedPlace?.id === placeId) { setSelectedPlace(null); setIsDetailOpen(false); } void placesService.remove(placeId).catch(e => console.error(e)); };
