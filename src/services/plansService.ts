@@ -5,6 +5,7 @@
 import { supabase } from '../lib/supabase';
 import { PlanItem, VybePlan } from '../types';
 import { DbPlanItemRow, DbPlanRow, newUuid, rowToPlan } from './mappers';
+import { ensureGooglePlaceStored } from './placesService';
 
 const assertBackend = () => {
   if (!supabase) throw new Error('VYBE backend is not configured');
@@ -67,6 +68,7 @@ export const plansService = {
 
   async addItem(planId: string, item: PlanItem): Promise<void> {
     const db = assertBackend();
+    await ensureGooglePlaceStored(item.placeId);
     const { error } = await db.from('plan_items').upsert(
       planItemToRow(planId, item),
       { ignoreDuplicates: true, onConflict: 'id' }
