@@ -19,7 +19,7 @@ interface DataContextType {
   activeHeroMood: MoodType | null; setActiveHeroMood: (mood: MoodType | null) => void;
   filters: FilterState; setFilters: React.Dispatch<React.SetStateAction<FilterState>>; resetFilters: () => void;
   discoveryLoading: boolean; discoveryError: string | null; locationError: string | null; userLocation: GeoLocation | null;
-  requestLocationAndDiscover: () => void; discover: (overrideFilters?: FilterState) => void;
+  requestLocationAndDiscover: () => void; discover: (overrideFilters?: FilterState) => void; discoverAtLocation: (location: GeoLocation, overrideFilters?: FilterState) => void;
   selectedPlace: Place | null; setSelectedPlace: (place: Place | null) => void; isDetailOpen: boolean; setIsDetailOpen: (open: boolean) => void;
   openPlaceDetail: (place: Place) => void; isReviewModalOpen: boolean; setIsReviewModalOpen: (open: boolean) => void;
   isShareModalOpen: boolean; setIsShareModalOpen: (open: boolean) => void; shareTargetPlace: Place | null; openShareModal: (place?: Place) => void;
@@ -77,16 +77,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const removeToast = useCallback((id: string) => setToasts(prev => prev.filter(t => t.id !== id)), []);
   const showToast = useCallback((message: string, emoji = '⚡', type: 'success' | 'info' | 'vibe' = 'vibe') => { const id = `toast-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`; setToasts(prev => [...prev, { id, message, emoji, type }]); setTimeout(() => removeToast(id), 4000); }, [removeToast]);
 
-  const discover = useCallback((overrideFilters?: FilterState) => {
+  const discoverAtLocation = useCallback((location: GeoLocation, overrideFilters?: FilterState) => {
     const activeFilters = overrideFilters ?? filters;
-    const userLat = geo.location?.lat; const userLng = geo.location?.lng;
-    if (userLat === undefined || userLng === undefined) { console.log('[discovery] Waiting for browser location.'); return; }
-    setDiscoveryLoading(true); setDiscoveryError(null);
-    discoverPlaces({ userLat, userLng, radiusKm: 5, searchQuery: activeFilters.searchQuery.trim() || undefined, filters: activeFilters })
+    if (!Number.isFinite(location.lat) || !Number.isFinite(location.lng)) return;
+    setDiscoveryLoading(true);
+    setDiscoveryError(null);
+    discoverPlaces({ userLat: location.lat, userLng: location.lng, radiusKm: 5, searchQuery: activeFilters.searchQuery.trim() || undefined, filters: activeFilters })
       .then(result => { setPlaces(result); })
       .catch(err => { console.error('[DataContext] Discovery failed:', err); setPlaces([]); const message = err instanceof Error ? err.message : 'Unable to load places right now.'; setDiscoveryError(message); showToast(message, '⚠️', 'info'); })
       .finally(() => setDiscoveryLoading(false));
-  }, [geo.location, filters, showToast]);
+  }, [filters, showToast]);
+
+  const discover = useCallback((overrideFilters?: FilterState) => {
+    if (!geo.location) { console.log('[discovery] Waiting for browser location.'); return; }
+    discoverAtLocation(geo.location, overrideFilters);
+  }, [geo.location, discoverAtLocation]);
 
   const requestLocationAndDiscover = useCallback(() => { geo.requestLocation(); }, [geo.requestLocation]);
   useEffect(() => { if (!geo.location && !geo.loading && !geo.error) geo.requestLocation(); }, [geo.location, geo.loading, geo.error, geo.requestLocation]);
@@ -119,7 +124,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setActiveTab('explore');
           return;
         }
-
         try {
           let publicPlace: Place | null = null;
           if (placeId.startsWith('google:')) {
@@ -198,20 +202,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const addPlaceToPlan = (planId: string, placeId: string, customTime = '20:00') => { const plan = plans.find(p => p.id === planId); const place = places.find(p => p.id === placeId); if (!plan || !place || plan.items.some(item => item.placeId === placeId)) return; const newItem: PlanItem = { id: dataMode === 'supabase' ? newUuid() : `item-${Date.now()}`, placeId, startTime: customTime, durationMinutes: 90, customNote: `Experience ${place.name} (${place.tagline})`, order: plan.items.length + 1 }; const updatedPlans = plans.map(p => p.id === planId ? { ...p, items: [...p.items, newItem] } : p); setPlans(updatedPlans); setActivePlan(prev => prev?.id === planId ? updatedPlans.find(p => p.id === planId) || null : prev); if (realUserId) void plansService.addItem(planId, newItem).catch(e => console.error(e)); };
   const removePlaceFromPlan = (planId: string, planItemId: string) => { const updatedPlans = plans.map(p => p.id === planId ? { ...p, items: p.items.filter(item => item.id !== planItemId) } : p); setPlans(updatedPlans); if (activePlan?.id === planId) setActivePlan(updatedPlans.find(p => p.id === planId) || null); if (realUserId) void plansService.removeItem(planItemId).catch(e => console.error(e)); };
   const updatePlanItem = (planId: string, planItemId: string, updates: { startTime?: string; customNote?: string; durationMinutes?: number }) => { const updatedPlans = plans.map(p => p.id === planId ? { ...p, items: p.items.map(item => item.id === planItemId ? { ...item, ...updates } : item) } : p); setPlans(updatedPlans); if (activePlan?.id === planId) setActivePlan(updatedPlans.find(p => p.id === planId) || null); if (realUserId) void plansService.updateItem(planItemId, updates).catch(e => console.error(e)); };
-  const deletePlan = (planId: string) => {
-    setPlans(prev => {
-      const nextPlans = prev.filter(p => p.id !== planId);
-      if (activePlan?.id === planId) setActivePlan(nextPlans[0] || null);
-      return nextPlans;
-    });
-    if (realUserId) void plansService.remove(planId).catch(e => console.error(e));
-  };
-
+  const deletePlan = (planId: string) => { setPlans(prev => { const nextPlans = prev.filter(p => p.id !== planId); if (activePlan?.id === planId) setActivePlan(nextPlans[0] || null); return nextPlans; }); if (realUserId) void plansService.remove(planId).catch(e => console.error(e)); };
   const createCollection = (name: string, emoji: string, color: string, description = '') => { const nowIso = new Date().toISOString(); const newCol: Collection = { id: dataMode === 'supabase' ? newUuid() : `col-${Date.now()}`, userId: currentUser?.id || 'u-1', name, description, emoji, color, isPublic: true, placeIds: [], createdAt: nowIso, updatedAt: nowIso }; setCollections(prev => [newCol, ...prev]); if (realUserId) void collectionsService.create(newCol).catch(e => console.error(e)); return newCol; };
   const addPlaceToCollection = (collectionId: string, placeId: string) => { const col = collections.find(c => c.id === collectionId); if (!col || !places.some(p => p.id === placeId) || col.placeIds.includes(placeId)) return; setCollections(prev => prev.map(c => c.id === collectionId ? { ...c, placeIds: [...c.placeIds, placeId], updatedAt: new Date().toISOString() } : c)); if (realUserId) void collectionsService.addPlace(collectionId, placeId).catch(e => console.error(e)); };
   const removePlaceFromCollection = (collectionId: string, placeId: string) => { setCollections(prev => prev.map(c => c.id === collectionId ? { ...c, placeIds: c.placeIds.filter(id => id !== placeId) } : c)); if (realUserId) void collectionsService.removePlace(collectionId, placeId).catch(e => console.error(e)); };
   const deleteCollection = (collectionId: string) => { setCollections(prev => prev.filter(c => c.id !== collectionId)); if (realUserId) void collectionsService.remove(collectionId).catch(e => console.error(e)); };
-
   const addReview = (placeId: string, reviewData: Omit<PlaceReview, 'id' | 'createdAt' | 'likesCount'>) => { const target = places.find(p => p.id === placeId); if (!target) return; const newReview: PlaceReview = { ...reviewData, id: dataMode === 'supabase' ? newUuid() : `rev-${Date.now()}`, createdAt: 'Just now', likesCount: 0 }; const updatedPlace = { ...target, reviews: [newReview, ...target.reviews], rating: Number(((target.rating * target.reviewCount + reviewData.rating) / (target.reviewCount + 1)).toFixed(1)), reviewCount: target.reviewCount + 1 }; setPlaces(prev => prev.map(p => p.id === placeId ? updatedPlace : p)); setSelectedPlace(cur => cur?.id === placeId ? updatedPlace : cur); if (realUserId) void reviewsService.create({ placeId, userId: reviewData.userId, rating: reviewData.rating, vibeRating: reviewData.vibeRating, moodTags: reviewData.moodTags, comment: reviewData.comment, id: newReview.id }).catch(e => console.error(e)); };
   const addPlace = (placeData: Omit<Place, 'id' | 'rating' | 'reviewCount' | 'baseVybeScore' | 'reviews'>) => { const newPlace: Place = { ...placeData, id: dataMode === 'supabase' ? newUuid() : `place-${Date.now()}`, rating: 4.8, reviewCount: 1, baseVybeScore: 92, reviews: [] }; setPlaces(prev => [newPlace, ...prev]); if (realUserId) void placesService.create(newPlace).catch(e => console.error(e)); return newPlace; };
   const updatePlace = (placeId: string, updates: Partial<Place>) => { setPlaces(prev => prev.map(p => p.id === placeId ? { ...p, ...updates } : p)); if (selectedPlace?.id === placeId) setSelectedPlace(prev => prev ? { ...prev, ...updates } : null); if (realUserId) void placesService.update(placeId, updates).catch(e => console.error(e)); };
@@ -240,7 +235,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
   }, [places, filters, activeHeroMood]);
 
-  return <DataContext.Provider value={{ places, activeTab, setActiveTab, activeHeroMood, setActiveHeroMood, filters, setFilters, resetFilters, discoveryLoading, discoveryError, locationError: geo.error, userLocation: geo.location, requestLocationAndDiscover, discover, selectedPlace, setSelectedPlace, isDetailOpen, setIsDetailOpen, openPlaceDetail, isReviewModalOpen, setIsReviewModalOpen, isShareModalOpen, setIsShareModalOpen, shareTargetPlace, openShareModal, isAuthModalOpen, setIsAuthModalOpen, authModalMode, setAuthModalMode, plans, activePlan, setActivePlan, createPlan, addPlaceToPlan, removePlaceFromPlan, updatePlanItem, deletePlan, collections, createCollection, addPlaceToCollection, removePlaceFromCollection, deleteCollection, addReview, addPlace, updatePlace, deletePlace, filteredPlaces, toasts, showToast, removeToast }}>{children}</DataContext.Provider>;
+  return <DataContext.Provider value={{ places, activeTab, setActiveTab, activeHeroMood, setActiveHeroMood, filters, setFilters, resetFilters, discoveryLoading, discoveryError, locationError: geo.error, userLocation: geo.location, requestLocationAndDiscover, discover, discoverAtLocation, selectedPlace, setSelectedPlace, isDetailOpen, setIsDetailOpen, openPlaceDetail, isReviewModalOpen, setIsReviewModalOpen, isShareModalOpen, setIsShareModalOpen, shareTargetPlace, openShareModal, isAuthModalOpen, setIsAuthModalOpen, authModalMode, setAuthModalMode, plans, activePlan, setActivePlan, createPlan, addPlaceToPlan, removePlaceFromPlan, updatePlanItem, deletePlan, collections, createCollection, addPlaceToCollection, removePlaceFromCollection, deleteCollection, addReview, addPlace, updatePlace, deletePlace, filteredPlaces, toasts, showToast, removeToast }}>{children}</DataContext.Provider>;
 };
 
 export const useData = () => { const context = useContext(DataContext); if (!context) throw new Error('useData must be used within DataProvider'); return context; };
