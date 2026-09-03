@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Heart, Bookmark, MapPin, Clock, Share2, Plus, Navigation, Sparkles, ArrowUpRight, Gem, Utensils, Coffee, Music, Landmark, Trees, Gamepad2, ShoppingBag, Dumbbell, Film, Church, BookOpen, Hotel, Stethoscope } from 'lucide-react';
+import { Heart, Bookmark, MapPin, Clock, Share2, Plus, Navigation, Sparkles, ArrowUpRight, Gem, Utensils, Coffee, Music, Landmark, Trees, Gamepad2, ShoppingBag, Dumbbell, Film, Church, BookOpen, Hotel, Stethoscope, BadgeCheck } from 'lucide-react';
 import { Place } from '../../types';
 import { VybeScoreBadge } from '../common/VybeScoreBadge';
 import { calculateVybeScore } from '../../hooks/useVybeScore';
@@ -45,6 +45,11 @@ function formatCategory(category: Place['category']): string {
   return labels[category] ?? 'Place';
 }
 
+function getTrustLabel(place: Place) {
+  if (place.provider === 'google' || place.providerPlaceId || place.id.startsWith('google:')) return 'Google verified';
+  return 'VYBE curated';
+}
+
 export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
   const { toggleLikePlace, toggleSavePlace, isPlaceLiked, isPlaceSaved } = useAuth();
   const { openPlaceDetail, openShareModal, addPlaceToPlan, plans, showToast, setActiveTab, setSelectedPlace } = useData();
@@ -66,6 +71,7 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
   const hasDistance = typeof place.distanceKm === 'number' && Number.isFinite(place.distanceKm) && place.distanceKm >= 0;
   const locationLabel = place.location.neighborhood?.trim() || place.location.address?.trim();
   const openState = place.openingHours.isOpenNow;
+  const trustLabel = getTrustLabel(place);
 
   const handleQuickAddPlan = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -108,7 +114,7 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
             <div className="flex items-center gap-1 min-w-0"><MapPin className="w-3.5 h-3.5 text-vybe-cyan shrink-0" /><span className="truncate">🇩🇿 Algeria · {locationLabel || 'Location unavailable'}{hasDistance ? ` · ${place.distanceKm!.toFixed(1)} km` : ''}</span></div>
             {openState !== undefined && <div className="flex items-center gap-1 shrink-0 font-mono text-[11px]"><span className={`w-2 h-2 rounded-full ${openState ? 'bg-emerald-400' : 'bg-rose-400'}`} /><span className={openState ? 'text-emerald-500 dark:text-emerald-400 font-bold' : 'text-slate-400'}>{openState ? 'Open Now' : 'Closed'}</span></div>}
           </div>
-          <div className="flex items-center gap-2"><span className="inline-flex items-center px-2 py-1 rounded-lg bg-slate-100 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-[10px] font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">{formatCategory(displayCategory)}</span></div>
+          <div className="flex flex-wrap items-center gap-2"><span className="inline-flex items-center px-2 py-1 rounded-lg bg-slate-100 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-[10px] font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">{formatCategory(displayCategory)}</span><span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-vybe-cyan/10 border border-vybe-cyan/20 text-[10px] font-bold text-vybe-cyan"><BadgeCheck className="w-3 h-3" />{trustLabel}</span></div>
           <h3 className="font-display font-bold text-lg text-slate-900 dark:text-white group-hover:text-vybe-lime transition-colors leading-tight line-clamp-1">{place.name}</h3>
           <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2 leading-relaxed">{place.tagline || place.location.address || 'Real place discovered via Google Places.'}</p>
         </div>
