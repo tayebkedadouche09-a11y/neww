@@ -59,7 +59,7 @@ const GOOGLE_TYPE_TO_MOOD: Record<string, MoodType> = {
   amusement_park: 'energetic', amusement_center: 'energetic', bowling_alley: 'gaming', movie_theater: 'chill', casino: 'party', go_karting_venue: 'energetic', miniature_golf_course: 'gaming', paintball_center: 'energetic',
   video_arcade: 'gaming', internet_cafe: 'gaming',
   shopping_mall: 'explore', store: 'explore', clothing_store: 'explore', book_store: 'curious', thrift_store: 'explore', flea_market: 'explore', toy_store: 'explore', gift_shop: 'explore',
-  spa: 'lazy', garden: 'chill', tourist_attraction: 'explore', historical_landmark: 'explore', monument: 'explore', observation_deck: 'explore', plaza: 'explore', cultural_landmark: 'explore',
+  spa: 'lazy', garden: 'chill', tourist_attraction: 'explore', monument: 'explore', observation_deck: 'explore', plaza: 'explore', cultural_landmark: 'explore',
   sports_complex: 'energetic', sports_club: 'energetic', sports_activity_location: 'energetic', swimming_pool: 'energetic', tennis_court: 'energetic', athletic_field: 'energetic', stadium: 'energetic', arena: 'energetic', adventure_sports_center: 'energetic',
   mosque: 'curious', church: 'curious', hindu_temple: 'curious', synagogue: 'curious', place_of_worship: 'curious',
   hospital: 'explore', doctor: 'explore', pharmacy: 'explore', dentist: 'explore', hotel: 'chill', lodging: 'chill',
@@ -72,7 +72,7 @@ const NAME_RULES: Array<{ category: CategoryType; mood: MoodType; words: string[
   { category: 'outdoors-nature', mood: 'outdoor', words: ['park', 'parc', 'jardin', 'garden', 'forêt', 'forest', 'plage', 'beach', 'promenade', 'hiking', 'randonnée', 'nature'] },
   { category: 'entertainment', mood: 'energetic', words: ['cinema', 'cinéma', 'theatre', 'théâtre', 'amusement', 'manège', 'karting', 'paintball', 'bowling'] },
   { category: 'shopping-vintage', mood: 'explore', words: ['mall', 'centre commercial', 'shopping', 'boutique', 'store', 'magasin', 'marché', 'market', 'friperie', 'bookstore', 'librairie'] },
-  { category: 'arts-culture', mood: 'curious', words: ['mosquée', 'mosquee', 'mosque', 'مسجد', 'église', 'eglise', 'church', 'temple', 'synagogue', 'museum', 'musée', 'musee', 'gallery', 'galerie', 'library', 'bibliothèque', 'bibliotheque'] },
+  { category: 'arts-culture', mood: 'curious', words: ['mosquée', 'mosquee', 'mosque', 'مسجد', 'جامع', 'église', 'eglise', 'church', 'temple', 'synagogue', 'museum', 'musée', 'musee', 'gallery', 'galerie', 'library', 'bibliothèque', 'bibliotheque'] },
   { category: 'chill-spots', mood: 'lazy', words: ['spa', 'hotel', 'hôtel', 'resort', 'wellness', 'relax'] },
 ];
 
@@ -84,8 +84,6 @@ export function classifyPlace(types?: string[], name?: string): { category: Cate
   const normalized = normalizeName(name);
   const typeSet = new Set(types ?? []);
 
-  // Strong name evidence wins over broad Google types. This keeps names such as
-  // "Jeux ..." / "Gaming ..." in arcade-gaming even when Google says restaurant.
   for (const rule of NAME_RULES) {
     if (rule.words.some(word => normalized.includes(normalizeName(word)))) {
       return { category: rule.category, mood: rule.mood };
@@ -98,7 +96,6 @@ export function classifyPlace(types?: string[], name?: string): { category: Cate
     }
   }
 
-  // Never force an unknown place into food/drink. Keep it discoverable.
   return { category: 'hidden-gems', mood: 'explore' };
 }
 
