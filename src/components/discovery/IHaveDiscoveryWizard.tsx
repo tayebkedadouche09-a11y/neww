@@ -1,16 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect } from 'react';
 import confetti from 'canvas-confetti';
-import {
-  Clock,
-  Wallet,
-  Users,
-  Sparkles,
-  ArrowRight,
-  RotateCcw,
-  CheckCircle2,
-  Flame,
-  MapPin
-} from 'lucide-react';
+import { Clock, Wallet, Users, Sparkles, ArrowRight, RotateCcw, CheckCircle2, Flame, MapPin } from 'lucide-react';
 import { TimeDuration, CompanionType, MoodType } from '../../types';
 import { INITIAL_MOODS } from '../../data/initialMoods';
 import { useData } from '../../context/DataContext';
@@ -43,64 +33,46 @@ const COMPANION_OPTIONS: { value: CompanionType; label: string; icon: string }[]
 export const IHaveDiscoveryWizard: React.FC<{ onResultsReady?: () => void }> = ({ onResultsReady }) => {
   const { filters, setFilters, showToast, requestLocationAndDiscover, discover, discoveryLoading } = useData();
 
-  const [selectedTime, setSelectedTime] = useState<TimeDuration>(filters.duration || '2h');
-  const [selectedBudget, setSelectedBudget] = useState<number | 'free' | 'unlimited'>(
-    filters.onlyFree ? 'free' : (filters.maxBudget || 25)
-  );
-  const [selectedCompanion, setSelectedCompanion] = useState<CompanionType>(filters.companion || 'friends');
-  const [selectedMoods, setSelectedMoods] = useState<MoodType[]>(filters.moods.length ? filters.moods : ['chill', 'hungry']);
+  useEffect(() => {
+    if (!filters.moods.length) {
+      setFilters(prev => ({ ...prev, moods: ['chill', 'hungry'] }));
+    }
+  }, [filters.moods.length, setFilters]);
 
   const selectedPlaceType = filters.searchQuery.trim();
+  const selectedTime = filters.duration || '2h';
+  const selectedBudget: number | 'free' | 'unlimited' = filters.onlyFree ? 'free' : (filters.maxBudget ?? 'unlimited');
+  const selectedCompanion = filters.companion || 'friends';
+  const selectedMoods = filters.moods.length ? filters.moods : ['chill', 'hungry'] as MoodType[];
+
+  const updateFilters = (patch: Partial<typeof filters>) => {
+    setFilters(prev => ({ ...prev, ...patch }));
+  };
 
   const toggleMood = (moodId: MoodType) => {
-    setSelectedMoods(prev => {
-      if (prev.includes(moodId)) return prev.length > 1 ? prev.filter(m => m !== moodId) : prev;
-      return [...prev, moodId];
+    setFilters(prev => {
+      const exists = prev.moods.includes(moodId);
+      if (exists && prev.moods.length === 1) return prev;
+      return { ...prev, moods: exists ? prev.moods.filter(m => m !== moodId) : [...prev.moods, moodId] };
     });
   };
 
   const handleGenerate = () => {
     confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 }, colors: ['#CCFF00', '#FF5500', '#00F0FF', '#FF007F'] });
-
-    setFilters(prev => ({
-      ...prev,
-      duration: selectedTime,
-      maxBudget: typeof selectedBudget === 'number' ? selectedBudget : undefined,
-      onlyFree: selectedBudget === 'free',
-      companion: selectedCompanion,
-      moods: selectedMoods,
-      sortBy: 'vybe-score'
-    }));
-
+    updateFilters({ sortBy: 'vybe-score' });
     showToast(
-      selectedPlaceType
-        ? `Finding ${selectedPlaceType} around you and ranking them with your VYBE.`
-        : 'Your Explore feed is now personalized to your outing.',
+      selectedPlaceType ? `Finding ${selectedPlaceType} around you and ranking them with your VYBE.` : 'Explore is now personalized to your outing.',
       '🔥',
       'vibe'
     );
-
     requestLocationAndDiscover();
     setTimeout(() => discover(), 500);
     setTimeout(() => onResultsReady?.(), 200);
   };
 
   const handleReset = () => {
-    setSelectedTime('2h');
-    setSelectedBudget(25);
-    setSelectedCompanion('friends');
-    setSelectedMoods(['chill', 'hungry']);
-    setFilters(prev => ({
-      ...prev,
-      duration: undefined,
-      maxBudget: undefined,
-      onlyFree: false,
-      companion: undefined,
-      moods: [],
-      categories: [],
-      searchQuery: ''
-    }));
-    showToast('Explore preferences reset', '🔄', 'info');
+    updateFilters({ duration: undefined, maxBudget: undefined, onlyFree: false, companion: undefined, moods: [], categories: [], searchQuery: '', priceLevels: [], onlyOpenNow: false, onlyHiddenGems: false, onlyLateNight: false, sortBy: 'vybe-score' });
+    showToast('Explore discovery preferences reset', '🔄', 'info');
   };
 
   return (
@@ -115,8 +87,9 @@ export const IHaveDiscoveryWizard: React.FC<{ onResultsReady?: () => void }> = (
               <span>DISCOVERY ENGINE</span>
             </div>
             <h2 className="font-display font-extrabold text-2xl sm:text-3xl text-slate-900 dark:text-white">"I have..." Personalized Matcher</h2>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Set your outing constraints and the same Explore + Map results will update together.</p>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Every choice here updates the same Explore + Map filters.</p>
           </div>
+
           <button onClick={handleReset} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-700 dark:hover:text-white self-start sm:self-auto py-2 transition-colors">
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Reset</span>
@@ -124,12 +97,15 @@ export const IHaveDiscoveryWizard: React.FC<{ onResultsReady?: () => void }> = (
         </div>
 
         <div className="py-6 border-b border-slate-200 dark:border-white/10 space-y-3">
-          <label className="flex items-center gap-2 font-display font-bold text-base text-slate-900 dark:text-white"><MapPin className="w-4 h-4 text-vybe-cyan" /><span>Discovery target</span></label>
-          <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-2 font-display font-bold text-base text-slate-900 dark:text-white">
+            <MapPin className="w-4 h-4 text-vybe-cyan" />
+            <span>Discovery target</span>
+          </label>
+          <div className="flex flex-wrap gap-2 items-center">
             {selectedPlaceType ? (
               <span className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-vybe-lime/15 border border-vybe-lime/30 text-vybe-lime text-xs font-bold"><span>📍</span><span>{selectedPlaceType}</span><span>🇩🇿</span></span>
             ) : (
-              <span className="text-xs text-slate-500">Choose a place type from the Explore buttons above. Leave it empty to discover broadly.</span>
+              <span className="text-xs text-slate-500">No specific type selected — Explore will discover broadly.</span>
             )}
           </div>
         </div>
@@ -137,21 +113,21 @@ export const IHaveDiscoveryWizard: React.FC<{ onResultsReady?: () => void }> = (
         <div className="py-6 border-b border-slate-200 dark:border-white/10 space-y-3">
           <label className="flex items-center gap-2 font-display font-bold text-base text-slate-900 dark:text-white"><Clock className="w-4 h-4 text-vybe-cyan" /><span>1. How much time do you have?</span></label>
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-            {TIME_OPTIONS.map(opt => <button key={opt.value} onClick={() => setSelectedTime(opt.value)} className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all flex flex-col items-center gap-1 ${selectedTime === opt.value ? 'bg-black text-white dark:bg-vybe-lime dark:text-black border-transparent shadow-neon-lime' : 'bg-slate-50 dark:bg-vybe-dark-surface border-slate-200 dark:border-vybe-dark-border text-slate-700 dark:text-slate-300 hover:border-slate-400 dark:hover:border-slate-600'}`}><span>{opt.icon}</span><span>{opt.label}</span></button>)}
+            {TIME_OPTIONS.map(opt => <button key={opt.value} onClick={() => updateFilters({ duration: opt.value })} className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all flex flex-col items-center gap-1 ${selectedTime === opt.value ? 'bg-black text-white dark:bg-vybe-lime dark:text-black border-transparent shadow-neon-lime' : 'bg-slate-50 dark:bg-vybe-dark-surface border-slate-200 dark:border-vybe-dark-border text-slate-700 dark:text-slate-300 hover:border-slate-400'}`}><span>{opt.icon}</span><span>{opt.label}</span></button>)}
           </div>
         </div>
 
         <div className="py-6 border-b border-slate-200 dark:border-white/10 space-y-3">
           <label className="flex items-center gap-2 font-display font-bold text-base text-slate-900 dark:text-white"><Wallet className="w-4 h-4 text-vybe-lime" /><span>2. What's your budget per person?</span></label>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-            {BUDGET_OPTIONS.map(opt => <button key={String(opt.value)} onClick={() => setSelectedBudget(opt.value)} className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all flex flex-col items-center gap-1 ${selectedBudget === opt.value ? 'bg-black text-white dark:bg-vybe-lime dark:text-black border-transparent shadow-neon-lime' : 'bg-slate-50 dark:bg-vybe-dark-surface border-slate-200 dark:border-vybe-dark-border text-slate-700 dark:text-slate-300 hover:border-slate-400 dark:hover:border-slate-600'}`}><span>{opt.icon}</span><span>{opt.label}</span></button>)}
+            {BUDGET_OPTIONS.map(opt => <button key={String(opt.value)} onClick={() => updateFilters({ maxBudget: typeof opt.value === 'number' ? opt.value : undefined, onlyFree: opt.value === 'free' })} className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all flex flex-col items-center gap-1 ${selectedBudget === opt.value ? 'bg-black text-white dark:bg-vybe-lime dark:text-black border-transparent shadow-neon-lime' : 'bg-slate-50 dark:bg-vybe-dark-surface border-slate-200 dark:border-vybe-dark-border text-slate-700 dark:text-slate-300 hover:border-slate-400'}`}><span>{opt.icon}</span><span>{opt.label}</span></button>)}
           </div>
         </div>
 
         <div className="py-6 border-b border-slate-200 dark:border-white/10 space-y-3">
           <label className="flex items-center gap-2 font-display font-bold text-base text-slate-900 dark:text-white"><Users className="w-4 h-4 text-vybe-pink" /><span>3. Who are you rolling with?</span></label>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-            {COMPANION_OPTIONS.map(opt => <button key={opt.value} onClick={() => setSelectedCompanion(opt.value)} className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all flex flex-col items-center gap-1 ${selectedCompanion === opt.value ? 'bg-black text-white dark:bg-vybe-lime dark:text-black border-transparent shadow-neon-lime' : 'bg-slate-50 dark:bg-vybe-dark-surface border-slate-200 dark:border-vybe-dark-border text-slate-700 dark:text-slate-300 hover:border-slate-400 dark:hover:border-slate-600'}`}><span>{opt.icon}</span><span>{opt.label}</span></button>)}
+            {COMPANION_OPTIONS.map(opt => <button key={opt.value} onClick={() => updateFilters({ companion: opt.value })} className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all flex flex-col items-center gap-1 ${selectedCompanion === opt.value ? 'bg-black text-white dark:bg-vybe-lime dark:text-black border-transparent shadow-neon-lime' : 'bg-slate-50 dark:bg-vybe-dark-surface border-slate-200 dark:border-vybe-dark-border text-slate-700 dark:text-slate-300 hover:border-slate-400'}`}><span>{opt.icon}</span><span>{opt.label}</span></button>)}
           </div>
         </div>
 
@@ -169,11 +145,8 @@ export const IHaveDiscoveryWizard: React.FC<{ onResultsReady?: () => void }> = (
         </div>
 
         <div className="pt-6 border-t border-slate-200 dark:border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="text-xs text-slate-500 font-medium text-center sm:text-left">🎯 Place type + time + budget + company + vibes all feed the same Explore ranking.</div>
-          <button onClick={handleGenerate} disabled={discoveryLoading} className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-vybe-lime text-black font-display font-black text-base uppercase tracking-wider shadow-neon-lime hover:scale-105 transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-wait" data-cursor="GO!">
-            <span>{discoveryLoading ? 'BUILDING YOUR VYBES' : 'SHOW MY VYBES'}</span>
-            <ArrowRight className="w-5 h-5" />
-          </button>
+          <div className="text-xs text-slate-500 font-medium text-center sm:text-left">🎯 One shared Explore state powers the type, time, budget, company, vibe ranking and Map.</div>
+          <button onClick={handleGenerate} disabled={discoveryLoading} className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-vybe-lime text-black font-display font-black text-base uppercase tracking-wider shadow-neon-lime hover:scale-105 transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-wait" data-cursor="GO!"><span>{discoveryLoading ? 'BUILDING YOUR VYBES' : 'SHOW MY VYBES'}</span><ArrowRight className="w-5 h-5" /></button>
         </div>
       </div>
     </section>
