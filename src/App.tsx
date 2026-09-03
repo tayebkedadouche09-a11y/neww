@@ -17,6 +17,7 @@ import { VybePlanBuilder } from "./components/plan/VybePlanBuilder";
 import { CollectionsView } from "./components/profile/CollectionsView";
 import { ProfileView } from "./components/profile/ProfileView";
 import { AdminPortal } from "./components/admin/AdminPortal";
+import { VybeCommandCenter } from "./components/vybe/VybeCommandCenter";
 import { useData } from "./context/DataContext";
 
 const SelectedPlaceMapAction: React.FC = () => {
@@ -50,6 +51,7 @@ export const App: React.FC = () => {
       <CustomCursor />
       <Navbar />
       <ModeBadge />
+      <VybeCommandCenter />
 
       <main className="flex-1">
         {activeTab === "explore" && <ExploreExperience />}
