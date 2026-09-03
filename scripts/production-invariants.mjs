@@ -39,12 +39,7 @@ assert(squadVote.includes('?vote='), 'Squad voting creates shareable poll links.
 assert(placeCard.includes('Google verified') && placeCard.includes('VYBE curated'), 'Place cards explain their data trust source.');
 assert(admin.includes('latitude === 0 && longitude === 0'), 'Admin creation rejects invalid 0,0 coordinates.');
 assert(!discovery.includes('unsplash.com'), 'Discovery service contains no fake Unsplash place-image fallback.');
-assert(
-  googlePlaces.includes('Array.isArray(type)') &&
-  googlePlaces.includes('includedTypes') &&
-  !googlePlaces.includes('type.map(placeType => searchNearbyGooglePlacesSingle'),
-  'Google nearby discovery keeps multi-type searches inside one request instead of fanning out quota usage.'
-);
+assert(googlePlaces.includes('Array.isArray(type)') && googlePlaces.includes('includedTypes') && !googlePlaces.includes('type.map(placeType => searchNearbyGooglePlacesSingle'), 'Google nearby discovery keeps multi-type searches inside one request instead of fanning out quota usage.');
 assert(discovery.includes('Promise.allSettled') && discovery.includes('[...googlePlaces, ...osmPlaces]'), 'Discovery merges Google and OpenStreetMap instead of stopping at the first provider.');
 assert(discovery.includes('function analyzePlace') && discovery.includes('.map(analyzePlace)'), 'Every discovered place is classified and analyzed before Explore/Map receive it.');
 assert(!googleMap.includes('maps.googleapis.com/maps/api/js?'), 'GoogleMap does not embed the legacy Maps JavaScript URL loader.');
@@ -52,6 +47,9 @@ assert(indexHtml.includes('<link rel="manifest" href="/manifest.webmanifest" />'
 assert(main.includes("navigator.serviceWorker.register('/sw.js')"), 'Production registers the offline shell service worker.');
 assert(serviceWorker.includes('caches.match(request)'), 'Offline shell falls back to cached same-origin content.');
 assert(ci.includes('npm run typecheck') && ci.includes('npm run build'), 'CI keeps typecheck and production build gates enabled.');
+assert(discovery.includes('overpass.private.coffee/api/interpreter'), 'OSM fallback includes the secondary Overpass endpoint.');
+assert(discovery.includes('const discoveryCache = new Map') && discovery.includes('DISCOVERY_CACHE_MS = 20_000'), 'Discovery has a short request deduplication cache.');
+assert(discovery.includes('Google Places quota is currently exhausted'), 'Google quota failures have a safe user-facing fallback message.');
 
 const failed = checks.filter(({ condition }) => !condition).length;
 if (failed) {
