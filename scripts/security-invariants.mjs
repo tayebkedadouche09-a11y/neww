@@ -4,6 +4,7 @@ import path from 'node:path';
 const root = process.cwd();
 const requiredFiles = [
   'api/materialize-google-place.ts',
+  'api/osm-discovery.ts',
   'supabase/migrations/0009_lock_google_materializer.sql',
   'vercel.json'
 ];
@@ -11,12 +12,11 @@ const requiredFiles = [
 const failures = [];
 
 for (const relative of requiredFiles) {
-  if (!fs.existsSync(path.join(root, relative))) {
-    failures.push(`Missing required security file: ${relative}`);
-  }
+  if (!fs.existsSync(path.join(root, relative))) failures.push(`Missing required security file: ${relative}`);
 }
 
 const api = fs.readFileSync(path.join(root, 'api/materialize-google-place.ts'), 'utf8');
+const osm = fs.readFileSync(path.join(root, 'api/osm-discovery.ts'), 'utf8');
 const vercel = fs.readFileSync(path.join(root, 'vercel.json'), 'utf8');
 const migration = fs.readFileSync(path.join(root, 'supabase/migrations/0009_lock_google_materializer.sql'), 'utf8');
 const authModal = fs.readFileSync(path.join(root, 'src/components/auth/AuthModal.tsx'), 'utf8');
@@ -43,7 +43,7 @@ if (!/revoke all on function public\.ensure_google_place\(jsonb\) from authentic
 }
 
 const passwordPolicyChecks = [
-  ['12 character minimum', /PASSWORD_MIN_LENGTH\s*=\s*12/],
+  ['12 character minimum', /(?:MIN|PASSWORD)_PASSWORD_LENGTH\s*=\s*12/],
   ['lowercase requirement', /\[a-z\]/],
   ['uppercase requirement', /\[A-Z\]/],
   ['numeric requirement', /\\d/],
@@ -51,6 +51,17 @@ const passwordPolicyChecks = [
 ];
 for (const [name, pattern] of passwordPolicyChecks) {
   if (!pattern.test(authModal) || !pattern.test(authService)) failures.push(`Password policy missing ${name}.`);
+}
+
+const osmSecurityChecks = [
+  ['rate limiting', /MAX_REQUESTS_PER_WINDOW/],
+  ['constrained static clauses', /ALLOWED_STATIC_CLAUSES/],
+  ['constrained broad clauses', /ALLOWED_BROAD_CLAUSES/],
+  ['safe name clause', /isSafeNameClause/],
+  ['radius cap', /MAX_RADIUS_METERS/]
+];
+for (const [name, pattern] of osmSecurityChecks) {
+  if (!pattern.test(osm)) failures.push(`OSM proxy missing ${name}.`);
 }
 
 if (!/Strict-Transport-Security/.test(vercel) || !/X-Content-Type-Options/.test(vercel) || !/X-Frame-Options/.test(vercel)) {
