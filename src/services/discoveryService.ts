@@ -147,7 +147,7 @@ async function fetchOsmPlaces(userLat: number, userLng: number, radiusKm: number
 }
 
 async function discoverGooglePlaces(options: DiscoveryOptions): Promise<Place[]> {
-  if (!isGoogleMapsConfigured()) return [];
+  if (!isGoogleMapsConfigured) return [];
   if (options.userLat === undefined || options.userLng === undefined) return [];
   const radiusKm = options.radiusKm ?? 5;
   const query = normalize(options.searchQuery || options.filters?.searchQuery || '');
