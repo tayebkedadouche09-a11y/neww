@@ -27,6 +27,8 @@ jobs:
         run: node scripts/real-only-invariants.mjs
       - name: Security invariants
         run: node scripts/security-invariants.mjs
+      - name: Canonical category contract
+        run: npm run category-contract
       - name: Typecheck
         run: npm run typecheck
       - name: Production build
