@@ -10,6 +10,7 @@ import { collectionsService } from '../services/collectionsService';
 import { plansService } from '../services/plansService';
 import { reviewsService } from '../services/reviewsService';
 import { discoverPlaces } from '../services/discoveryService';
+import { getGooglePlaceDetails } from '../services/googlePlaces';
 
 export type ActiveTab = 'explore' | 'map' | 'plan' | 'saved' | 'profile' | 'admin';
 export interface ToastNotification { id: string; type: 'success' | 'info' | 'vibe'; message: string; emoji?: string; }
@@ -99,6 +100,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [realUserId]);
 
   useEffect(() => {
+    let cancelled = false;
     const params = new URLSearchParams(window.location.search);
     const placeId = params.get('place');
     const planId = params.get('plan');
@@ -106,31 +108,86 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const routeKey = placeId ? `place:${placeId}` : planId ? `plan:${planId}` : collectionId ? `collection:${collectionId}` : null;
     if (!routeKey || deepLinkHandledRef.current === routeKey) return;
 
-    if (placeId) {
-      const place = places.find(item => item.id === placeId);
-      if (!place) return;
-      deepLinkHandledRef.current = routeKey;
-      setSelectedPlace(place);
-      setIsDetailOpen(true);
-      setActiveTab('explore');
-      return;
-    }
+    const resolveDeepLink = async () => {
+      if (placeId) {
+        const localPlace = places.find(item => item.id === placeId);
+        if (localPlace) {
+          if (cancelled) return;
+          deepLinkHandledRef.current = routeKey;
+          setSelectedPlace(localPlace);
+          setIsDetailOpen(true);
+          setActiveTab('explore');
+          return;
+        }
 
-    if (planId) {
-      const plan = plans.find(item => item.id === planId);
-      if (!plan) return;
-      deepLinkHandledRef.current = routeKey;
-      setActivePlan(plan);
-      setActiveTab('plan');
-      return;
-    }
+        try {
+          let publicPlace: Place | null = null;
+          if (placeId.startsWith('google:')) {
+            const providerId = placeId.slice('google:'.length);
+            if (providerId) publicPlace = await getGooglePlaceDetails(providerId);
+          } else if (dataMode === 'supabase') {
+            publicPlace = await placesService.getPublic(placeId);
+          }
+          if (!publicPlace || cancelled) return;
+          deepLinkHandledRef.current = routeKey;
+          setPlaces(prev => prev.some(item => item.id === publicPlace!.id) ? prev : [publicPlace!, ...prev]);
+          setSelectedPlace(publicPlace);
+          setIsDetailOpen(true);
+          setActiveTab('explore');
+        } catch (error) {
+          console.warn('[DataContext] Public place deep link could not be resolved', error);
+        }
+        return;
+      }
 
-    if (collectionId) {
-      const collection = collections.find(item => item.id === collectionId);
-      if (!collection) return;
-      deepLinkHandledRef.current = routeKey;
-      setActiveTab('saved');
-    }
+      if (planId) {
+        const localPlan = plans.find(item => item.id === planId);
+        if (localPlan) {
+          if (cancelled) return;
+          deepLinkHandledRef.current = routeKey;
+          setActivePlan(localPlan);
+          setActiveTab('plan');
+          return;
+        }
+        if (dataMode === 'supabase') {
+          try {
+            const publicPlan = await plansService.getPublic(planId);
+            if (!publicPlan || cancelled) return;
+            deepLinkHandledRef.current = routeKey;
+            setPlans(prev => [publicPlan, ...prev.filter(item => item.id !== publicPlan.id)]);
+            setActivePlan(publicPlan);
+            setActiveTab('plan');
+          } catch (error) {
+            console.warn('[DataContext] Public plan deep link could not be resolved', error);
+          }
+        }
+        return;
+      }
+
+      if (collectionId) {
+        const localCollection = collections.find(item => item.id === collectionId);
+        if (localCollection) {
+          if (cancelled) return;
+          deepLinkHandledRef.current = routeKey;
+          setActiveTab('saved');
+          return;
+        }
+        if (dataMode === 'supabase') {
+          try {
+            const publicCollection = await collectionsService.getPublic(collectionId);
+            if (!publicCollection || cancelled) return;
+            deepLinkHandledRef.current = routeKey;
+            setCollections(prev => [publicCollection, ...prev.filter(item => item.id !== publicCollection.id)]);
+            setActiveTab('saved');
+          } catch (error) {
+            console.warn('[DataContext] Public collection deep link could not be resolved', error);
+          }
+        }
+      }
+    };
+
+    void resolveDeepLink();
+    return () => { cancelled = true; };
   }, [places, plans, collections]);
 
   const resetFilters = () => { setFilters(DEFAULT_FILTERS); setActiveHeroMood(null); };
