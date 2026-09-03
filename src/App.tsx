@@ -1,4 +1,5 @@
 import React from "react";
+import { MapPin } from "lucide-react";
 import { Navbar } from "./components/layout/Navbar";
 import { MobileNav } from "./components/layout/MobileNav";
 import { Footer } from "./components/layout/Footer";
@@ -18,8 +19,31 @@ import { ProfileView } from "./components/profile/ProfileView";
 import { AdminPortal } from "./components/admin/AdminPortal";
 import { useData } from "./context/DataContext";
 
+const SelectedPlaceMapAction: React.FC = () => {
+  const { activeTab, setActiveTab, selectedPlace, isDetailOpen, setIsDetailOpen } = useData();
+
+  if (!selectedPlace || !isDetailOpen || activeTab === "map") return null;
+
+  const openOnMap = () => {
+    setIsDetailOpen(false);
+    setActiveTab("map");
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={openOnMap}
+      aria-label={`Show ${selectedPlace.name} on the map`}
+      className="fixed bottom-24 sm:bottom-8 left-1/2 -translate-x-1/2 z-[60] inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-vybe-lime text-black font-display font-extrabold text-sm shadow-neon-lime border-2 border-black/10 hover:scale-105 active:scale-95 transition-all"
+    >
+      <MapPin className="w-4 h-4" />
+      <span>View {selectedPlace.name} on Map</span>
+    </button>
+  );
+};
+
 export const App: React.FC = () => {
-  const { activeTab, setActiveTab } = useData();
+  const { activeTab } = useData();
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F6F7FB] dark:bg-[#090A0F] text-slate-900 dark:text-slate-100 transition-colors duration-300">
@@ -44,6 +68,7 @@ export const App: React.FC = () => {
       </main>
 
       <PlaceDetailModal />
+      <SelectedPlaceMapAction />
       <ReviewModal />
       <ShareStoryModal />
       <AuthModal />
