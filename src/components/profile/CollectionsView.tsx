@@ -1,31 +1,24 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  Bookmark, 
-  Plus, 
-  Trash2, 
-  Share2, 
-  Sparkles, 
-  FolderPlus, 
-  Edit2, 
+import {
+  Bookmark,
+  FolderPlus,
+  Trash2,
   X,
   Lock,
   Globe,
-  ArrowRight
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { PlaceCard } from '../cards/PlaceCard';
-import { Collection } from '../../types';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 
 export const CollectionsView: React.FC = () => {
-  const { 
-    collections, 
-    createCollection, 
-    deleteCollection, 
-    removePlaceFromCollection, 
-    places, 
-    openShareModal,
-    showToast 
+  const {
+    collections,
+    createCollection,
+    deleteCollection,
+    removePlaceFromCollection,
+    places,
+    showToast,
   } = useData();
   const requireAuth = useRequireAuth();
 
@@ -34,14 +27,16 @@ export const CollectionsView: React.FC = () => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [emoji, setEmoji] = useState('✨');
-  const [color, setColor] = useState('#CCFF00');
+  const [color] = useState('#CCFF00');
 
   useEffect(() => {
     const requestedId = new URLSearchParams(window.location.search).get('collection');
     if (requestedId && collections.some(collection => collection.id === requestedId)) {
       setActiveCollectionId(requestedId);
+    } else if (!collections.some(collection => collection.id === activeCollectionId)) {
+      setActiveCollectionId(collections[0]?.id || '');
     }
-  }, [collections]);
+  }, [collections, activeCollectionId]);
 
   const activeCol = collections.find(c => c.id === activeCollectionId) || collections[0];
 
@@ -57,22 +52,36 @@ export const CollectionsView: React.FC = () => {
     setActiveCollectionId(newCol.id);
     setName('');
     setDescription('');
+    setEmoji('✨');
     setIsCreating(false);
   };
 
-  const copyCollectionLink = () => {
-    try {
-      navigator.clipboard.writeText(`${window.location.origin}?collection=${activeCol?.id}`);
-    } catch (e) {
-      // clipboard unavailable (e.g. non-secure context)
+  const copyCollectionLink = async () => {
+    if (!activeCol) return;
+    if (!activeCol.isPublic) {
+      showToast('This collection is private and cannot be shared publicly.', '🔒', 'info');
+      return;
     }
-    showToast(`Copied public link for "${activeCol?.name}"!`, '🔗', 'success');
+
+    const url = `${window.location.origin}?collection=${encodeURIComponent(activeCol.id)}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      showToast(`Copied public link for "${activeCol.name}"!`, '🔗', 'success');
+    } catch {
+      const textarea = document.createElement('textarea');
+      textarea.value = url;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      const copied = document.execCommand('copy');
+      textarea.remove();
+      showToast(copied ? `Copied public link for "${activeCol.name}"!` : 'Could not copy the collection link.', copied ? '🔗' : '⚠️', copied ? 'success' : 'info');
+    }
   };
 
   return (
     <div data-testid="collections-view" className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-fadeIn">
-      
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200 dark:border-white/10">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-vybe-lime/15 text-slate-900 dark:text-vybe-lime font-mono font-bold text-xs mb-2">
@@ -99,7 +108,6 @@ export const CollectionsView: React.FC = () => {
         </button>
       </div>
 
-      {/* New Collection Form */}
       {isCreating && (
         <div className="p-6 rounded-3xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border space-y-4 animate-fadeIn">
           <h3 className="font-display font-bold text-lg text-slate-900 dark:text-white">
@@ -144,7 +152,7 @@ export const CollectionsView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsCreating(false)}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400"
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-slate-700 dark:hover:text-white"
               >
                 Cancel
               </button>
@@ -159,29 +167,29 @@ export const CollectionsView: React.FC = () => {
         </div>
       )}
 
-      {/* Collection Navigation Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-2">
-        {collections.map(col => {
-          const isSelected = activeCol?.id === col.id;
-          return (
-            <button
-              key={col.id}
-              onClick={() => setActiveCollectionId(col.id)}
-              className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all border ${
-                isSelected
-                  ? 'bg-black text-white dark:bg-vybe-lime dark:text-black border-transparent shadow-neon-lime'
-                  : 'bg-white dark:bg-vybe-dark-surface text-slate-700 dark:text-slate-300 border-slate-200 dark:border-vybe-dark-border hover:border-slate-400'
-              }`}
-            >
-              <span>{col.emoji}</span>
-              <span>{col.name}</span>
-              <span className="opacity-70 text-[10px] font-mono">({col.placeIds.length})</span>
-            </button>
-          );
-        })}
-      </div>
+      {collections.length > 0 && (
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-2">
+          {collections.map(col => {
+            const isSelected = activeCol?.id === col.id;
+            return (
+              <button
+                key={col.id}
+                onClick={() => setActiveCollectionId(col.id)}
+                className={`shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all border ${
+                  isSelected
+                    ? 'bg-black text-white dark:bg-vybe-lime dark:text-black border-transparent shadow-neon-lime'
+                    : 'bg-white dark:bg-vybe-dark-surface text-slate-700 dark:text-slate-300 border-slate-200 dark:border-vybe-dark-border hover:border-slate-400'
+                }`}
+              >
+                <span>{col.emoji}</span>
+                <span>{col.name}</span>
+                <span className="opacity-70 text-[10px] font-mono">({col.placeIds.length})</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
-      {/* Active Collection Header Details */}
       {activeCol && (
         <div className="p-6 rounded-3xl bg-white dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
@@ -201,10 +209,12 @@ export const CollectionsView: React.FC = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={copyCollectionLink}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-vybe-dark-surface text-slate-800 dark:text-slate-200 font-bold text-xs border border-slate-200 dark:border-vybe-dark-border hover:border-vybe-lime transition-all"
+              disabled={!activeCol.isPublic}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-vybe-dark-surface text-slate-800 dark:text-slate-200 font-bold text-xs border border-slate-200 dark:border-vybe-dark-border hover:border-vybe-lime transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              title={activeCol.isPublic ? 'Copy public collection link' : 'Private collections cannot be shared publicly'}
             >
-              <Globe className="w-3.5 h-3.5" />
-              <span>Share Link</span>
+              {activeCol.isPublic ? <Globe className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+              <span>{activeCol.isPublic ? 'Share Link' : 'Private'}</span>
             </button>
 
             {collections.length > 1 && (
@@ -220,7 +230,6 @@ export const CollectionsView: React.FC = () => {
         </div>
       )}
 
-      {/* Collection Places Grid */}
       <div className="space-y-6">
         {colPlaces.length === 0 ? (
           <div className="p-16 text-center rounded-3xl bg-slate-50 dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border space-y-2">
@@ -240,10 +249,11 @@ export const CollectionsView: React.FC = () => {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    removePlaceFromCollection(activeCol.id, place.id);
+                    if (activeCol) removePlaceFromCollection(activeCol.id, place.id);
                   }}
                   className="absolute top-3 right-16 z-20 p-2 rounded-full bg-black/80 text-slate-400 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-md"
                   title="Remove from collection"
+                  aria-label={`Remove ${place.name} from ${activeCol?.name || 'collection'}`}
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -252,8 +262,6 @@ export const CollectionsView: React.FC = () => {
           </div>
         )}
       </div>
-
     </div>
   );
 };
-
