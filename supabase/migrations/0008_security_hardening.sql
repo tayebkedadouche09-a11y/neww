@@ -17,7 +17,8 @@ declare
   v_lng double precision;
   v_rating numeric;
   v_review_count integer;
-  v_price text := nullif(payload ->> 'price_level', '');
+  v_price text := nullif(trim(payload ->> 'price_level'), '');
+  v_website text := nullif(trim(payload ->> 'website'), '');
 begin
   if auth.uid() is null then
     raise exception 'Authentication required';
@@ -59,6 +60,10 @@ begin
     raise exception 'Invalid price level';
   end if;
 
+  if v_website is not null and v_website !~* '^https://[^[:space:]]+$' then
+    raise exception 'Invalid website URL';
+  end if;
+
   insert into public.places (
     id, external_place_id, provider, name, tagline, description, category,
     primary_mood, secondary_moods, latitude, longitude, address, neighborhood,
@@ -91,7 +96,7 @@ begin
     coalesce(payload -> 'opening_hours', '{}'::jsonb),
     coalesce(payload -> 'features', '{}'::jsonb),
     coalesce((select array_agg(value) from jsonb_array_elements_text(coalesce(payload -> 'suitable_for', '[]'::jsonb)) as x(value)), '{}'::text[]),
-    nullif(payload ->> 'website', ''),
+    v_website,
     nullif(payload ->> 'phone', ''),
     nullif(payload ->> 'instagram', ''),
     false,
