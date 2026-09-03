@@ -63,7 +63,7 @@ function directionsUrl(place: Place) {
 }
 
 export const VybeCommandCenter: React.FC = () => {
-  const { places, userLocation, discoverAtLocation, createPlan, addPlaceToPlan, setActiveTab, showToast } = useData();
+  const { places, userLocation, discoveryLoading, discoverAtLocation, createPlan, addPlaceToPlan, setActiveTab, showToast } = useData();
   const { currentUser } = useAuth();
   const requireAuth = useRequireAuth();
   const [open, setOpen] = useState(false);
@@ -107,7 +107,7 @@ export const VybeCommandCenter: React.FC = () => {
       return;
     }
     if (preset.lat !== null && preset.lng !== null) {
-      discoverAtLocation({ lat: preset.lat, lng: preset.lng });
+      discoverAtLocation({ lat: preset.lat, lng: preset.lng, accuracy: 0, timestamp: Date.now() });
     }
   };
 
