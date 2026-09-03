@@ -2,7 +2,7 @@ import { CategoryType, FilterState, Place, PlaceOpeningHours, PriceLevel } from 
 import { isGoogleMapsConfigured } from '../lib/env';
 import { searchNearbyGooglePlaces, searchGooglePlacesText } from './googlePlaces';
 import { haversineDistanceKm } from '../hooks/useGeolocation';
-import { classifyPlace } from './googlePlacesAdapter';
+import { classifyPlace, isGooglePlaceValidForRequest } from './googlePlacesAdapter';
 
 export interface DiscoveryOptions { userLat?: number; userLng?: number; radiusKm?: number; searchQuery?: string; filters?: Partial<FilterState>; }
 
@@ -151,12 +151,16 @@ async function discoverGooglePlaces(options: DiscoveryOptions): Promise<Place[]>
   if (options.userLat === undefined || options.userLng === undefined) return [];
   const radiusKm = options.radiusKm ?? 5;
   const query = normalize(options.searchQuery || options.filters?.searchQuery || '');
-  if (query) return searchGooglePlacesText(query, options.userLat, options.userLng, radiusKm);
+  if (query) {
+    const results = await searchGooglePlacesText(query, options.userLat, options.userLng, radiusKm);
+    return results.filter(place => isGooglePlaceValidForRequest(place, { query, categories: options.filters?.categories }));
+  }
 
   const categoryTypes = (options.filters?.categories ?? []).flatMap(category => CATEGORY_TYPES[category] ?? []);
   const uniqueTypes = [...new Set(categoryTypes)];
   const fallbackTypes = uniqueTypes.length ? uniqueTypes : undefined;
-  return searchNearbyGooglePlaces(options.userLat, options.userLng, radiusKm, fallbackTypes);
+  const results = await searchNearbyGooglePlaces(options.userLat, options.userLng, radiusKm, fallbackTypes);
+  return results.filter(place => isGooglePlaceValidForRequest(place, { categories: options.filters?.categories }));
 }
 
 function isQuotaError(error: unknown): boolean {
