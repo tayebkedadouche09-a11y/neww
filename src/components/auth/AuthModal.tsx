@@ -3,6 +3,14 @@ import { X, ArrowRight, KeyRound } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 
+const PASSWORD_MIN_LENGTH = 12;
+const passwordIsStrong = (value: string) =>
+  value.length >= PASSWORD_MIN_LENGTH &&
+  /[a-z]/.test(value) &&
+  /[A-Z]/.test(value) &&
+  /\d/.test(value) &&
+  /[^A-Za-z0-9]/.test(value);
+
 export const AuthModal: React.FC = () => {
   const { isAuthModalOpen, setIsAuthModalOpen, authModalMode, setAuthModalMode, showToast } = useData();
   const { signIn, signUp, resetPassword, appDataMode } = useAuth();
@@ -47,7 +55,12 @@ export const AuthModal: React.FC = () => {
         return;
       }
 
-      if (!name.trim() || !username.trim() || !email.trim() || password.length < 6) return;
+      if (!name.trim() || !username.trim() || !email.trim()) return;
+      if (!passwordIsStrong(password)) {
+        showToast('Use a 12+ character password with uppercase, lowercase, a number, and a symbol.', '🔐', 'info');
+        return;
+      }
+
       const res = await signUp(name.trim(), username.trim(), email.trim(), password);
       if (res.ok) {
         showToast(
@@ -83,15 +96,17 @@ export const AuthModal: React.FC = () => {
         <form onSubmit={handleSubmit} className="space-y-4">
           {authModalMode === 'register' && (
             <>
-              <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Your Full Name</label><input type="text" required placeholder="e.g. Alex Rivera" value={name} onChange={e => setName(e.target.value)} autoComplete="name" className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none" /></div>
-              <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Username</label><input type="text" required placeholder="e.g. alex_vybes" value={username} onChange={e => setUsername(e.target.value)} autoComplete="username" className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none" /></div>
+              <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Your Full Name</label><input type="text" required maxLength={120} placeholder="e.g. Alex Rivera" value={name} onChange={e => setName(e.target.value)} autoComplete="name" className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none" /></div>
+              <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Username</label><input type="text" required minLength={3} maxLength={30} pattern="[A-Za-z0-9_]+" placeholder="e.g. alex_vybes" value={username} onChange={e => setUsername(e.target.value)} autoComplete="username" className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none" /></div>
             </>
           )}
 
-          <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Email Address</label><input type="email" required placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none" /></div>
+          <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Email Address</label><input type="email" required maxLength={254} placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none" /></div>
 
           {authModalMode !== 'forgot' && (
-            <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Password</label><input type="password" required minLength={authModalMode === 'register' ? 6 : 1} data-testid="auth-password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} autoComplete={authModalMode === 'login' ? 'current-password' : 'new-password'} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none" /></div>
+            <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Password</label><input type="password" required minLength={authModalMode === 'register' ? PASSWORD_MIN_LENGTH : 1} data-testid="auth-password" placeholder="••••••••••••" value={password} onChange={e => setPassword(e.target.value)} autoComplete={authModalMode === 'login' ? 'current-password' : 'new-password'} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none" />
+              {authModalMode === 'register' && <p className="text-[11px] text-slate-500 dark:text-slate-400">12+ chars, with uppercase, lowercase, number and symbol.</p>}
+            </div>
           )}
 
           <button type="submit" disabled={busy} className="w-full py-3.5 rounded-2xl bg-vybe-lime text-black font-display font-extrabold text-xs uppercase tracking-wider shadow-neon-lime hover:scale-105 transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:hover:scale-100">
