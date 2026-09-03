@@ -24,14 +24,15 @@ function withDistance(places: Place[], userLat?: number, userLng?: number): Plac
   return places.map(place => !Number.isFinite(place.location.lat) || !Number.isFinite(place.location.lng) ? place : { ...place, distanceKm: haversineDistanceKm(userLat, userLng, place.location.lat, place.location.lng) });
 }
 function applySmartClassification(place: Place): Place { const { category, mood } = classifyPlace(place.tags, place.name); return { ...place, category, primaryMood: mood }; }
+
+// Place type is the discovery target. Mood, companion and budget are ranking
+// signals so a real place is not discarded simply because it is an imperfect
+// match. Explicit toggles like Free/Open/Late Night remain hard filters.
 function matchesFilters(place: Place, filters?: Partial<FilterState>): boolean {
   if (!filters) return true;
   const classified = applySmartClassification(place);
-  if (filters.moods?.length && !filters.moods.includes(classified.primaryMood) && !classified.secondaryMoods.some(mood => filters.moods?.includes(mood))) return false;
   if (filters.categories?.length && !filters.categories.includes(classified.category)) return false;
   if (filters.priceLevels?.length && !filters.priceLevels.includes(classified.priceLevel)) return false;
-  if (filters.maxBudget !== undefined && !classified.features.isFree && classified.approxCostUsd > 0 && classified.approxCostUsd > filters.maxBudget) return false;
-  if (filters.companion && !classified.suitableFor.includes(filters.companion)) return false;
   if (filters.onlyOpenNow && classified.openingHours.isOpenNow !== true) return false;
   if (filters.onlyFree && !classified.features.isFree) return false;
   if (filters.onlyHiddenGems && !classified.features.isSecretGem) return false;
@@ -39,6 +40,7 @@ function matchesFilters(place: Place, filters?: Partial<FilterState>): boolean {
   if (filters.maxDistanceKm !== undefined && (classified.distanceKm === undefined || classified.distanceKm > filters.maxDistanceKm)) return false;
   return true;
 }
+
 function normalize(value: string): string { return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
 
 const OSM_PLACE_QUERIES: Record<string, string[]> = {
