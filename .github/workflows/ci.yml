@@ -1,30 +1,21 @@
-name: VYBE CI
-
+name: VYBE clean verification
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
-
 permissions:
   contents: read
-
 jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
           cache: npm
-      - name: Install dependencies
-        run: npm ci
-      - name: Production invariants
-        run: node scripts/production-invariants.mjs
-      - name: Typecheck
-        run: npm run typecheck
-      - name: Production build
-        run: npm run build
+      - run: npm install
+      - run: npm run check
+      - name: Verify clean architecture
+        run: test -f src/engine.ts && test -f src/App.tsx && ! find src -mindepth 1 -maxdepth 2 -type d | grep -E 'context|services|components|features|pages'
