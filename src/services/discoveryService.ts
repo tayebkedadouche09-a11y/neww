@@ -18,19 +18,58 @@ const CATEGORY_TYPES: Record<CategoryType, string[]> = {
   'shopping-vintage': ['shopping_mall', 'store', 'clothing_store', 'book_store', 'thrift_store', 'flea_market', 'toy_store', 'gift_shop'],
 };
 
-function deduplicate(places: Place[]): Place[] { return [...new Map(places.map(place => [place.providerPlaceId || place.id, place])).values()]; }
+const QUERY_TO_GOOGLE_TYPES: Record<string, string[]> = {
+  restaurant: CATEGORY_TYPES['food-drink'],
+  cafe: CATEGORY_TYPES['food-drink'].filter(type => ['cafe', 'coffee_shop'].includes(type)),
+  park: CATEGORY_TYPES['outdoors-nature'].filter(type => ['park', 'playground', 'botanical_garden', 'national_park', 'hiking_area', 'beach'].includes(type)),
+  cinema: ['movie_theater'],
+  gym: ['gym', 'fitness_center'],
+  hotel: ['hotel', 'lodging'],
+  shopping: CATEGORY_TYPES['shopping-vintage'],
+  library: ['library'],
+  museum: ['museum', 'art_gallery', 'art_museum'],
+  'sports center': ['sports_complex', 'sports_club', 'sports_activity_location', 'swimming_pool', 'tennis_court', 'athletic_field', 'stadium', 'arena'],
+  nightlife: CATEGORY_TYPES.nightlife,
+  'arcade gaming': CATEGORY_TYPES['arcade-gaming'],
+  'live music': ['live_music_venue'],
+  hospital: ['hospital'],
+  theatre: ['performing_arts_theater'],
+  playground: ['playground', 'indoor_playground'],
+  beach: ['beach'],
+  mosque: ['place_of_worship'],
+};
+
+function deduplicate(places: Place[]): Place[] {
+  const byKey = new Map<string, Place>();
+  for (const place of places) {
+    const key = place.providerPlaceId || place.id || `${place.name}:${place.location.lat}:${place.location.lng}`;
+    const previous = byKey.get(key);
+    if (!previous) byKey.set(key, place);
+    else if ((place.reviewCount ?? 0) > (previous.reviewCount ?? 0)) byKey.set(key, { ...previous, ...place });
+  }
+  return [...byKey.values()];
+}
+
 function withDistance(places: Place[], userLat?: number, userLng?: number): Place[] {
   if (userLat === undefined || userLng === undefined) return places;
   return places.map(place => !Number.isFinite(place.location.lat) || !Number.isFinite(place.location.lng) ? place : { ...place, distanceKm: haversineDistanceKm(userLat, userLng, place.location.lat, place.location.lng) });
 }
-function applySmartClassification(place: Place): Place { const { category, mood } = classifyPlace(place.tags, place.name); return { ...place, category, primaryMood: mood }; }
 
-// Place type is the discovery target. Mood, companion and budget are ranking
-// signals so a real place is not discarded simply because it is an imperfect
-// match. Explicit toggles like Free/Open/Late Night remain hard filters.
+function analyzePlace(place: Place): Place {
+  const signals = [...(place.tags ?? []), place.name, place.tagline, place.description, place.category, place.primaryMood].filter(Boolean);
+  const { category, mood } = classifyPlace(signals, place.name);
+  const tags = [...new Set([...place.tags, category, mood, ...(place.name.toLowerCase().includes('bowling') ? ['bowling', 'gaming'] : [])])].slice(0, 20);
+  const rating = Number.isFinite(place.rating) ? place.rating : 0;
+  const reviews = Number.isFinite(place.reviewCount) ? place.reviewCount : 0;
+  const ratingBoost = rating > 0 ? Math.min(16, rating * 2.7) : 0;
+  const reviewBoost = Math.min(8, Math.log10(Math.max(1, reviews)) * 3);
+  const baseVybeScore = Math.max(50, Math.min(99, Math.round(58 + ratingBoost + reviewBoost)));
+  return { ...place, category, primaryMood: mood, tags, baseVybeScore };
+}
+
 function matchesFilters(place: Place, filters?: Partial<FilterState>): boolean {
   if (!filters) return true;
-  const classified = applySmartClassification(place);
+  const classified = analyzePlace(place);
   if (filters.categories?.length && !filters.categories.includes(classified.category)) return false;
   if (filters.priceLevels?.length && !filters.priceLevels.includes(classified.priceLevel)) return false;
   if (filters.onlyOpenNow && classified.openingHours.isOpenNow !== true) return false;
@@ -56,44 +95,50 @@ const OSM_PLACE_QUERIES: Record<string, string[]> = {
   museum: ['tourism="museum"', 'amenity="museum"'],
   'sports center': ['leisure="sports_centre"', 'leisure="stadium"', 'leisure="pitch"', 'sport'],
   nightlife: ['amenity="bar"', 'amenity="pub"', 'amenity="nightclub"'],
-  'arcade gaming': ['leisure="amusement_arcade"', 'leisure="bowling_alley"', 'amenity="internet_cafe"'],
+  'arcade gaming': ['leisure="amusement_arcade"', 'leisure="bowling_alley"', 'amenity="internet_cafe"', 'amenity="game_centre"'],
   'live music': ['amenity="music_venue"', 'amenity="theatre"[theatre:type="music"]'],
   hospital: ['amenity="hospital"', 'amenity="clinic"'],
   theatre: ['amenity="theatre"'],
   playground: ['leisure="playground"'],
   beach: ['natural="beach"'],
 };
+
 const OSM_BROAD_QUERIES = [
-  'amenity~"restaurant|fast_food|cafe|bar|pub|nightclub|cinema|theatre|library|hospital|clinic|place_of_worship|music_venue"',
+  'amenity~"restaurant|fast_food|cafe|bar|pub|nightclub|cinema|theatre|library|hospital|clinic|place_of_worship|music_venue|internet_cafe|game_centre"',
   'leisure~"park|garden|playground|fitness_centre|sports_centre|stadium|pitch|amusement_arcade|bowling_alley"',
-  'tourism~"hotel|hostel|guest_house|museum"',
+  'tourism~"hotel|hostel|guest_house|museum|attraction"',
   'shop~"mall|department_store|supermarket|clothes|books|second_hand|toys|gift"',
   'natural="beach"',
 ];
+
 function buildOsmQuery(lat: number, lng: number, radiusMeters: number, clauses: string[]): string {
-  return `[out:json][timeout:20];(${clauses.map(clause => `nwr(around:${radiusMeters},${lat},${lng})[${clause}];`).join('')});out center tags;`;
+  return `[out:json][timeout:30];(${clauses.map(clause => `nwr(around:${radiusMeters},${lat},${lng})[${clause}];`).join('')});out center tags;`;
 }
+
 function pickOsmCoordinates(element: any): { lat: number; lng: number } | null {
   if (Number.isFinite(element?.lat) && Number.isFinite(element?.lon)) return { lat: element.lat, lng: element.lon };
   if (Number.isFinite(element?.center?.lat) && Number.isFinite(element?.center?.lon)) return { lat: element.center.lat, lng: element.center.lon };
   return null;
 }
+
 function estimateOsmPrice(tags: Record<string, string>): PriceLevel {
   if (tags.amenity === 'place_of_worship' || tags.leisure === 'park' || tags.leisure === 'playground' || tags.natural === 'beach' || tags.amenity === 'library') return 'free';
   return '$$';
 }
+
 function osmOpeningHours(tags: Record<string, string>): PlaceOpeningHours {
   const weekday = tags.opening_hours || '';
   return { monday: weekday, tuesday: weekday, wednesday: weekday, thursday: weekday, friday: weekday, saturday: weekday, sunday: weekday, isOpenNow: undefined };
 }
+
 function osmElementToPlace(element: any): Place | null {
   const tags: Record<string, string> = element?.tags || {};
-  const name = String(tags.name || '').trim();
+  const name = String(tags.name || tags['name:fr'] || tags['name:ar'] || '').trim();
   const coords = pickOsmCoordinates(element);
   if (!name || !coords) return null;
   const categoryHint = [tags.amenity, tags.leisure, tags.tourism, tags.shop, tags.sport, tags.natural, tags.religion, tags['theatre:type']].filter(Boolean) as string[];
   const extraNames = [tags.name, tags['name:fr'], tags['name:ar']].filter(Boolean).join(' ');
-  const tagsForClassifier = [...categoryHint, ...Object.values(tags).filter(v => typeof v === 'string').slice(0, 8), extraNames].filter(Boolean);
+  const tagsForClassifier = [...categoryHint, ...Object.values(tags).filter(v => typeof v === 'string').slice(0, 10), extraNames].filter(Boolean);
   if (tags.religion === 'muslim' || normalize(name).includes('mosque') || normalize(name).includes('mosquee') || name.includes('مسجد') || name.includes('جامع')) tagsForClassifier.push('mosque');
   const { category, mood } = classifyPlace(tagsForClassifier, name);
   const address = [tags['addr:housenumber'], tags['addr:street'], tags['addr:suburb'], tags['addr:city']].filter(Boolean).join(', ');
@@ -101,6 +146,7 @@ function osmElementToPlace(element: any): Place | null {
   const isFree = priceLevel === 'free';
   return {
     id: `osm:${element.type}:${element.id}`,
+    provider: 'osm',
     providerPlaceId: `osm:${element.type}:${element.id}`,
     name,
     tagline: address || tags['addr:street'] || tags['addr:city'] || 'Nearby place',
@@ -113,9 +159,9 @@ function osmElementToPlace(element: any): Place | null {
     approxCostUsd: 0,
     rating: 0,
     reviewCount: 0,
-    baseVybeScore: 70,
+    baseVybeScore: 58,
     images: /^https?:\/\//i.test(tags.image || '') ? [tags.image] : [],
-    tags: [...new Set([...categoryHint, ...Object.values(tags).filter(v => typeof v === 'string' && v.length < 80).slice(0, 6), name])].slice(0, 12),
+    tags: [...new Set([...categoryHint, ...Object.values(tags).filter(v => typeof v === 'string' && v.length < 80).slice(0, 8), name])].slice(0, 15),
     estimatedDuration: '',
     openingHours: osmOpeningHours(tags),
     features: {
@@ -140,10 +186,15 @@ function osmElementToPlace(element: any): Place | null {
     reviews: [],
   };
 }
+
 async function fetchOsmPlaces(userLat: number, userLng: number, radiusKm: number, searchQuery?: string): Promise<Place[]> {
   const normalizedQuery = normalize(searchQuery || '');
-  const clauses = normalizedQuery && OSM_PLACE_QUERIES[normalizedQuery] ? OSM_PLACE_QUERIES[normalizedQuery] : normalizedQuery ? [`name~"${normalizedQuery.replace(/[\\"\n\r]/g, ' ')}",i`] : OSM_BROAD_QUERIES;
-  const query = buildOsmQuery(userLat, userLng, Math.min(radiusKm * 1000, 5000), clauses);
+  const clauses = normalizedQuery && OSM_PLACE_QUERIES[normalizedQuery]
+    ? OSM_PLACE_QUERIES[normalizedQuery]
+    : normalizedQuery
+      ? [`name~"${normalizedQuery.replace(/[\\"\n\r\[\]]/g, ' ')}",i`]
+      : OSM_BROAD_QUERIES;
+  const query = buildOsmQuery(userLat, userLng, Math.min(radiusKm * 1000, 50000), clauses);
   const endpoints = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
   let lastError: unknown = null;
   for (const endpoint of endpoints) {
@@ -152,39 +203,60 @@ async function fetchOsmPlaces(userLat: number, userLng: number, radiusKm: number
       if (!response.ok) throw new Error(`OSM discovery failed (${response.status})`);
       const payload = await response.json();
       const converted = (payload.elements || []).map(osmElementToPlace).filter(Boolean) as Place[];
-      return withDistance(deduplicate(converted), userLat, userLng).sort((a, b) => (a.distanceKm ?? 999) - (b.distanceKm ?? 999)).slice(0, 120);
+      return withDistance(deduplicate(converted), userLat, userLng).sort((a, b) => (a.distanceKm ?? 999) - (b.distanceKm ?? 999)).slice(0, 250);
     } catch (error) { lastError = error; }
   }
   throw lastError instanceof Error ? lastError : new Error('OSM discovery is unavailable right now.');
 }
+
+async function discoverGooglePlaces(options: DiscoveryOptions): Promise<Place[]> {
+  if (!isGoogleMapsConfigured || options.userLat === undefined || options.userLng === undefined) return [];
+  const { userLat, userLng, radiusKm = 5, filters } = options;
+  const query = options.searchQuery?.trim();
+  if (query) {
+    const mappedTypes = QUERY_TO_GOOGLE_TYPES[normalize(query)];
+    if (mappedTypes?.length) return searchNearbyGooglePlaces(userLat, userLng, radiusKm, mappedTypes);
+    return searchGooglePlacesText(query, userLat, userLng, radiusKm);
+  }
+  if (filters?.categories?.length) {
+    const types = [...new Set(filters.categories.flatMap(category => CATEGORY_TYPES[category] || []))];
+    if (types.length) return searchNearbyGooglePlaces(userLat, userLng, radiusKm, types);
+  }
+  return searchNearbyGooglePlaces(userLat, userLng, radiusKm);
+}
+
 export async function discoverPlaces(options: DiscoveryOptions): Promise<Place[]> {
   const { userLat, userLng, radiusKm = 5, filters } = options;
   if (userLat === undefined || userLng === undefined) return [];
-  const query = options.searchQuery?.trim();
-  let googleError: unknown = null;
-  if (isGoogleMapsConfigured) {
-    try {
-      let places: Place[];
-      if (query) places = await searchGooglePlacesText(query, userLat, userLng, radiusKm);
-      else if (filters?.categories?.length) {
-        const types = [...new Set(filters.categories.flatMap(category => CATEGORY_TYPES[category]))];
-        places = await searchNearbyGooglePlaces(userLat, userLng, radiusKm, types);
-      } else places = await searchNearbyGooglePlaces(userLat, userLng, radiusKm);
-      const result = deduplicate(withDistance(places, userLat, userLng)).map(applySmartClassification).filter(place => matchesFilters(place, filters));
-      if (result.length > 0) return result;
-    } catch (error) {
-      googleError = error;
-      console.warn('[discovery] Google provider failed; falling back to OpenStreetMap.', error);
-    }
+
+  const [googleResult, osmResult] = await Promise.allSettled([
+    discoverGooglePlaces(options),
+    fetchOsmPlaces(userLat, userLng, radiusKm, options.searchQuery?.trim() || undefined),
+  ]);
+
+  const googlePlaces = googleResult.status === 'fulfilled' ? googleResult.value : [];
+  const osmPlaces = osmResult.status === 'fulfilled' ? osmResult.value : [];
+  const googleError = googleResult.status === 'rejected' ? googleResult.reason : null;
+  const osmError = osmResult.status === 'rejected' ? osmResult.reason : null;
+
+  if (googleError) console.warn('[discovery] Google provider failed; continuing with OpenStreetMap.', googleError);
+  if (osmError) console.warn('[discovery] OpenStreetMap provider failed; continuing with Google.', osmError);
+
+  const analyzed = withDistance(deduplicate([...googlePlaces, ...osmPlaces]), userLat, userLng)
+    .map(analyzePlace)
+    .filter(place => Number.isFinite(place.location.lat) && Number.isFinite(place.location.lng))
+    .filter(place => matchesFilters(place, filters))
+    .sort((a, b) => {
+      if (filters?.sortBy === 'rating') return b.rating - a.rating;
+      if (filters?.sortBy === 'price-asc') return a.approxCostUsd - b.approxCostUsd;
+      if (filters?.sortBy === 'distance') return (a.distanceKm ?? 999) - (b.distanceKm ?? 999);
+      if (filters?.sortBy === 'trending') return Number(b.isTrending) - Number(a.isTrending);
+      return (b.baseVybeScore ?? 0) - (a.baseVybeScore ?? 0);
+    });
+
+  if (analyzed.length > 0) return analyzed;
+  if (googleError && osmError) {
+    throw new Error(`${googleError instanceof Error ? googleError.message : 'Google discovery failed'} — ${osmError instanceof Error ? osmError.message : 'OpenStreetMap fallback also failed'}.`);
   }
-  try {
-    const osmPlaces = await fetchOsmPlaces(userLat, userLng, radiusKm, query);
-    const result = osmPlaces.map(applySmartClassification).filter(place => matchesFilters(place, filters));
-    if (result.length > 0 || !googleError) return result;
-    return osmPlaces;
-  } catch (osmError) {
-    console.error('[discovery] OSM fallback failed:', osmError);
-    if (googleError instanceof Error) throw new Error(`${googleError.message} — OpenStreetMap fallback also unavailable.`);
-    throw osmError;
-  }
+  return analyzed;
 }
