@@ -4,7 +4,7 @@
  */
 import { supabase } from '../lib/supabase';
 import { Collection } from '../types';
-import { DbCollectionItemRow, DbCollectionRow, rowToCollection } from './mappers';
+import { DbCollectionItemRow, DbCollectionRow, newUuid, rowToCollection } from './mappers';
 
 const assertBackend = () => {
   if (!supabase) throw new Error('VYBE backend is not configured');
@@ -67,7 +67,7 @@ export const collectionsService = {
     const { error } = await db
       .from('collection_items')
       .upsert(
-        { collection_id: collectionId, place_id: placeId },
+        { id: newUuid(), collection_id: collectionId, place_id: placeId },
         { ignoreDuplicates: true, onConflict: 'collection_id,place_id' }
       );
     if (error) throw error;
