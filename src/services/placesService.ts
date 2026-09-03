@@ -48,9 +48,10 @@ export function placeToRow(place: Place) {
 }
 
 /**
- * Materialize an external Google place before a user-owned row references it.
- * The catalog itself remains admin-write protected; authenticated users only
- * invoke the narrowly-scoped ensure_google_place RPC.
+ * Materialize an external Google place only after server-side verification.
+ * The browser submits only the stable Google Place ID. The Vercel function
+ * authenticates the Supabase session, fetches the place directly from Google,
+ * and persists trusted Google metadata with a server-only Supabase key.
  */
 const googleEnsureInFlight = new Map<string, Promise<void>>();
 export async function ensureGooglePlaceStored(placeId: string): Promise<void> {
@@ -67,11 +68,28 @@ export async function ensureGooglePlaceStored(placeId: string): Promise<void> {
     if (lookupError) throw lookupError;
     if (data?.id) return;
 
-    const place = await getGooglePlaceDetails(providerId);
-    if (!place) throw new Error('Unable to load this Google place for saving.');
+    const { data: sessionData, error: sessionError } = await db.auth.getSession();
+    if (sessionError) throw sessionError;
+    const token = sessionData.session?.access_token;
+    if (!token) throw new Error('Authentication required to save a Google place.');
 
-    const { error } = await db.rpc('ensure_google_place', { payload: placeToRow(place) });
-    if (error) throw error;
+    const response = await fetch('/api/materialize-google-place', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ placeId: providerId })
+    });
+
+    let payload: { id?: string; error?: string } = {};
+    try { payload = await response.json(); } catch { /* handled below */ }
+    if (!response.ok || payload.id !== placeId) {
+      // Fall back to the already available browser Google details only for UX;
+      // persistence remains server-verified and never trusts this payload.
+      await getGooglePlaceDetails(providerId).catch(() => null);
+      throw new Error(payload.error || 'Unable to verify this Google place for saving.');
+    }
   })();
 
   googleEnsureInFlight.set(providerId, task);
