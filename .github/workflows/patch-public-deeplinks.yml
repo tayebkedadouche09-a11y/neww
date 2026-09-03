@@ -1,0 +1,37 @@
+name: Patch public deep links
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Patch DataContext
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/context/DataContext.tsx')
+          s = p.read_text()
+          s = s.replace("import { discoverPlaces } from '../services/discoveryService';", "import { discoverPlaces } from '../services/discoveryService';\nimport { getGooglePlaceDetails } from '../services/googlePlaces';")
+          old = '''  useEffect(() => {\n    const params = new URLSearchParams(window.location.search);\n    const placeId = params.get('place');\n    const planId = params.get('plan');\n    const collectionId = params.get('collection');\n    const routeKey = placeId ? `place:${placeId}` : planId ? `plan:${planId}` : collectionId ? `collection:${collectionId}` : null;\n    if (!routeKey || deepLinkHandledRef.current === routeKey) return;\n\n    if (placeId) {\n      const place = places.find(item => item.id === placeId);\n      if (!place) return;\n      deepLinkHandledRef.current = routeKey;\n      setSelectedPlace(place);\n      setIsDetailOpen(true);\n      setActiveTab('explore');\n      return;\n    }\n\n    if (planId) {\n      const plan = plans.find(item => item.id === planId);\n      if (!plan) return;\n      deepLinkHandledRef.current = routeKey;\n      setActivePlan(plan);\n      setActiveTab('plan');\n      return;\n    }\n\n    if (collectionId) {\n      const collection = collections.find(item => item.id === collectionId);\n      if (!collection) return;\n      deepLinkHandledRef.current = routeKey;\n      setActiveTab('saved');\n    }\n  }, [places, plans, collections]);'''
+          new = '''  useEffect(() => {\n    let cancelled = false;\n    const params = new URLSearchParams(window.location.search);\n    const placeId = params.get('place');\n    const planId = params.get('plan');\n    const collectionId = params.get('collection');\n    const routeKey = placeId ? `place:${placeId}` : planId ? `plan:${planId}` : collectionId ? `collection:${collectionId}` : null;\n    if (!routeKey || deepLinkHandledRef.current === routeKey) return;\n\n    const resolveDeepLink = async () => {\n      if (placeId) {\n        const localPlace = places.find(item => item.id === placeId);\n        if (localPlace) {\n          if (cancelled) return;\n          deepLinkHandledRef.current = routeKey;\n          setSelectedPlace(localPlace);\n          setIsDetailOpen(true);\n          setActiveTab('explore');\n          return;\n        }\n\n        try {\n          let publicPlace: Place | null = null;\n          if (placeId.startsWith('google:')) {\n            const providerId = placeId.slice('google:'.length);\n            if (providerId) publicPlace = await getGooglePlaceDetails(providerId);\n          } else if (dataMode === 'supabase') {\n            publicPlace = await placesService.getPublic(placeId);\n          }\n          if (!publicPlace || cancelled) return;\n          deepLinkHandledRef.current = routeKey;\n          setPlaces(prev => prev.some(item => item.id === publicPlace!.id) ? prev : [publicPlace!, ...prev]);\n          setSelectedPlace(publicPlace);\n          setIsDetailOpen(true);\n          setActiveTab('explore');\n        } catch (error) {\n          console.warn('[DataContext] Public place deep link could not be resolved', error);\n        }\n        return;\n      }\n\n      if (planId) {\n        const localPlan = plans.find(item => item.id === planId);\n        if (localPlan) {\n          if (cancelled) return;\n          deepLinkHandledRef.current = routeKey;\n          setActivePlan(localPlan);\n          setActiveTab('plan');\n          return;\n        }\n        if (dataMode === 'supabase') {\n          try {\n            const publicPlan = await plansService.getPublic(planId);\n            if (!publicPlan || cancelled) return;\n            deepLinkHandledRef.current = routeKey;\n            setPlans(prev => [publicPlan, ...prev.filter(item => item.id !== publicPlan.id)]);\n            setActivePlan(publicPlan);\n            setActiveTab('plan');\n          } catch (error) {\n            console.warn('[DataContext] Public plan deep link could not be resolved', error);\n          }\n        }\n        return;\n      }\n\n      if (collectionId) {\n        const localCollection = collections.find(item => item.id === collectionId);\n        if (localCollection) {\n          if (cancelled) return;\n          deepLinkHandledRef.current = routeKey;\n          setActiveTab('saved');\n          return;\n        }\n        if (dataMode === 'supabase') {\n          try {\n            const publicCollection = await collectionsService.getPublic(collectionId);\n            if (!publicCollection || cancelled) return;\n            deepLinkHandledRef.current = routeKey;\n            setCollections(prev => [publicCollection, ...prev.filter(item => item.id !== publicCollection.id)]);\n            setActiveTab('saved');\n          } catch (error) {\n            console.warn('[DataContext] Public collection deep link could not be resolved', error);\n          }\n        }\n      }\n    };\n\n    void resolveDeepLink();\n    return () => { cancelled = true; };\n  }, [places, plans, collections]);'''
+          if old not in s:
+              raise SystemExit('expected deep-link block not found')
+          s = s.replace(old, new)
+          p.write_text(s)
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/context/DataContext.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m 'fix: resolve public VYBE deep links across sessions [skip ci]'
+          git push
