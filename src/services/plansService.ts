@@ -36,6 +36,20 @@ export const plansService = {
       .map(row => rowToPlan(row, row.plan_items ?? []));
   },
 
+  async getPublic(planId: string): Promise<VybePlan | null> {
+    const db = assertBackend();
+    const { data, error } = await db
+      .from('plans')
+      .select('*, plan_items(*)')
+      .eq('id', planId)
+      .eq('is_public', true)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    const row = data as unknown as DbPlanRow & { plan_items: DbPlanItemRow[] | null };
+    return rowToPlan(row, row.plan_items ?? []);
+  },
+
   async create(plan: VybePlan): Promise<void> {
     const db = assertBackend();
     const { error } = await db.from('plans').insert({
