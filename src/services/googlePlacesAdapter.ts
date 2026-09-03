@@ -1,5 +1,13 @@
-import { Place, CategoryType, MoodType, PriceLevel, CompanionType, PlaceOpeningHours, ProviderType, PlacePhotoAttribution } from '../types';
+import { Place, CategoryType, MoodType, PriceLevel, CompanionType, PlaceOpeningHours, ProviderType, PlacePhotoAttribution, VybeCategory } from '../types';
 import { GooglePlaceResult } from './googlePlacesTypes';
+import {
+  VYBE_CATEGORY_DEFINITIONS,
+  LEGACY_CATEGORY_TO_CANONICAL,
+  normalizeCategoryQuery,
+  classifyProviderPlace,
+  placeMatchesCanonicalCategory,
+  type ProviderCategoryDefinition,
+} from '../data/categoryTaxonomy';
 
 function googlePriceLevelToVybe(priceLevel?: number): PriceLevel {
   if (priceLevel === undefined || priceLevel === null) return '$$';
@@ -13,24 +21,22 @@ function googleApproxCost(priceLevel?: number, isFree = false): number {
 }
 
 function googlePhotosToUrls(photos?: { photo_reference?: string }[]): string[] {
-  if (!photos?.length) return [];
-  return photos
+  return (photos ?? [])
     .map(photo => photo.photo_reference?.trim())
     .filter((uri): uri is string => Boolean(uri && /^https?:\/\//i.test(uri)));
 }
 
 function googlePhotoAttributions(photos?: Array<{ author_attributions?: Array<{ displayName: string; uri?: string }> }>): PlacePhotoAttribution[] {
-  if (!photos?.length) return [];
   const seen = new Set<string>();
   const result: PlacePhotoAttribution[] = [];
-  for (const photo of photos) {
+  for (const photo of photos ?? []) {
     for (const author of photo.author_attributions ?? []) {
       const displayName = author.displayName?.trim();
       if (!displayName) continue;
       const key = `${displayName}|${author.uri ?? ''}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      result.push({ displayName, uri: author.uri });
+      result.push({ displayName, ...(author.uri ? { uri: author.uri } : {}) });
     }
   }
   return result.slice(0, 3);
@@ -42,154 +48,120 @@ function googleWeekdayToOpeningHours(weekdayText?: string[]): Partial<PlaceOpeni
   const result: Partial<PlaceOpeningHours> = {};
   for (const entry of weekdayText) {
     const match = entry.match(/^(\w+):\s*(.+)$/);
-    if (match) {
-      const dayIndex = days.indexOf(match[1].toLowerCase());
-      if (dayIndex >= 0) (result as Record<string, string>)[days[dayIndex]] = match[2];
-    }
+    if (!match) continue;
+    const index = days.indexOf(match[1].toLowerCase());
+    if (index >= 0) (result as Record<string, string>)[days[index]] = match[2];
   }
   return result;
 }
 
 function hasLateNightHours(weekdayText?: string[]): boolean {
-  if (!weekdayText?.length) return false;
-  return weekdayText.some(entry => {
+  return (weekdayText ?? []).some(entry => {
     const value = entry.toLowerCase();
-    if (/24\s*hours|open\s*24/i.test(value)) return true;
-    return /(?:1|2|3|4|5)(?::\d{2})?\s*(?:am|a\.m\.)\b/.test(value);
+    return /24\s*hours|open\s*24/.test(value) || /(?:1|2|3|4|5)(?::\d{2})?\s*(?:am|a\.m\.)\b/.test(value);
   });
 }
 
-const GOOGLE_TYPE_TO_CATEGORY: Record<string, CategoryType> = {
-  restaurant: 'food-drink', cafe: 'food-drink', bakery: 'food-drink', meal_takeaway: 'food-drink', meal_delivery: 'food-drink', coffee_shop: 'food-drink', dessert_shop: 'food-drink',
-  bar: 'nightlife', night_club: 'nightlife', cocktail_bar: 'nightlife', karaoke: 'nightlife', live_music_venue: 'nightlife',
-  museum: 'arts-culture', art_gallery: 'arts-culture', art_museum: 'arts-culture', library: 'arts-culture', historical_place: 'arts-culture', historical_landmark: 'arts-culture', performing_arts_theater: 'arts-culture',
-  park: 'outdoors-nature', city_park: 'outdoors-nature', playground: 'outdoors-nature', indoor_playground: 'outdoors-nature', skateboard_park: 'outdoors-nature', water_park: 'outdoors-nature', zoo: 'outdoors-nature', aquarium: 'outdoors-nature', campground: 'outdoors-nature', gym: 'outdoors-nature', fitness_center: 'outdoors-nature', botanical_garden: 'outdoors-nature', national_park: 'outdoors-nature', hiking_area: 'outdoors-nature', beach: 'outdoors-nature',
-  amusement_park: 'entertainment', amusement_center: 'entertainment', bowling_alley: 'arcade-gaming', movie_theater: 'entertainment', casino: 'entertainment', go_karting_venue: 'entertainment', miniature_golf_course: 'arcade-gaming', paintball_center: 'entertainment',
-  video_arcade: 'arcade-gaming', internet_cafe: 'arcade-gaming',
-  shopping_mall: 'shopping-vintage', store: 'shopping-vintage', clothing_store: 'shopping-vintage', book_store: 'shopping-vintage', thrift_store: 'shopping-vintage', flea_market: 'shopping-vintage', toy_store: 'shopping-vintage', gift_shop: 'shopping-vintage',
-  spa: 'chill-spots', garden: 'chill-spots',
-  tourist_attraction: 'hidden-gems', monument: 'hidden-gems', observation_deck: 'hidden-gems', plaza: 'hidden-gems', cultural_landmark: 'hidden-gems',
-  sports_complex: 'outdoors-nature', sports_club: 'outdoors-nature', sports_activity_location: 'outdoors-nature', swimming_pool: 'outdoors-nature', tennis_court: 'outdoors-nature', athletic_field: 'outdoors-nature', stadium: 'entertainment', arena: 'entertainment', adventure_sports_center: 'entertainment',
-  mosque: 'arts-culture', church: 'arts-culture', hindu_temple: 'arts-culture', synagogue: 'arts-culture', place_of_worship: 'arts-culture',
-  hospital: 'chill-spots', doctor: 'chill-spots', pharmacy: 'chill-spots', dentist: 'chill-spots',
-  hotel: 'chill-spots', lodging: 'chill-spots',
-};
-
-const GOOGLE_TYPE_TO_MOOD: Record<string, MoodType> = {
-  restaurant: 'hungry', cafe: 'chill', bakery: 'hungry', meal_takeaway: 'hungry', meal_delivery: 'hungry', coffee_shop: 'chill', dessert_shop: 'hungry',
-  bar: 'party', night_club: 'party', cocktail_bar: 'party', karaoke: 'party', live_music_venue: 'music',
-  museum: 'curious', art_gallery: 'creative', art_museum: 'curious', library: 'lazy', historical_place: 'curious', historical_landmark: 'curious', performing_arts_theater: 'creative',
-  park: 'outdoor', city_park: 'outdoor', playground: 'energetic', indoor_playground: 'energetic', skateboard_park: 'energetic', water_park: 'energetic', zoo: 'explore', aquarium: 'curious', campground: 'outdoor', gym: 'energetic', fitness_center: 'energetic', botanical_garden: 'outdoor', national_park: 'outdoor', hiking_area: 'outdoor', beach: 'outdoor',
-  amusement_park: 'energetic', amusement_center: 'energetic', bowling_alley: 'gaming', movie_theater: 'chill', casino: 'party', go_karting_venue: 'energetic', miniature_golf_course: 'gaming', paintball_center: 'energetic',
-  video_arcade: 'gaming', internet_cafe: 'gaming',
-  shopping_mall: 'explore', store: 'explore', clothing_store: 'explore', book_store: 'curious', thrift_store: 'explore', flea_market: 'explore', toy_store: 'explore', gift_shop: 'explore',
-  spa: 'lazy', garden: 'chill', tourist_attraction: 'explore', monument: 'explore', observation_deck: 'explore', plaza: 'explore', cultural_landmark: 'explore',
-  sports_complex: 'energetic', sports_club: 'energetic', sports_activity_location: 'energetic', swimming_pool: 'energetic', tennis_court: 'energetic', athletic_field: 'energetic', stadium: 'energetic', arena: 'energetic', adventure_sports_center: 'energetic',
-  mosque: 'curious', church: 'curious', hindu_temple: 'curious', synagogue: 'curious', place_of_worship: 'curious',
-  hospital: 'explore', doctor: 'explore', pharmacy: 'explore', dentist: 'explore', hotel: 'chill', lodging: 'chill',
-};
-
-const NAME_RULES: Array<{ category: CategoryType; mood: MoodType; words: string[] }> = [
-  { category: 'arcade-gaming', mood: 'gaming', words: ['arcade', 'gaming', 'gamer', 'video game', 'video games', 'playstation', 'xbox', 'espace jeux', 'salle de jeux', 'jeux video', 'jeux vidéos', 'jeux', 'gaming lounge', 'game room'] },
-  { category: 'food-drink', mood: 'hungry', words: ['restaurant', 'resto', 'pizzeria', 'pizza', 'burger', 'grill', 'tacos', 'snack', 'fast food', 'café', 'cafe', 'coffee', 'coffee shop', 'bakery', 'boulangerie', 'patisserie', 'pâtisserie', 'tea room', 'salon de thé'] },
-  { category: 'nightlife', mood: 'party', words: ['bar', 'pub', 'club', 'nightclub', 'boite de nuit', 'discothèque', 'disco', 'karaoke', 'lounge', 'cocktail'] },
-  { category: 'outdoors-nature', mood: 'outdoor', words: ['park', 'parc', 'jardin', 'garden', 'forêt', 'forest', 'plage', 'beach', 'promenade', 'hiking', 'randonnée', 'nature'] },
-  { category: 'entertainment', mood: 'energetic', words: ['cinema', 'cinéma', 'theatre', 'théâtre', 'amusement', 'manège', 'karting', 'paintball'] },
-  { category: 'shopping-vintage', mood: 'explore', words: ['mall', 'centre commercial', 'shopping', 'boutique', 'store', 'magasin', 'marché', 'market', 'friperie', 'bookstore', 'librairie'] },
-  { category: 'arts-culture', mood: 'curious', words: ['mosquée', 'mosquee', 'mosque', 'مسجد', 'جامع', 'église', 'eglise', 'church', 'temple', 'synagogue', 'museum', 'musée', 'musee', 'gallery', 'galerie', 'library', 'bibliothèque', 'bibliotheque'] },
-  { category: 'chill-spots', mood: 'lazy', words: ['spa', 'hotel', 'hôtel', 'resort', 'wellness', 'relax'] },
-];
-
-const NON_VYBE_DISCOVERY_TYPES = new Set(['hospital', 'doctor', 'pharmacy', 'dentist', 'tv_station', 'government_office', 'train_station', 'transit_station', 'bus_station', 'airport', 'school', 'university', 'post_office', 'police', 'fire_station', 'courthouse']);
-
-function normalizeName(value?: string): string {
-  return (value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ').trim();
-}
-
+/**
+ * Compatibility helper for legacy UI callers. The canonical category is the
+ * source of truth; this returns the existing legacy bucket for the UI/storage.
+ */
 export function classifyPlace(types?: string[], name?: string): { category: CategoryType; mood: MoodType } {
-  const normalized = normalizeName(name);
-  const typeSet = new Set(types ?? []);
-  for (const type of typeSet) {
-    if (GOOGLE_TYPE_TO_CATEGORY[type]) return { category: GOOGLE_TYPE_TO_CATEGORY[type], mood: GOOGLE_TYPE_TO_MOOD[type] ?? 'explore' };
-  }
-  for (const rule of NAME_RULES) {
-    if (rule.words.some(word => normalized.includes(normalizeName(word)))) return { category: rule.category, mood: rule.mood };
-  }
-  return { category: 'hidden-gems', mood: 'explore' };
-}
-
-const QUERY_CATEGORY_EXPECTATIONS: Record<string, CategoryType[]> = {
-  restaurant: ['food-drink'], cafe: ['food-drink'], park: ['outdoors-nature'], cinema: ['entertainment'], gym: ['outdoors-nature'], hotel: ['chill-spots'], shopping: ['shopping-vintage'], library: ['arts-culture'], museum: ['arts-culture'], 'sports center': ['outdoors-nature', 'entertainment'], nightlife: ['nightlife'], 'arcade gaming': ['arcade-gaming', 'entertainment'], 'live music': ['nightlife'], hospital: ['chill-spots'], theatre: ['arts-culture', 'entertainment'], playground: ['outdoors-nature'], beach: ['outdoors-nature'], mosque: ['arts-culture'],
-};
-
-export function isGooglePlaceValidForRequest(place: Place, request?: { query?: string; categories?: CategoryType[] }): boolean {
-  if (place.provider !== 'google' || !place.providerPlaceId || !place.name.trim()) return false;
-  if (!Number.isFinite(place.location.lat) || !Number.isFinite(place.location.lng) || (place.location.lat === 0 && place.location.lng === 0)) return false;
-  const normalizedQuery = normalizeName(request?.query);
-  const placeTypes = new Set(place.tags ?? []);
-  if (normalizedQuery !== 'hospital' && normalizedQuery !== 'hospital ') {
-    for (const blocked of NON_VYBE_DISCOVERY_TYPES) if (placeTypes.has(blocked)) return false;
-  }
-  const expected = new Set<CategoryType>(request?.categories ?? []);
-  if (normalizedQuery && QUERY_CATEGORY_EXPECTATIONS[normalizedQuery]) QUERY_CATEGORY_EXPECTATIONS[normalizedQuery].forEach(category => expected.add(category));
-  if (!expected.size) return true;
-  return expected.has(place.category);
+  const result = classifyProviderPlace(types ?? [], undefined, name);
+  return { category: result.legacyCategory, mood: result.mood };
 }
 
 function googleTypesToSuitableFor(types?: string[]): CompanionType[] {
+  const typeSet = new Set(types ?? []);
   const suitable: CompanionType[] = ['solo', 'friends'];
-  if (!types) return suitable;
-  const typeSet = new Set(types);
-  if (['restaurant', 'cafe', 'bar', 'night_club', 'karaoke', 'live_music_venue', 'video_arcade', 'bowling_alley'].some(t => typeSet.has(t))) suitable.push('couple', 'group');
-  if (['park', 'playground', 'indoor_playground', 'amusement_park', 'shopping_mall', 'zoo', 'aquarium', 'water_park', 'sports_complex', 'swimming_pool'].some(t => typeSet.has(t))) suitable.push('family', 'group');
+  if (['restaurant', 'cafe', 'bar', 'night_club', 'karaoke', 'live_music_venue', 'video_arcade', 'bowling_alley', 'amusement_center'].some(t => typeSet.has(t))) {
+    suitable.push('couple', 'group');
+  }
+  if (['park', 'playground', 'indoor_playground', 'amusement_center', 'amusement_park', 'shopping_mall', 'zoo', 'aquarium', 'water_park', 'sports_complex', 'swimming_pool', 'children_camp'].some(t => typeSet.has(t))) {
+    suitable.push('family', 'group');
+  }
   return [...new Set(suitable)];
+}
+
+/**
+ * Strict provider validation. Query text is only converted into a canonical
+ * intent; it never changes the returned place's category by itself.
+ */
+export function isGooglePlaceValidForRequest(place: Place, request?: { query?: string; categories?: CategoryType[] }): boolean {
+  if (place.provider !== 'google' || !place.providerPlaceId || !place.name.trim()) return false;
+  if (!Number.isFinite(place.location.lat) || !Number.isFinite(place.location.lng) || (place.location.lat === 0 && place.location.lng === 0)) return false;
+
+  const canonicalFromQuery = normalizeCategoryQuery(request?.query);
+  const categoryTargets = canonicalFromQuery
+    ? [canonicalFromQuery]
+    : (request?.categories ?? []).flatMap(category => LEGACY_CATEGORY_TO_CANONICAL[category] ?? []);
+
+  if (!categoryTargets.length) return true;
+
+  return categoryTargets.some(category => placeMatchesCanonicalCategory(place, category));
 }
 
 export function googlePlaceToVybePlace(gp: GooglePlaceResult): Place {
   const providerPlaceId = gp.place_id?.trim();
-  const { category, mood: primaryMood } = classifyPlace(gp.types, gp.name);
+  const providerTypes = [...new Set((gp.types ?? []).filter(Boolean))];
+  const analysis = classifyProviderPlace(providerTypes, gp.primary_type, gp.name);
+  const categoryDefinition: ProviderCategoryDefinition = VYBE_CATEGORY_DEFINITIONS[analysis.canonicalCategory];
   const photoUrls = googlePhotosToUrls(gp.photos);
   const photoAttributions = googlePhotoAttributions(gp.photos);
   const openingHours = googleWeekdayToOpeningHours(gp.opening_hours?.weekday_text);
   const lat = gp.geometry?.location?.lat;
   const lng = gp.geometry?.location?.lng;
-  const isFree = gp.price_level === 0 || gp.types?.some(type => ['park', 'playground', 'library', 'museum', 'place_of_worship'].includes(type)) === true;
+  const isFree = gp.price_level === 0 || providerTypes.some(type => ['park', 'playground', 'library', 'place_of_worship'].includes(type));
+  const canonicalCategory: VybeCategory = analysis.canonicalCategory;
 
   return {
     id: providerPlaceId ? `google:${providerPlaceId}` : `google:${encodeURIComponent(gp.name || 'place')}`,
     provider: 'google' as ProviderType,
     providerPlaceId,
+    providerTypes,
+    providerPrimaryType: gp.primary_type,
+    canonicalCategory,
     name: gp.name,
     tagline: gp.vicinity || gp.formatted_address || '',
     description: '',
-    category,
-    primaryMood,
+    category: categoryDefinition.legacyCategory,
+    primaryMood: analysis.mood,
     secondaryMoods: [],
-    location: { address: gp.formatted_address || gp.vicinity || '', neighborhood: '', city: '', lat: Number.isFinite(lat) ? lat! : 0, lng: Number.isFinite(lng) ? lng! : 0 },
+    location: {
+      address: gp.formatted_address || gp.vicinity || '',
+      neighborhood: '',
+      city: '',
+      lat: Number.isFinite(lat) ? lat! : 0,
+      lng: Number.isFinite(lng) ? lng! : 0,
+    },
     priceLevel: isFree ? 'free' : googlePriceLevelToVybe(gp.price_level),
     approxCostUsd: googleApproxCost(gp.price_level, isFree),
     rating: gp.rating ?? 0,
     reviewCount: gp.user_ratings_total ?? 0,
-    baseVybeScore: 75,
+    baseVybeScore: Math.max(1, Math.min(99, Math.round(70 + analysis.confidence * 15 + Math.min(10, (gp.rating ?? 0) * 2)))),
     images: photoUrls,
     photoAttributions,
-    tags: gp.types?.slice(0, 10).map(t => t.replace(/_/g, ' ')) ?? [],
+    tags: providerTypes.slice(0, 15),
     estimatedDuration: '',
-    openingHours: { monday: '', tuesday: '', wednesday: '', thursday: '', friday: '', saturday: '', sunday: '', isOpenNow: gp.opening_hours?.open_now, ...openingHours },
+    openingHours: {
+      monday: '', tuesday: '', wednesday: '', thursday: '', friday: '', saturday: '', sunday: '',
+      isOpenNow: gp.opening_hours?.open_now,
+      ...openingHours,
+    },
     features: {
       isFree,
-      isOutdoor: gp.types?.some(t => ['park', 'city_park', 'playground', 'indoor_playground', 'skateboard_park', 'water_park', 'campground', 'zoo', 'aquarium', 'botanical_garden', 'national_park', 'hiking_area', 'beach'].includes(t)) ?? false,
-      isIndoor: gp.types?.some(t => ['restaurant', 'cafe', 'museum', 'art_gallery', 'art_museum', 'movie_theater', 'shopping_mall', 'library', 'gym', 'fitness_center', 'spa', 'indoor_playground', 'video_arcade', 'internet_cafe'].includes(t)) ?? false,
-      hasFood: gp.types?.some(t => ['restaurant', 'cafe', 'bakery', 'meal_takeaway', 'meal_delivery', 'coffee_shop', 'dessert_shop'].includes(t)) ?? false,
-      hasAlcohol: gp.types?.some(t => ['bar', 'night_club', 'cocktail_bar', 'casino'].includes(t)) ?? false,
+      isOutdoor: providerTypes.some(t => ['park', 'city_park', 'state_park', 'national_park', 'hiking_area', 'beach', 'garden', 'botanical_garden', 'campground', 'zoo', 'aquarium', 'wildlife_park', 'wildlife_refuge'].includes(t)),
+      isIndoor: providerTypes.some(t => ['restaurant', 'cafe', 'museum', 'art_gallery', 'art_museum', 'library', 'movie_theater', 'video_arcade', 'amusement_center', 'indoor_playground', 'gym', 'spa', 'shopping_mall', 'store'].includes(t)),
+      hasFood: providerTypes.some(t => ['restaurant', 'cafe', 'bakery', 'meal_takeaway', 'meal_delivery', 'bar', 'food_court'].includes(t)),
+      hasAlcohol: providerTypes.some(t => ['bar', 'night_club', 'cocktail_bar', 'brewery', 'wine_bar'].includes(t)),
       isLateNight: hasLateNightHours(gp.opening_hours?.weekday_text),
-      isSecretGem: false,
+      isSecretGem: canonicalCategory === 'tourist' || canonicalCategory === 'entertainment',
       isPetFriendly: false,
-      isWifiFriendly: false,
-      isPhotoSpot: gp.types?.some(t => ['tourist_attraction', 'historical_landmark', 'art_gallery', 'art_museum', 'park', 'museum', 'observation_deck', 'plaza'].includes(t)) ?? false,
+      isWifiFriendly: providerTypes.includes('internet_cafe'),
+      isPhotoSpot: canonicalCategory === 'tourist' || canonicalCategory === 'outdoors',
       isAccessible: false,
     },
-    suitableFor: googleTypesToSuitableFor(gp.types),
+    suitableFor: googleTypesToSuitableFor(providerTypes),
     website: gp.website,
     phone: gp.formatted_phone_number,
     instagram: undefined,
