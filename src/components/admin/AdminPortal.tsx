@@ -78,56 +78,77 @@ export const AdminPortal: React.FC = () => {
     if (editingPlaceId) {
       const existing = places.find(place => place.id === editingPlaceId);
       if (!existing) {
-        showToast('This place is no longer available.', '⚠️', 'info');
+        showToast('Place no longer exists.', '⚠️', 'info');
         resetForm();
         return;
       }
-      updatePlace(existing.id, {
-        name: name.trim(),
-        tagline: tagline.trim(),
-        description: description.trim(),
+      updatePlace(editingPlaceId, {
+        name,
+        tagline,
+        description,
         category,
         primaryMood,
-        location: editingPlaceId && existing.location ? { ...existing.location, address: address.trim() || existing.location.address, neighborhood: neighborhood.trim() || existing.location.neighborhood, lat: Number.isFinite(latitude) && latitude !== 0 ? latitude : existing.location.lat, lng: Number.isFinite(longitude) && longitude !== 0 ? longitude : existing.location.lng } : existing.location,
         priceLevel,
-        approxCostUsd: approxCost,
+        approxCostUsd: Number(approxCost),
+        location: existing.location,
         images: img ? [img] : existing.images,
-        features: { ...existing.features, isSecretGem, isLateNight, isOutdoor },
+        features: {
+          ...existing.features,
+          isFree: priceLevel === 'free',
+          isOutdoor,
+          isIndoor: !isOutdoor,
+          isLateNight,
+          isSecretGem,
+        },
       });
-      showToast('Place updated.', '✅', 'success');
-      resetForm();
-      return;
+      showToast(`Updated place "${name}"`, '✏️', 'success');
+    } else {
+      addPlace({
+        name,
+        tagline,
+        description,
+        category,
+        primaryMood,
+        secondaryMoods: ['chill', 'creative'],
+        location: {
+          address: address.trim(),
+          neighborhood: neighborhood.trim(),
+          city: '',
+          lat: latitude,
+          lng: longitude,
+        },
+        priceLevel,
+        approxCostUsd: Number(approxCost),
+        images: img ? [img] : [],
+        tags: ['New Spot', 'Community Pick'],
+        estimatedDuration: '1h - 2h',
+        openingHours: {
+          monday: '', tuesday: '', wednesday: '', thursday: '', friday: '', saturday: '', sunday: '',
+        },
+        features: {
+          isFree: priceLevel === 'free',
+          isOutdoor,
+          isIndoor: !isOutdoor,
+          hasFood: true,
+          hasAlcohol: false,
+          isLateNight,
+          isSecretGem,
+          isPetFriendly: false,
+          isWifiFriendly: false,
+          isPhotoSpot: false,
+          isAccessible: false,
+        },
+        suitableFor: ['friends', 'solo', 'couple'],
+        isFeatured: false,
+        isTrending: false,
+      });
+      showToast(`Created place "${name}"`, '✅', 'success');
     }
 
-    const created = addPlace({
-      provider: 'vybe',
-      providerPlaceId: undefined,
-      name: name.trim(),
-      tagline: tagline.trim(),
-      description: description.trim(),
-      category,
-      primaryMood,
-      secondaryMoods: [],
-      location: { address: address.trim(), neighborhood: neighborhood.trim(), city: '', lat: latitude, lng: longitude },
-      priceLevel,
-      approxCostUsd: approxCost,
-      images: img ? [img] : [],
-      tags: [],
-      estimatedDuration: '90 min',
-      openingHours: { monday: '', tuesday: '', wednesday: '', thursday: '', friday: '', saturday: '', sunday: '', isOpenNow: undefined },
-      features: { isFree: priceLevel === 'free', isOutdoor, isIndoor: !isOutdoor, hasFood: category === 'food-drink', hasAlcohol: category === 'nightlife', isLateNight, isSecretGem, isPetFriendly: false, isWifiFriendly: false, isPhotoSpot: false, isAccessible: false },
-      suitableFor: ['solo', 'friends'],
-      website: '',
-      phone: '',
-      instagram: '',
-      isFeatured: false,
-      isTrending: false,
-    });
-    if (created) showToast('Place created.', '✅', 'success');
     resetForm();
   };
 
-  const editPlace = (place: Place) => {
+  const startEdit = (place: Place) => {
     setEditingPlaceId(place.id);
     setName(place.name);
     setTagline(place.tagline);
@@ -148,44 +169,75 @@ export const AdminPortal: React.FC = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      <div className="flex items-center justify-between gap-4">
+    <div data-testid="admin-portal" className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-fadeIn">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200 dark:border-white/10">
         <div>
-          <div className="inline-flex items-center gap-2 text-xs font-mono font-bold text-vybe-pink"><ShieldCheck className="w-4 h-4" /> VYBE ADMIN</div>
-          <h1 className="font-display font-extrabold text-3xl text-slate-900 dark:text-white">Place Catalog</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Manage the real VYBE catalog stored in Supabase.</p>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-vybe-pink/15 text-vybe-pink font-mono font-bold text-xs mb-2">
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>CONTENT MANAGEMENT PORTAL</span>
+          </div>
+          <h1 className="font-display font-extrabold text-3xl sm:text-4xl text-slate-900 dark:text-white">Admin Place Management</h1>
+          <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Create, curate, edit and feature new spots on VYBE platform.</p>
         </div>
-        <button type="button" onClick={() => { resetForm(); setIsAddingPlace(true); }} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-vybe-lime text-black font-bold text-xs shadow-neon-lime"><Plus className="w-4 h-4" />Add Place</button>
+        <button onClick={() => { resetForm(); setIsAddingPlace(true); }} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-vybe-lime text-black font-bold text-xs shadow-neon-lime hover:scale-105 transition-all self-start sm:self-auto">
+          <Plus className="w-4 h-4" />
+          <span>Add New Place</span>
+        </button>
       </div>
 
       {isAddingPlace && (
-        <form onSubmit={handleCreateOrUpdate} className="p-6 rounded-3xl bg-white dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border space-y-4">
-          <div className="flex items-center justify-between"><h2 className="font-display font-bold text-lg text-slate-900 dark:text-white">{editingPlaceId ? 'Edit Place' : 'Add Place'}</h2><button type="button" onClick={resetForm} className="p-2 rounded-xl bg-slate-100 dark:bg-vybe-dark-surface"><X className="w-4 h-4" /></button></div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <input required value={name} onChange={e => setName(e.target.value)} placeholder="Name" className="p-3 rounded-xl border" />
-            <input required value={tagline} onChange={e => setTagline(e.target.value)} placeholder="Tagline" className="p-3 rounded-xl border" />
-            <textarea required value={description} onChange={e => setDescription(e.target.value)} placeholder="Description" className="p-3 rounded-xl border md:col-span-2" />
-            <input value={address} onChange={e => setAddress(e.target.value)} placeholder="Address" className="p-3 rounded-xl border" />
-            <input value={neighborhood} onChange={e => setNeighborhood(e.target.value)} placeholder="Neighborhood" className="p-3 rounded-xl border" />
-            <input type="number" step="any" value={latitude} onChange={e => setLatitude(Number(e.target.value))} placeholder="Latitude" className="p-3 rounded-xl border" />
-            <input type="number" step="any" value={longitude} onChange={e => setLongitude(Number(e.target.value))} placeholder="Longitude" className="p-3 rounded-xl border" />
-            <input type="number" min="0" value={approxCost} onChange={e => setApproxCost(Number(e.target.value))} placeholder="Approx cost USD" className="p-3 rounded-xl border" />
-            <input value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder="Image URL (optional)" className="p-3 rounded-xl border" />
-            <select value={category} onChange={e => setCategory(e.target.value as CategoryType)} className="p-3 rounded-xl border">{INITIAL_CATEGORIES.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
-            <select value={primaryMood} onChange={e => setPrimaryMood(e.target.value as MoodType)} className="p-3 rounded-xl border">{INITIAL_MOODS.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
+        <div className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border shadow-2xl space-y-6">
+          <div className="flex justify-between items-center">
+            <h3 className="font-display font-bold text-xl text-slate-900 dark:text-white">{editingPlaceId ? 'Edit Place Details' : 'Create New Spot'}</h3>
+            <button onClick={resetForm} className="p-1 text-slate-400 hover:text-white" aria-label="Close"><X className="w-5 h-5" /></button>
           </div>
-          <div className="flex flex-wrap gap-4 text-xs font-bold"><label><input type="checkbox" checked={isSecretGem} onChange={e => setIsSecretGem(e.target.checked)} /> Secret gem</label><label><input type="checkbox" checked={isLateNight} onChange={e => setIsLateNight(e.target.checked)} /> Late night</label><label><input type="checkbox" checked={isOutdoor} onChange={e => setIsOutdoor(e.target.checked)} /> Outdoor</label></div>
-          <div className="flex justify-end gap-2"><button type="button" onClick={resetForm} className="px-4 py-2 rounded-xl text-xs font-bold">Cancel</button><button type="submit" className="px-5 py-2 rounded-xl bg-vybe-lime text-black text-xs font-bold">Save</button></div>
-        </form>
+
+          <form onSubmit={handleCreateOrUpdate} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Name</label><input type="text" required placeholder="Place name" value={name} onChange={e => setName(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none" /></div>
+              <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Tagline</label><input type="text" required placeholder="Short vibe description" value={tagline} onChange={e => setTagline(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none" /></div>
+            </div>
+
+            <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Full Description</label><textarea rows={3} required placeholder="Description" value={description} onChange={e => setDescription(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none" /></div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Category</label><select value={category} onChange={e => setCategory(e.target.value as CategoryType)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-xs font-bold text-slate-900 dark:text-white">{INITIAL_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}</select></div>
+              <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Primary Mood</label><select value={primaryMood} onChange={e => setPrimaryMood(e.target.value as MoodType)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-xs font-bold text-slate-900 dark:text-white">{INITIAL_MOODS.map(m => <option key={m.id} value={m.id}>{m.emoji} {m.label}</option>)}</select></div>
+              <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Price Level</label><select value={priceLevel} onChange={e => setPriceLevel(e.target.value as PriceLevel)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-xs font-bold text-slate-900 dark:text-white"><option value="free">Free</option><option value="$">$</option><option value="$$">$$</option><option value="$$$">$$$</option><option value="$$$$">$$$$</option></select></div>
+              <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Approx Cost ($)</label><input type="number" min="0" value={approxCost} onChange={e => setApproxCost(Number(e.target.value))} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white" /></div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Address</label><input type="text" required={!editingPlaceId} placeholder="Real street address" value={address} onChange={e => setAddress(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white" /></div>
+              <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Image URL (optional)</label><input type="url" placeholder="https://..." value={imageUrl} onChange={e => setImageUrl(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white" /></div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Latitude</label><input name="latitude" type="number" required={!editingPlaceId} min="-90" max="90" step="any" placeholder="e.g. 36.7538" value={latitude} onChange={e => setLatitude(Number(e.target.value))} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white" /></div>
+              <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Longitude</label><input name="longitude" type="number" required={!editingPlaceId} min="-180" max="180" step="any" placeholder="e.g. 3.0588" value={longitude} onChange={e => setLongitude(Number(e.target.value))} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white" /></div>
+            </div>
+
+            <div className="flex flex-wrap gap-4 pt-2">
+              <label className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer"><input type="checkbox" checked={isSecretGem} onChange={e => setIsSecretGem(e.target.checked)} className="rounded accent-vybe-lime" /><span>💎 Hidden Gem</span></label>
+              <label className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer"><input type="checkbox" checked={isLateNight} onChange={e => setIsLateNight(e.target.checked)} className="rounded accent-vybe-lime" /><span>🌙 Late Night</span></label>
+              <label className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer"><input type="checkbox" checked={isOutdoor} onChange={e => setIsOutdoor(e.target.checked)} className="rounded accent-vybe-lime" /><span>🌿 Outdoor</span></label>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-white/10"><button type="button" onClick={resetForm} className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white">Cancel</button><button type="submit" className="px-6 py-2.5 rounded-xl bg-vybe-lime text-black font-bold text-xs uppercase tracking-wider shadow-neon-lime hover:scale-105 transition-all">{editingPlaceId ? 'Update Place' : 'Publish Spot'}</button></div>
+          </form>
+        </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {places.map(place => (
-          <div key={place.id} className="p-4 rounded-2xl bg-white dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border">
-            <div className="flex items-start justify-between gap-3"><div><h3 className="font-display font-bold text-slate-900 dark:text-white">{place.name}</h3><p className="text-xs text-slate-500 mt-1">{place.tagline}</p></div><Flame className={`w-4 h-4 ${place.isTrending ? 'text-orange-500' : 'text-slate-300'}`} /></div>
-            <div className="mt-4 flex gap-2"><button type="button" onClick={() => editPlace(place)} className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-100 dark:bg-vybe-dark-surface text-xs font-bold"><Edit className="w-3.5 h-3.5" />Edit</button><button type="button" onClick={() => deletePlace(place.id)} className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-rose-50 text-rose-600 text-xs font-bold"><Trash2 className="w-3.5 h-3.5" />Delete</button></div>
-          </div>
-        ))}
+      <div className="rounded-3xl bg-white dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border shadow-lg overflow-hidden">
+        <div className="p-5 border-b border-slate-200 dark:border-white/10"><h3 className="font-display font-bold text-lg text-slate-900 dark:text-white">Active Places Catalog ({places.length})</h3></div>
+        <div className="divide-y divide-slate-100 dark:divide-white/5 overflow-x-auto">
+          {places.map(place => (
+            <div key={place.id} className="p-4 flex items-center justify-between gap-4 hover:bg-slate-50 dark:hover:bg-vybe-dark-surface/50 transition-colors">
+              <div className="flex items-center gap-3 min-w-0"><div className="w-12 h-12 rounded-xl bg-slate-900 shrink-0 flex items-center justify-center text-slate-500"><span aria-hidden="true">📍</span></div><div className="truncate"><div className="flex items-center gap-2"><h4 className="font-display font-bold text-sm text-slate-900 dark:text-white truncate">{place.name}</h4>{place.isTrending && <span className="px-2 py-0.5 rounded bg-orange-500/10 text-orange-400 font-mono text-[10px] font-bold">TRENDING</span>}</div><p className="text-xs text-slate-500 truncate">{place.category} · {place.location.neighborhood || place.location.address || 'Location unavailable'} · {place.priceLevel}</p></div></div>
+              <div className="flex items-center gap-2 shrink-0"><button onClick={() => updatePlace(place.id, { isTrending: !place.isTrending })} className={`p-2 rounded-xl text-xs font-bold transition-all ${place.isTrending ? 'bg-orange-500/20 text-orange-400' : 'bg-slate-100 dark:bg-vybe-dark-surface text-slate-400'}`} title="Toggle Trending" aria-label={`Toggle trending for ${place.name}`}><Flame className="w-4 h-4" /></button><button onClick={() => startEdit(place)} className="p-2 rounded-xl bg-slate-100 dark:bg-vybe-dark-surface text-slate-600 dark:text-slate-300 hover:text-vybe-lime transition-all" title="Edit Place" aria-label={`Edit ${place.name}`}><Edit className="w-4 h-4" /></button><button onClick={() => deletePlace(place.id)} className="p-2 rounded-xl bg-slate-100 dark:bg-vybe-dark-surface text-slate-600 dark:text-slate-400 hover:text-rose-500 transition-all" title="Delete Place" aria-label={`Delete ${place.name}`}><Trash2 className="w-4 h-4" /></button></div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
