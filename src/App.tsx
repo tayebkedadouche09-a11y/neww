@@ -20,6 +20,7 @@ import { ProfileView } from "./components/profile/ProfileView";
 import { AdminPortal } from "./components/admin/AdminPortal";
 import { VybeCommandCenter } from "./components/vybe/VybeCommandCenter";
 import { VybeDailyDrop } from "./components/vybe/VybeDailyDrop";
+import { VybeSquadVote } from "./components/vybe/VybeSquadVote";
 import { useData } from "./context/DataContext";
 
 const SelectedPlaceMapAction: React.FC = () => {
@@ -60,6 +61,7 @@ export const App: React.FC = () => {
           <>
             <ExploreExperience />
             <VybeDailyDrop />
+            <VybeSquadVote />
           </>
         )}
 
