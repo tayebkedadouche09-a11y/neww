@@ -27,7 +27,8 @@ async function libraryPlaceToResult(p: google.maps.places.Place): Promise<Google
   let openNow: boolean | undefined;
   if (p.regularOpeningHours) {
     try {
-      if (typeof p.isOpen === 'function') openNow = await p.isOpen();
+      const placeWithOpen = p as google.maps.places.Place & { isOpen?: () => Promise<boolean | undefined> };
+      if (typeof placeWithOpen.isOpen === 'function') openNow = await placeWithOpen.isOpen();
     } catch {
       // Keep unknown rather than guessing.
     }
@@ -39,7 +40,11 @@ async function libraryPlaceToResult(p: google.maps.places.Place): Promise<Google
     try {
       const uri = photo.getURI({ maxWidth: 1200, maxHeight: 750 });
       const authorAttributions = (photo.authorAttributions ?? [])
-        .map(author => ({ displayName: author.displayName, uri: author.uri, photoUri: author.photoUri }))
+        .map(author => ({
+          displayName: author.displayName,
+          ...(author.uri ? { uri: author.uri } : {}),
+          ...(author.photoURI ? { photoUri: author.photoURI } : {}),
+        }))
         .filter(author => Boolean(author.displayName));
       return uri ? [{
         photo_reference: uri,
@@ -115,9 +120,10 @@ export async function searchGooglePlacesText(query: string, lat?: number, lng?: 
 }
 
 export async function getGooglePlaceDetails(placeId: string): Promise<Place | null> {
-  if (!/^[A-Za-z0-9_-]{1,300}$/.test(placeId.trim())) throw new Error('Invalid Google place ID');
+  const normalizedPlaceId = placeId.trim();
+  if (!/^[A-Za-z0-9_-]{1,300}$/.test(normalizedPlaceId)) throw new Error('Invalid Google place ID');
   const { Place } = await importPlacesLibrary();
-  const place = new Place({ id: placeId.trim() });
+  const place = new Place({ id: normalizedPlaceId });
   await place.fetchFields({ fields: PLACE_FIELDS });
   if (!place.id || (!place.displayName && !place.location)) return null;
   return googlePlaceToVybePlace(await libraryPlaceToResult(place));
