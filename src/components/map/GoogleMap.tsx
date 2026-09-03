@@ -5,7 +5,15 @@ import { loadGoogleMaps } from '../../lib/googleMapsLoader';
 import { INITIAL_MOODS } from '../../data/initialMoods';
 import { classifyPlace } from '../../services/googlePlacesAdapter';
 
-interface GoogleMapProps { places: Place[]; onMarkerClick?: (place: Place) => void; selectedPlace?: Place | null; userLocation?: { lat: number; lng: number } | null; onError?: (message: string) => void; }
+interface GoogleMapProps {
+  places: Place[];
+  onMarkerClick?: (place: Place) => void;
+  selectedPlace?: Place | null;
+  userLocation?: { lat: number; lng: number } | null;
+  onError?: (message: string) => void;
+}
+
+type MapMarker = google.maps.marker.AdvancedMarkerElement | google.maps.Marker;
 
 function getPlaceMarkerEmoji(place: Place): string {
   const text = `${place.name} ${place.tags.join(' ')}`.toLowerCase();
@@ -39,10 +47,23 @@ function getPlaceMarkerEmoji(place: Place): string {
   }
 }
 
+function addFallbackMarker(map: google.maps.Map, place: Place, selected: boolean, onClick?: (place: Place) => void): google.maps.Marker {
+  const emoji = getPlaceMarkerEmoji(place);
+  const marker = new google.maps.Marker({
+    map,
+    position: { lat: place.location.lat, lng: place.location.lng },
+    title: place.name,
+    label: { text: emoji, fontSize: selected ? '26px' : '22px' },
+    zIndex: selected ? 1000 : 1,
+  });
+  marker.addListener('click', () => onClick?.(place));
+  return marker;
+}
+
 export const GoogleMap: React.FC<GoogleMapProps> = ({ places, onMarkerClick, selectedPlace, userLocation, onError }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const googleMapRef = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
+  const markersRef = useRef<MapMarker[]>([]);
   const onLoadCallbackRef = useRef(onMarkerClick);
   const advancedMarkerRef = useRef<typeof google.maps.marker.AdvancedMarkerElement | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
@@ -56,7 +77,7 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({ places, onMarkerClick, sel
 
     const initializeMap = async () => {
       if (!googleMapsConfig.apiKey) {
-        const message = 'Google Maps API key is not configured; using the legacy map fallback.';
+        const message = 'Google Maps API key is not configured; using the map fallback.';
         setMapError(message);
         onError?.(message);
         return;
@@ -78,8 +99,11 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({ places, onMarkerClick, sel
         mapInstance = map;
         googleMapRef.current = map;
         setMapLoaded(true);
+        if (!googleMapsConfig.mapId?.trim()) {
+          console.warn('[GoogleMap] VITE_GOOGLE_MAPS_MAP_ID is missing; using legacy markers for compatibility.');
+        }
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown Google Maps error';
+        const message = error instanceof Error ? error.message : 'Google Maps failed to initialize';
         console.error('[GoogleMap] Google Maps initialization error:', message);
         if (!cancelled) {
           setMapError(message);
@@ -90,7 +114,9 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({ places, onMarkerClick, sel
     initializeMap();
     return () => {
       cancelled = true;
-      markersRef.current.forEach(marker => { marker.map = null; });
+      markersRef.current.forEach(marker => {
+        if ('map' in marker) marker.map = null;
+      });
       markersRef.current = [];
       if (mapInstance) mapInstance = null;
       googleMapRef.current = null;
@@ -101,60 +127,77 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({ places, onMarkerClick, sel
   }, [userLocation]);
 
   useEffect(() => {
-    if (!mapLoaded || !googleMapRef.current || !advancedMarkerRef.current) return;
-    markersRef.current.forEach(marker => { marker.map = null; });
+    if (!mapLoaded || !googleMapRef.current) return;
+    markersRef.current.forEach(marker => {
+      if ('map' in marker) marker.map = null;
+    });
     markersRef.current = [];
+
+    const map = googleMapRef.current;
     const AdvancedMarkerElement = advancedMarkerRef.current;
+    const useAdvancedMarkers = Boolean(AdvancedMarkerElement && googleMapsConfig.mapId?.trim());
+
     places.forEach(place => {
-      if (place.location?.lat == null || place.location?.lng == null) return;
+      if (!Number.isFinite(place.location?.lat) || !Number.isFinite(place.location?.lng)) return;
       const { mood: classifiedMood } = classifyPlace(place.tags, place.name);
       const moodObj = INITIAL_MOODS.find(m => m.id === classifiedMood);
       const emoji = getPlaceMarkerEmoji(place);
       const color = moodObj?.accentColor || '#CCFF00';
       const isSelected = selectedPlace?.id === place.id;
-      const markerContent = document.createElement('div');
-      markerContent.className = `custom-map-marker group relative cursor-pointer${isSelected ? ' selected' : ''}`;
-      markerContent.style.cssText = `width:46px;height:46px;border-radius:14px;overflow:hidden;border:2px solid #000;box-shadow:0 4px 14px rgba(0,0,0,.35);background:#111;position:relative;transform:${isSelected ? 'scale(1.25)' : 'scale(1)'};z-index:${isSelected ? '20' : '1'};transition:transform .2s ease;`;
-      const imageUrl = place.images.find(image => image?.trim().toLowerCase().startsWith('http'))?.trim();
-      if (imageUrl) {
-        const image = document.createElement('img');
-        image.src = imageUrl;
-        image.alt = place.name;
-        image.loading = 'lazy';
-        image.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
-        image.onerror = () => {
-          image.remove();
+
+      if (!useAdvancedMarkers) {
+        markersRef.current.push(addFallbackMarker(map, place, isSelected, value => onLoadCallbackRef.current?.({ ...value, primaryMood: classifiedMood })));
+        return;
+      }
+
+      try {
+        const markerContent = document.createElement('div');
+        markerContent.className = `custom-map-marker group relative cursor-pointer${isSelected ? ' selected' : ''}`;
+        markerContent.style.cssText = `width:46px;height:46px;border-radius:14px;overflow:hidden;border:2px solid #000;box-shadow:0 4px 14px rgba(0,0,0,.35);background:#111;position:relative;transform:${isSelected ? 'scale(1.25)' : 'scale(1)'};z-index:${isSelected ? '20' : '1'};transition:transform .2s ease;`;
+        const imageUrl = place.images.find(image => image?.trim().toLowerCase().startsWith('http'))?.trim();
+        if (imageUrl) {
+          const image = document.createElement('img');
+          image.src = imageUrl;
+          image.alt = place.name;
+          image.loading = 'lazy';
+          image.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+          image.onerror = () => {
+            image.remove();
+            const fallback = document.createElement('span');
+            fallback.textContent = emoji;
+            fallback.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:24px;background:#111;';
+            markerContent.appendChild(fallback);
+          };
+          markerContent.appendChild(image);
+          const tint = document.createElement('span');
+          tint.style.cssText = `position:absolute;inset:0;border:2px solid ${isSelected ? '#FFFFFF' : color};border-radius:12px;pointer-events:none;box-shadow:${isSelected ? '0 0 0 3px rgba(204,255,0,.65), 0 0 22px rgba(204,255,0,.7), ' : ''}inset 0 0 0 1px rgba(255,255,255,.18);`;
+          markerContent.appendChild(tint);
+        } else {
           const fallback = document.createElement('span');
           fallback.textContent = emoji;
-          fallback.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:24px;background:#111;';
+          fallback.style.cssText = `position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:24px;background:${color};`;
           markerContent.appendChild(fallback);
-        };
-        markerContent.appendChild(image);
-        const tint = document.createElement('span');
-        tint.style.cssText = `position:absolute;inset:0;border:2px solid ${isSelected ? '#FFFFFF' : color};border-radius:12px;pointer-events:none;box-shadow:${isSelected ? '0 0 0 3px rgba(204,255,0,.65), 0 0 22px rgba(204,255,0,.7), ' : ''}inset 0 0 0 1px rgba(255,255,255,.18);`;
-        markerContent.appendChild(tint);
-      } else {
-        const fallback = document.createElement('span');
-        fallback.textContent = emoji;
-        fallback.style.cssText = `position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:24px;background:${color};`;
-        markerContent.appendChild(fallback);
+        }
+        const marker = new AdvancedMarkerElement({
+          map,
+          position: { lat: place.location.lat, lng: place.location.lng },
+          content: markerContent,
+          title: place.name,
+          zIndex: isSelected ? 1000 : 1,
+        });
+        marker.addEventListener('gmp-click', () => onLoadCallbackRef.current?.({ ...place, primaryMood: classifiedMood }));
+        markersRef.current.push(marker);
+      } catch (error) {
+        console.warn('[GoogleMap] Advanced marker failed; using legacy marker instead.', place.name, error);
+        markersRef.current.push(addFallbackMarker(map, place, isSelected, value => onLoadCallbackRef.current?.({ ...value, primaryMood: classifiedMood })));
       }
-      const marker = new AdvancedMarkerElement({
-        map: googleMapRef.current!,
-        position: { lat: place.location.lat, lng: place.location.lng },
-        content: markerContent,
-        title: place.name,
-        zIndex: isSelected ? 1000 : 1,
-      });
-      marker.addEventListener('gmp-click', () => onLoadCallbackRef.current?.({ ...place, primaryMood: classifiedMood }));
-      markersRef.current.push(marker);
     });
   }, [places, mapLoaded, selectedPlace]);
 
   useEffect(() => {
     if (!googleMapRef.current || !selectedPlace?.location) return;
     const { lat, lng } = selectedPlace.location;
-    if (lat == null || lng == null) return;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
     googleMapRef.current.panTo({ lat, lng });
     googleMapRef.current.setZoom(17);
   }, [selectedPlace]);
