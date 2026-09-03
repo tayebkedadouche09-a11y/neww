@@ -4,46 +4,8 @@ import path from 'node:path';
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const checks = [];
-const assert = (condition, message) => {
-  checks.push({ condition, message });
-  if (!condition) console.error(`✗ ${message}`);
-  else console.log(`✓ ${message}`);
-};
-
-const dataContext = read('src/context/DataContext.tsx');
-const authContext = read('src/context/AuthContext.tsx');
-const app = read('src/App.tsx');
-const authModal = read('src/components/auth/AuthModal.tsx');
-const collections = read('src/components/profile/CollectionsView.tsx');
-const plans = read('src/components/plan/VybePlanBuilder.tsx');
-const routeSummary = read('src/components/plan/VybeRouteSummary.tsx');
-const commandCenter = read('src/components/vybe/VybeCommandCenter.tsx');
-const dailyDrop = read('src/components/vybe/VybeDailyDrop.tsx');
-const squadVote = read('src/components/vybe/VybeSquadVote.tsx');
-const admin = read('src/components/admin/AdminPortal.tsx');
-const googleMap = read('src/components/map/GoogleMap.tsx');
-const placeCard = read('src/components/cards/PlaceCard.tsx');
-const discovery = read('src/services/discoveryService.ts');
-const googlePlaces = read('src/services/googlePlaces.ts');
-const googleAdapter = read('src/services/googlePlacesAdapter.ts');
-const savedPlaces = read('src/services/savedPlacesService.ts');
-const likes = read('src/services/likesService.ts');
-const plansService = read('src/services/plansService.ts');
-const collectionsService = read('src/services/collectionsService.ts');
-const reviewsService = read('src/services/reviewsService.ts');
-const placesService = read('src/services/placesService.ts');
-const mappers = read('src/services/mappers.ts');
-const indexHtml = read('index.html');
-const serviceWorker = read('public/sw.js');
-const main = read('src/main.tsx');
-const envExample = read('.env.example');
-const ci = read('.github/workflows/ci.yml');
-const schema = read('supabase/migrations/0001_schema.sql');
-const googlePersistenceMigration = read('supabase/migrations/0007_google_place_persistence.sql');
-const googleSecurityMigration = read('supabase/migrations/0009_lock_google_materializer.sql');
-const googleServer = read('api/materialize-google-place.ts');
-const osmProxy = read('api/osm-discovery.ts');
-
+const assert = (condition, message) => { checks.push({ condition, message }); if (!condition) console.error(`✗ ${message}`); else console.log(`✓ ${message}`); };
+const dataContext = read('src/context/DataContext.tsx'); const authContext = read('src/context/AuthContext.tsx'); const app = read('src/App.tsx'); const authModal = read('src/components/auth/AuthModal.tsx'); const collections = read('src/components/profile/CollectionsView.tsx'); const plans = read('src/components/plan/VybePlanBuilder.tsx'); const routeSummary = read('src/components/plan/VybeRouteSummary.tsx'); const commandCenter = read('src/components/vybe/VybeCommandCenter.tsx'); const dailyDrop = read('src/components/vybe/VybeDailyDrop.tsx'); const squadVote = read('src/components/vybe/VybeSquadVote.tsx'); const admin = read('src/components/admin/AdminPortal.tsx'); const googleMap = read('src/components/map/GoogleMap.tsx'); const placeCard = read('src/components/cards/PlaceCard.tsx'); const discovery = read('src/services/discoveryService.ts'); const googlePlaces = read('src/services/googlePlaces.ts'); const googleAdapter = read('src/services/googlePlacesAdapter.ts'); const savedPlaces = read('src/services/savedPlacesService.ts'); const likes = read('src/services/likesService.ts'); const plansService = read('src/services/plansService.ts'); const collectionsService = read('src/services/collectionsService.ts'); const reviewsService = read('src/services/reviewsService.ts'); const placesService = read('src/services/placesService.ts'); const mappers = read('src/services/mappers.ts'); const indexHtml = read('index.html'); const serviceWorker = read('public/sw.js'); const main = read('src/main.tsx'); const envExample = read('.env.example'); const ci = read('.github/workflows/ci.yml'); const schema = read('supabase/migrations/0001_schema.sql'); const googlePersistenceMigration = read('supabase/migrations/0007_google_place_persistence.sql'); const googleSecurityMigration = read('supabase/migrations/0009_lock_google_materializer.sql'); const googleServer = read('api/materialize-google-place.ts'); const osmProxy = read('api/osm-discovery.ts');
 assert(!app.includes('ModeBadge'), 'Legacy demo-mode indicator is not part of the shipped app shell.');
 assert(!authModal.includes('Demo') && !authModal.includes('demo'), 'Authentication UI contains no demo login or persona controls.');
 assert(!authContext.includes('DEMO_PROFILES') && !authContext.includes("mode === 'demo'") && !authContext.includes('enterDemoMode'), 'Authentication state contains no demo profile runtime.');
@@ -67,7 +29,7 @@ assert(googlePlaces.includes('Array.isArray(type)') && googlePlaces.includes('in
 assert(discovery.includes('Promise.allSettled') && discovery.includes('[...googlePlaces, ...osmPlaces]'), 'Discovery merges Google and OpenStreetMap instead of stopping at the first provider.');
 assert(discovery.includes('function analyzePlace') && discovery.includes('.map(analyzePlace)'), 'Every discovered place is classified and analyzed before Explore/Map receive it.');
 assert(discovery.includes('isGooglePlaceValidForRequest') && discovery.includes('results.filter(place => isGooglePlaceValidForRequest'), 'Google discovery rejects results that fail place/type verification before Explore receives them.');
-assert(googleAdapter.includes('Google-provided place types are the authoritative discovery signal') && googleAdapter.includes('providerPlaceId') && googleAdapter.includes('QUERY_CATEGORY_EXPECTATIONS'), 'Google place validation requires a real Place ID and request-matching category.');
+assert(googleAdapter.includes('isGooglePlaceValidForRequest') && googleAdapter.includes('providerPlaceId') && googleAdapter.includes('QUERY_CATEGORY_EXPECTATIONS') && googleAdapter.includes('NON_VYBE_DISCOVERY_TYPES'), 'Google place validation requires a real Place ID and request-matching category.');
 assert(googleAdapter.includes("bowling_alley: 'arcade-gaming'") && googleAdapter.includes("miniature_golf_course: 'arcade-gaming'"), 'Gaming/arcade places are classified separately from generic entertainment.');
 assert(authContext.includes('toggleLikePlace') && authContext.includes('likesService.setLiked'), 'Like actions update both local UI state and the per-user backend row.');
 assert(authContext.includes('toggleSavePlace') && authContext.includes('savedPlacesService.setSaved'), 'Save actions update both local UI state and the per-user backend row.');
@@ -94,10 +56,6 @@ assert(serviceWorker.includes('caches.match(request)'), 'Offline shell falls bac
 assert(ci.includes('npm run typecheck') && ci.includes('npm run build'), 'CI keeps typecheck and production build gates enabled.');
 assert(discovery.includes('const discoveryCache = new Map') && discovery.includes('DISCOVERY_CACHE_MS = 20_000'), 'Discovery has a short request deduplication cache.');
 assert(discovery.includes('Google Places quota is currently exhausted'), 'Google quota failures have a safe user-facing fallback message.');
-
-const failed = checks.filter(({ condition }) => !condition).length;
-if (failed) {
-  console.error(`\n${failed} production invariant(s) failed.`);
-  process.exit(1);
-}
+const failed = checks.filter(({condition}) => !condition).length;
+if (failed) { console.error(`\n${failed} production invariant(s) failed.`); process.exit(1); }
 console.log(`\n${checks.length} production invariants passed.`);
