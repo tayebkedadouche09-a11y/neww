@@ -1,10 +1,10 @@
 import { isBackendConfigured } from './env';
 
-/** VYBE uses the real Supabase backend. There is no local/demo data mode. */
-export type DataMode = 'supabase';
+/** Runtime backend is Supabase. The legacy local literal remains only so old persistence guards can type-check; it is never selected. */
+export type DataMode = 'supabase' | 'local';
 export const dataMode: DataMode = 'supabase';
 
-/** Legacy storage namespace retained only for theme/session migration safety. */
+/** Storage names retained only for migration compatibility; production data lives in Supabase. */
 export const LOCAL_STORAGE_KEYS = {
   session: 'vybe_session',
   profiles: 'vybe_profiles',
