@@ -140,6 +140,11 @@ export const VybePlanBuilder: React.FC = () => {
                 ))}
               </select>
             </div>
+            <div className="flex items-center gap-2 max-w-xs">
+              <label htmlFor="new-plan-budget" className="text-xs font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">Budget / person ($)</label>
+              <input id="new-plan-budget" type="number" min="0" step="1" value={newBudget} onChange={e => setNewBudget(Math.max(0, Number(e.target.value) || 0))} className="w-full p-3 rounded-xl bg-white dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none" />
+            </div>
+
             <div className="flex justify-end gap-2">
               <button
                 type="button"

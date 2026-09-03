@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Bookmark, 
   Plus, 
@@ -35,6 +35,13 @@ export const CollectionsView: React.FC = () => {
   const [description, setDescription] = useState('');
   const [emoji, setEmoji] = useState('✨');
   const [color, setColor] = useState('#CCFF00');
+
+  useEffect(() => {
+    const requestedId = new URLSearchParams(window.location.search).get('collection');
+    if (requestedId && collections.some(collection => collection.id === requestedId)) {
+      setActiveCollectionId(requestedId);
+    }
+  }, [collections]);
 
   const activeCol = collections.find(c => c.id === activeCollectionId) || collections[0];
 

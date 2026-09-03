@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Flame, 
   Bookmark, 
@@ -27,6 +27,12 @@ export const ProfileView: React.FC = () => {
   const [editName, setEditName] = useState(currentUser?.name || '');
   const [editBio, setEditBio] = useState(currentUser?.bio || '');
   const [editMoods, setEditMoods] = useState<MoodType[]>(currentUser?.favoriteMoods || ['chill']);
+
+  useEffect(() => {
+    setEditName(currentUser?.name || '');
+    setEditBio(currentUser?.bio || '');
+    setEditMoods(currentUser?.favoriteMoods || ['chill']);
+  }, [currentUser?.id]);
 
   if (!currentUser) return null;
 
