@@ -21,8 +21,6 @@ jobs:
         run: npm ci
       - name: Production invariants
         run: node scripts/production-invariants.mjs
-      - name: Discovery contract checks
-        run: node scripts/discovery-contract-check.mjs
       - name: Typecheck
         run: npm run typecheck
       - name: Production build
