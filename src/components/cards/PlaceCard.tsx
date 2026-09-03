@@ -76,7 +76,7 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
   const handleQuickAddPlan = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!requireAuth()) return;
-    if (plans.length > 0) addPlaceToPlan(plans[0].id, place.id);
+    if (plans.length > 0) addPlaceToPlan(plans[0].id, place.id, '20:00', place);
     else showToast('Create a plan first in the Plans tab!', '📋', 'info');
   };
 
