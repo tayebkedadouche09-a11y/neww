@@ -18,6 +18,7 @@ import { CollectionsView } from "./components/profile/CollectionsView";
 import { ProfileView } from "./components/profile/ProfileView";
 import { AdminPortal } from "./components/admin/AdminPortal";
 import { VybeCommandCenter } from "./components/vybe/VybeCommandCenter";
+import { VybeDailyDrop } from "./components/vybe/VybeDailyDrop";
 import { useData } from "./context/DataContext";
 
 const SelectedPlaceMapAction: React.FC = () => {
@@ -54,7 +55,12 @@ export const App: React.FC = () => {
       <VybeCommandCenter />
 
       <main className="flex-1">
-        {activeTab === "explore" && <ExploreExperience />}
+        {activeTab === "explore" && (
+          <>
+            <ExploreExperience />
+            <VybeDailyDrop />
+          </>
+        )}
 
         {activeTab === "map" && (
           <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4 animate-fadeIn">
