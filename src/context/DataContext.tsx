@@ -1,10 +1,9 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Place, MoodType, FilterState, Collection, VybePlan, PlanItem, PlaceReview } from '../types';
 import { calculateVybeScore } from '../hooks/useVybeScore';
 import { useGeolocation, GeoLocation } from '../hooks/useGeolocation';
 import { useAuth } from './AuthContext';
 import { dataMode, LOCAL_STORAGE_KEYS } from '../lib/dataMode';
-import { isGoogleMapsConfigured } from '../lib/env';
 import { newUuid } from '../services/mappers';
 import { placesService } from '../services/placesService';
 import { collectionsService } from '../services/collectionsService';
@@ -69,6 +68,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [plans, setPlans] = useState<VybePlan[]>(() => { const saved = localStorage.getItem(LOCAL_STORAGE_KEYS.plans); if (saved) { try { return JSON.parse(saved); } catch (e) { console.error('Failed to parse plans', e); } } return INITIAL_PLANS; });
   const [activePlan, setActivePlan] = useState<VybePlan | null>(plans[0] || null);
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
+  const deepLinkHandledRef = useRef<string | null>(null);
 
   useEffect(() => { if (dataMode === 'local') localStorage.setItem(LOCAL_STORAGE_KEYS.places, JSON.stringify(places)); }, [places]);
   useEffect(() => { if (dataMode === 'local') localStorage.setItem(LOCAL_STORAGE_KEYS.collections, JSON.stringify(collections)); }, [collections]);
@@ -89,7 +89,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const requestLocationAndDiscover = useCallback(() => { geo.requestLocation(); }, [geo.requestLocation]);
   useEffect(() => { if (!geo.location && !geo.loading && !geo.error) geo.requestLocation(); }, [geo.location, geo.loading, geo.error, geo.requestLocation]);
-  useEffect(() => { if (geo.location) discover(); /* initial broad discovery; later explicit actions use overrideFilters */ }, [geo.location]);
+  useEffect(() => { if (geo.location) discover(); }, [geo.location]);
 
   const realUserId = dataMode === 'supabase' && sessionMode === 'auth' ? currentUser?.id ?? null : null;
   useEffect(() => {
@@ -97,6 +97,41 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     (async () => { try { const [remoteCollections, remotePlans] = await Promise.all([collectionsService.list(realUserId), plansService.list(realUserId)]); if (cancelled) return; setCollections(remoteCollections); setPlans(remotePlans); setActivePlan(prev => remotePlans.find(p => p.id === prev?.id) ?? remotePlans[0] ?? null); } catch (e) { console.error('[DataContext] User data hydration failed', e); } })();
     return () => { cancelled = true; };
   }, [realUserId]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const placeId = params.get('place');
+    const planId = params.get('plan');
+    const collectionId = params.get('collection');
+    const routeKey = placeId ? `place:${placeId}` : planId ? `plan:${planId}` : collectionId ? `collection:${collectionId}` : null;
+    if (!routeKey || deepLinkHandledRef.current === routeKey) return;
+
+    if (placeId) {
+      const place = places.find(item => item.id === placeId);
+      if (!place) return;
+      deepLinkHandledRef.current = routeKey;
+      setSelectedPlace(place);
+      setIsDetailOpen(true);
+      setActiveTab('explore');
+      return;
+    }
+
+    if (planId) {
+      const plan = plans.find(item => item.id === planId);
+      if (!plan) return;
+      deepLinkHandledRef.current = routeKey;
+      setActivePlan(plan);
+      setActiveTab('plan');
+      return;
+    }
+
+    if (collectionId) {
+      const collection = collections.find(item => item.id === collectionId);
+      if (!collection) return;
+      deepLinkHandledRef.current = routeKey;
+      setActiveTab('saved');
+    }
+  }, [places, plans, collections]);
 
   const resetFilters = () => { setFilters(DEFAULT_FILTERS); setActiveHeroMood(null); };
   const openPlaceDetail = (place: Place) => { setSelectedPlace(place); setIsDetailOpen(true); };
@@ -106,7 +141,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const addPlaceToPlan = (planId: string, placeId: string, customTime = '20:00') => { const plan = plans.find(p => p.id === planId); const place = places.find(p => p.id === placeId); if (!plan || !place || plan.items.some(item => item.placeId === placeId)) return; const newItem: PlanItem = { id: dataMode === 'supabase' ? newUuid() : `item-${Date.now()}`, placeId, startTime: customTime, durationMinutes: 90, customNote: `Experience ${place.name} (${place.tagline})`, order: plan.items.length + 1 }; const updatedPlans = plans.map(p => p.id === planId ? { ...p, items: [...p.items, newItem] } : p); setPlans(updatedPlans); setActivePlan(prev => prev?.id === planId ? updatedPlans.find(p => p.id === planId) || null : prev); if (realUserId) void plansService.addItem(planId, newItem).catch(e => console.error(e)); };
   const removePlaceFromPlan = (planId: string, planItemId: string) => { const updatedPlans = plans.map(p => p.id === planId ? { ...p, items: p.items.filter(item => item.id !== planItemId) } : p); setPlans(updatedPlans); if (activePlan?.id === planId) setActivePlan(updatedPlans.find(p => p.id === planId) || null); if (realUserId) void plansService.removeItem(planItemId).catch(e => console.error(e)); };
   const updatePlanItem = (planId: string, planItemId: string, updates: { startTime?: string; customNote?: string; durationMinutes?: number }) => { const updatedPlans = plans.map(p => p.id === planId ? { ...p, items: p.items.map(item => item.id === planItemId ? { ...item, ...updates } : item) } : p); setPlans(updatedPlans); if (activePlan?.id === planId) setActivePlan(updatedPlans.find(p => p.id === planId) || null); if (realUserId) void plansService.updateItem(planItemId, updates).catch(e => console.error(e)); };
-  const deletePlan = (planId: string) => { setPlans(prev => prev.filter(p => p.id !== planId)); if (activePlan?.id === planId) setActivePlan(plans.find(p => p.id !== planId) || null); if (realUserId) void plansService.remove(planId).catch(e => console.error(e)); };
+  const deletePlan = (planId: string) => {
+    setPlans(prev => {
+      const nextPlans = prev.filter(p => p.id !== planId);
+      if (activePlan?.id === planId) setActivePlan(nextPlans[0] || null);
+      return nextPlans;
+    });
+    if (realUserId) void plansService.remove(planId).catch(e => console.error(e));
+  };
 
   const createCollection = (name: string, emoji: string, color: string, description = '') => { const nowIso = new Date().toISOString(); const newCol: Collection = { id: dataMode === 'supabase' ? newUuid() : `col-${Date.now()}`, userId: currentUser?.id || 'u-1', name, description, emoji, color, isPublic: true, placeIds: [], createdAt: nowIso, updatedAt: nowIso }; setCollections(prev => [newCol, ...prev]); if (realUserId) void collectionsService.create(newCol).catch(e => console.error(e)); return newCol; };
   const addPlaceToCollection = (collectionId: string, placeId: string) => { const col = collections.find(c => c.id === collectionId); if (!col || !places.some(p => p.id === placeId) || col.placeIds.includes(placeId)) return; setCollections(prev => prev.map(c => c.id === collectionId ? { ...c, placeIds: [...c.placeIds, placeId], updatedAt: new Date().toISOString() } : c)); if (realUserId) void collectionsService.addPlace(collectionId, placeId).catch(e => console.error(e)); };
