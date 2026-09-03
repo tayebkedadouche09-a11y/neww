@@ -7,7 +7,6 @@ import {
   Clock3,
   WalletCards,
   Route,
-  Share2,
   Flame,
   Check,
   Copy,
@@ -64,7 +63,7 @@ function directionsUrl(place: Place) {
 }
 
 export const VybeCommandCenter: React.FC = () => {
-  const { places, userLocation, createPlan, addPlaceToPlan, setActivePlan, setActiveTab, showToast } = useData();
+  const { places, userLocation, discoverAtLocation, createPlan, addPlaceToPlan, setActiveTab, showToast } = useData();
   const { currentUser } = useAuth();
   const requireAuth = useRequireAuth();
   const [open, setOpen] = useState(false);
@@ -94,6 +93,24 @@ export const VybeCommandCenter: React.FC = () => {
     setSelected(prev => prev.some(item => item.id === place.id) ? prev.filter(item => item.id !== place.id) : [...prev, place].slice(0, 5));
   };
 
+  const handleCityChange = (value: string) => {
+    setCity(value);
+    setSelected([]);
+    const preset = CITY_PRESETS.find(item => item.id === value);
+    if (!preset) return;
+    if (value === 'current') {
+      if (userLocation) {
+        discoverAtLocation(userLocation);
+      } else {
+        showToast('GPS is not available yet. Choose a city to discover nearby spots.', '📍', 'info');
+      }
+      return;
+    }
+    if (preset.lat !== null && preset.lng !== null) {
+      discoverAtLocation({ lat: preset.lat, lng: preset.lng });
+    }
+  };
+
   const buildNight = () => {
     if (!requireAuth()) return;
     if (routePlaces.length === 0) {
@@ -103,7 +120,6 @@ export const VybeCommandCenter: React.FC = () => {
     const title = `${MOODS.find(item => item.id === mood)?.label || 'VYBE'} Night · ${people} people`;
     const plan = createPlan(title, mood, Math.round(budgetUsd));
     routePlaces.forEach((place, index) => addPlaceToPlan(plan.id, place.id, `${18 + index * 2}:00`));
-    setActivePlan({ ...plan, items: routePlaces.map((place, index) => ({ id: `preview-${index}`, placeId: place.id, startTime: `${18 + index * 2}:00`, durationMinutes: 90, customNote: `Smart VYBE pick · ${MOODS.find(item => item.id === mood)?.label || mood} match`, order: index + 1 })) });
     setOpen(false);
     setActiveTab('plan');
     showToast(`${title} created with ${routePlaces.length} smart stops.`, '⚡', 'success');
@@ -156,10 +172,11 @@ export const VybeCommandCenter: React.FC = () => {
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
                 <div className="lg:col-span-2 p-4 rounded-2xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border">
                   <div className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-3"><MapPin className="w-4 h-4 text-vybe-cyan" /> Location</div>
-                  <select value={city} onChange={e => setCity(e.target.value)} className="w-full p-3 rounded-xl bg-white dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border text-sm font-bold text-slate-900 dark:text-white">
+                  <select value={city} onChange={e => handleCityChange(e.target.value)} className="w-full p-3 rounded-xl bg-white dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border text-sm font-bold text-slate-900 dark:text-white">
                     {CITY_PRESETS.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
                   </select>
-                  {city === 'current' && !userLocation && <p className="text-[11px] text-amber-500 mt-2">Location is not available yet. Choose a city above to keep planning without GPS.</p>}
+                  {city === 'current' && !userLocation && <p className="text-[11px] text-amber-500 mt-2">Location is not available yet. Choose a city above to discover without GPS.</p>}
+                  {discoveryLoading && <p className="text-[11px] text-vybe-cyan mt-2 animate-pulse">Refreshing smart picks…</p>}
                 </div>
                 <label className="p-4 rounded-2xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border">
                   <span className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-2"><Users className="w-4 h-4 text-vybe-pink" /> Squad</span>
@@ -190,7 +207,7 @@ export const VybeCommandCenter: React.FC = () => {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between"><div><h3 className="font-display font-bold text-lg text-slate-900 dark:text-white">Smart Picks</h3><p className="text-[11px] text-slate-500">{locationLabel} · ranked for your vibe</p></div><span className="text-[11px] font-mono text-slate-400">{recommendations.length} candidates</span></div>
                   {recommendations.length === 0 ? (
-                    <div className="p-8 rounded-2xl border border-dashed border-slate-300 dark:border-white/10 text-center text-sm text-slate-500">No discovered places yet. Explore once or choose a city to keep the planner ready.</div>
+                    <div className="p-8 rounded-2xl border border-dashed border-slate-300 dark:border-white/10 text-center text-sm text-slate-500">No discovered places yet. Choose a city or enable location to populate the planner.</div>
                   ) : recommendations.map(place => {
                     const isChosen = selected.some(item => item.id === place.id);
                     return <button key={place.id} type="button" onClick={() => togglePlace(place)} className={`w-full text-left p-4 rounded-2xl border transition-all ${isChosen ? 'border-vybe-lime bg-vybe-lime/10' : 'border-slate-200 dark:border-vybe-dark-border bg-white dark:bg-vybe-dark-surface hover:border-vybe-lime/50'}`}>
