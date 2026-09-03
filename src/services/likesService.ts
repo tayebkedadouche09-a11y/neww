@@ -4,6 +4,7 @@
  */
 import { supabase } from '../lib/supabase';
 import { newUuid } from './mappers';
+import { ensureGooglePlaceStored } from './placesService';
 
 const assertBackend = () => {
   if (!supabase) throw new Error('VYBE backend is not configured');
@@ -14,6 +15,7 @@ export const likesService = {
   async setLiked(userId: string, placeId: string, liked: boolean): Promise<void> {
     const db = assertBackend();
     if (liked) {
+      await ensureGooglePlaceStored(placeId);
       const { error } = await db.from('likes').upsert(
         { id: newUuid(), user_id: userId, place_id: placeId },
         { ignoreDuplicates: true, onConflict: 'user_id,place_id' }
