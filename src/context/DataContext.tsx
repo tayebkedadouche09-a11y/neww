@@ -70,6 +70,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [activePlan, setActivePlan] = useState<VybePlan | null>(plans[0] || null);
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
   const deepLinkHandledRef = useRef<string | null>(null);
+  type GoogleHydrationState = { status: 'pending' | 'success' | 'failed'; nextAttemptAt: number };
+  const googleHydrationStateRef = useRef<Map<string, GoogleHydrationState>>(new Map());
+  const GOOGLE_HYDRATION_SUCCESS_COOLDOWN_MS = 10_000;
+  const GOOGLE_HYDRATION_FAILURE_COOLDOWN_MS = 60_000;
 
   useEffect(() => { if (dataMode === 'local') localStorage.setItem(LOCAL_STORAGE_KEYS.places, JSON.stringify(places)); }, [places]);
   useEffect(() => { if (dataMode === 'local') localStorage.setItem(LOCAL_STORAGE_KEYS.collections, JSON.stringify(collections)); }, [collections]);
@@ -105,10 +109,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [realUserId]);
 
   // Keep persisted Google places usable after discovery replaces the current result set.
-  // Plans and collections store stable place IDs; the details are restored on demand so
-  // opening Plan/Saved later does not turn a real saved place into a missing card.
+  // Plans and collections store stable place IDs; details are restored on demand.
+  // The per-place state machine prevents duplicate/infinite requests while still
+  // allowing a later retry when a discovery refresh has removed a previously restored place.
   useEffect(() => {
     let cancelled = false;
+    const now = Date.now();
     const referencedIds = [...new Set([
       ...plans.flatMap(plan => plan.items.map(item => item.placeId)),
       ...collections.flatMap(collection => collection.placeIds),
@@ -117,11 +123,29 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .filter(id => id.startsWith('google:'))
       .filter(id => !places.some(place => place.id === id))
       .map(id => id.slice('google:'.length))
-      .filter(Boolean);
+      .filter(Boolean)
+      .filter(providerId => {
+        const state = googleHydrationStateRef.current.get(providerId);
+        if (!state) return true;
+        if (state.status === 'pending') return false;
+        return state.nextAttemptAt <= now;
+      });
+
     if (missingGoogleIds.length === 0) return;
+    missingGoogleIds.forEach(providerId => {
+      googleHydrationStateRef.current.set(providerId, { status: 'pending', nextAttemptAt: now + GOOGLE_HYDRATION_SUCCESS_COOLDOWN_MS });
+    });
+
     void Promise.all(missingGoogleIds.map(async providerId => {
-      try { return await getGooglePlaceDetails(providerId); }
-      catch (error) { console.warn('[DataContext] failed to rehydrate Google place', providerId, error); return null; }
+      try {
+        const place = await getGooglePlaceDetails(providerId);
+        googleHydrationStateRef.current.set(providerId, { status: 'success', nextAttemptAt: Date.now() + GOOGLE_HYDRATION_SUCCESS_COOLDOWN_MS });
+        return place;
+      } catch (error) {
+        googleHydrationStateRef.current.set(providerId, { status: 'failed', nextAttemptAt: Date.now() + GOOGLE_HYDRATION_FAILURE_COOLDOWN_MS });
+        console.warn('[DataContext] failed to rehydrate Google place', providerId, error);
+        return null;
+      }
     })).then(results => {
       if (cancelled) return;
       const restored = results.filter((place): place is Place => Boolean(place));
@@ -132,6 +156,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return [...byId.values()];
       });
     });
+
     return () => { cancelled = true; };
   }, [plans, collections, places]);
 
