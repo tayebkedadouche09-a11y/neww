@@ -15,6 +15,8 @@ import { PlaceCard } from '../cards/PlaceCard';
 import { INITIAL_MOODS } from '../../data/initialMoods';
 import { MoodType, Place } from '../../types';
 import { getGooglePlaceDetails } from '../../services/googlePlaces';
+import { placesService } from '../../services/placesService';
+import { isBackendConfigured } from '../../lib/env';
 
 export const ProfileView: React.FC = () => {
   const { currentUser, profiles, switchProfile, updateProfile, logout } = useAuth();
@@ -33,30 +35,31 @@ export const ProfileView: React.FC = () => {
     setEditMoods(currentUser?.favoriteMoods || ['chill']);
   }, [currentUser?.id]);
 
-  // Saved/liked places can come from Google Places and may no longer be in the
-  // current discovery result set. Rehydrate those IDs so Save/Like really mean
-  // "keep this place for later", even after a new search or page refresh.
+  // Saved/liked places can come from Google Places or the VYBE catalog and may
+  // no longer be in the current discovery result set. Rehydrate every missing
+  // stable place ID so "My VYBES" survives refresh and a new discovery search.
   useEffect(() => {
     let cancelled = false;
     const ids = [...new Set([...(currentUser?.savedPlaceIds || []), ...(currentUser?.likedPlaceIds || [])])];
-    const missingGoogleIds = ids
-      .filter(id => !places.some(place => place.id === id))
-      .filter(id => id.startsWith('google:'))
-      .map(id => id.slice('google:'.length))
-      .filter(Boolean);
+    const missingIds = ids.filter(id => !places.some(place => place.id === id));
 
-    if (!currentUser || missingGoogleIds.length === 0) {
+    if (!currentUser || missingIds.length === 0) {
       setHydratedPlaces([]);
       setHydratingPlaces(false);
       return;
     }
 
     setHydratingPlaces(true);
-    void Promise.all(missingGoogleIds.map(async placeId => {
+    void Promise.all(missingIds.map(async id => {
       try {
-        return await getGooglePlaceDetails(placeId);
+        if (id.startsWith('google:')) {
+          const providerId = id.slice('google:'.length);
+          return providerId ? await getGooglePlaceDetails(providerId) : null;
+        }
+        if (!isBackendConfigured) return null;
+        return await placesService.getPublic(id);
       } catch (error) {
-        console.warn('[VYBE profile] failed to restore saved Google place', placeId, error);
+        console.warn('[VYBE profile] failed to restore saved/liked place', id, error);
         return null;
       }
     })).then(results => {
@@ -160,22 +163,22 @@ export const ProfileView: React.FC = () => {
           {userPlans.length === 0 ? (
             <div className="sm:col-span-2 p-12 text-center rounded-3xl bg-slate-50 dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border space-y-2"><span className="text-3xl">🗓️</span><p className="font-display font-bold text-slate-800 dark:text-white">No plans yet.</p><p className="text-xs text-slate-500">Build an outing from Explore and save the stops you want.</p></div>
           ) : userPlans.map(plan => (
-            <button key={plan.id} type="button" onClick={() => openPlan(plan)} className="text-left p-6 rounded-3xl bg-white dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border shadow-lg space-y-3 hover:border-vybe-lime/60 hover:shadow-neon-lime/10 transition-all group">
-              <div className="flex justify-between items-center"><span className="text-xs font-mono text-vybe-lime font-bold uppercase">{plan.mood} VIBE</span><span className="text-xs text-slate-400 font-mono">{plan.items.length} Stops</span></div>
-              <h3 className="font-display font-bold text-lg text-slate-900 dark:text-white">{plan.title}</h3>
-              <p className="text-xs text-slate-500">Target budget: ~${plan.targetBudgetUsd} · Created {plan.date}</p>
-              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-vybe-cyan group-hover:text-vybe-lime transition-colors">Open plan <ArrowRight className="w-3.5 h-3.5" /></span>
+            <button key={plan.id} type="button" onClick={() => openPlan(plan)} className="text-left p-5 rounded-3xl bg-white dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border hover:border-vybe-lime/50 transition-all shadow-lg">
+              <div className="flex items-center justify-between gap-3">
+                <div><h3 className="font-display font-bold text-lg text-slate-900 dark:text-white">{plan.title}</h3><p className="text-xs text-slate-500 mt-1">{plan.items.length} stops · {plan.mood} · ${plan.targetBudgetUsd}</p></div>
+                <ArrowRight className="w-5 h-5 text-vybe-lime shrink-0" />
+              </div>
             </button>
           ))}
         </div>
       )}
 
       {activeSubTab === 'edit' && (
-        <form onSubmit={handleSaveProfile} className="max-w-xl p-6 rounded-3xl bg-white dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border space-y-4">
-          <div className="space-y-2"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Name</label><input type="text" required value={editName} onChange={e => setEditName(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none" /></div>
-          <div className="space-y-2"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Bio</label><textarea rows={3} value={editBio} onChange={e => setEditBio(e.target.value)} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none" /></div>
-          <div className="space-y-2"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Favorite Mood Flavours</label><div className="flex flex-wrap gap-1.5">{INITIAL_MOODS.map(m => <button type="button" key={m.id} onClick={() => toggleMoodTag(m.id)} className={`text-xs px-3 py-1.5 rounded-lg border transition-all ${editMoods.includes(m.id) ? 'bg-vybe-lime text-black border-vybe-lime font-bold' : 'bg-slate-50 dark:bg-vybe-dark-surface border-slate-200 dark:border-vybe-dark-border text-slate-600 dark:text-slate-400'}`}>{m.emoji} {m.label}</button>)}</div></div>
-          <button type="submit" className="px-6 py-3 rounded-xl bg-vybe-lime text-black font-bold text-xs uppercase tracking-wider shadow-neon-lime hover:scale-105 transition-all">Save Profile Settings</button>
+        <form onSubmit={handleSaveProfile} className="p-6 rounded-3xl bg-white dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border shadow-lg space-y-5">
+          <div><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Display Name</label><input value={editName} onChange={e => setEditName(e.target.value)} required className="mt-1 w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white" /></div>
+          <div><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Bio</label><textarea value={editBio} onChange={e => setEditBio(e.target.value)} rows={3} className="mt-1 w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white" /></div>
+          <div><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Favorite Vibes</label><div className="mt-2 flex flex-wrap gap-2">{INITIAL_MOODS.map(m => <button key={m.id} type="button" onClick={() => toggleMoodTag(m.id)} className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all ${editMoods.includes(m.id) ? 'bg-vybe-lime text-black border-vybe-lime' : 'bg-slate-50 dark:bg-vybe-dark-surface text-slate-600 dark:text-slate-300 border-slate-200 dark:border-vybe-dark-border'}`}>{m.emoji} {m.label}</button>)}</div></div>
+          <div className="flex justify-end"><button type="submit" className="px-5 py-2.5 rounded-xl bg-vybe-lime text-black font-bold text-xs shadow-neon-lime">Save Profile</button></div>
         </form>
       )}
     </div>
