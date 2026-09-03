@@ -53,7 +53,7 @@ assert(googleAdapter.includes('Google-provided place types are the authoritative
 assert(googleAdapter.includes("bowling_alley: 'arcade-gaming'") && googleAdapter.includes("miniature_golf_course: 'arcade-gaming'"), 'Gaming/arcade places are classified separately from generic entertainment.');
 assert(authContext.includes('toggleLikePlace') && authContext.includes('likesService.setLiked'), 'Like actions update both local UI state and the per-user backend row.');
 assert(authContext.includes('toggleSavePlace') && authContext.includes('savedPlacesService.setSaved'), 'Save actions update both local UI state and the per-user backend row.');
-assert(authContext.includes('if (isBackendConfigured)') && authContext.includes('return remoteProfile;'), 'Authenticated users rehydrate persisted backend preferences instead of demo profiles.');
+assert(authContext.includes("if (session.mode === 'auth') return isBackendConfigured ? remoteProfile") && authContext.includes('savedPlacesService.listSavedPlaceIds(userId)') && authContext.includes('likesService.listLikedPlaceIds(userId)'), 'Authenticated users rehydrate persisted backend preferences instead of demo profiles.');
 assert(savedPlaces.includes("from('saved_places')") && savedPlaces.includes('user_id,place_id'), 'Saved places persist by user and stable place ID.');
 assert(likes.includes("from('likes')") && likes.includes('user_id,place_id'), 'Likes persist by user and stable place ID.');
 assert(plansService.includes("from('plan_items')") && plansService.includes('plan_id'), 'Plan items persist against the owning plan instead of only in the browser state.');
