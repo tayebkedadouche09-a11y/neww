@@ -20,7 +20,18 @@ export const savedPlacesService = {
         { id: newUuid(), user_id: userId, place_id: placeId },
         { ignoreDuplicates: true, onConflict: 'user_id,place_id' }
       );
-      if (error) throw error;
+      if (error) {
+        if (error.code === '23505' || error.status === 409) {
+          const { data: existing, error: lookupError } = await db
+            .from('saved_places')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('place_id', placeId)
+            .maybeSingle();
+          if (!lookupError && existing?.id) return;
+        }
+        throw error;
+      }
     } else {
       const { error } = await db.from('saved_places').delete().match({ user_id: userId, place_id: placeId });
       if (error) throw error;
