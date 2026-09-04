@@ -14,7 +14,7 @@ function weatherScore(place: Place, weather: VYBEWeather | null): number {
 
 function surpriseScore(place: Place, weather: VYBEWeather | null): number {
   const distance = typeof place.distanceKm === 'number' ? place.distanceKm : 5;
-  const fresh = place.isNew ? 8 : place.isTrending ? 5 : 0;
+  const fresh = place.isTrending ? 5 : 0;
   const variety = place.features.isSecretGem ? 8 : 0;
   return (place.baseVybeScore || 70) + Math.max(0, 12 - distance * 2) + Math.min(10, place.rating * 2) + fresh + variety + weatherScore(place, weather) + Math.random() * 18;
 }
