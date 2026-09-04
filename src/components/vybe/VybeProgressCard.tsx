@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Flame, Medal, Sparkles, Trophy } from 'lucide-react';
+import { Trophy } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { badgeDefinitions, getGamificationState, levelFromXp, levelTitle } from '../../services/gamificationService';
 
