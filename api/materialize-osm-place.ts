@@ -109,6 +109,27 @@ async function readUpstreamError(response: Response): Promise<string> {
   }
 }
 
+function parseTags(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object') return {};
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([, v]) => typeof v === 'string')
+      .map(([k, v]) => [k, String(v)])
+  );
+}
+
+function coordinates(element: Record<string, unknown>): { latitude: number; longitude: number } | null {
+  const center = element.center && typeof element.center === 'object'
+    ? element.center as Record<string, unknown>
+    : undefined;
+  const lat = typeof element.lat === 'number' ? element.lat : center?.lat;
+  const lng = typeof element.lon === 'number' ? element.lon : center?.lon;
+  if (typeof lat !== 'number' || typeof lng !== 'number') return null;
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90) return null;
+  if (!Number.isFinite(lng) || lng < -180 || lng > 180) return null;
+  return { latitude: lat, longitude: lng };
+}
+
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -147,7 +168,6 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (!authResponse.ok) return res.status(401).json({ error: 'Invalid or expired session.' });
 
   const osmExternalId = `${parsed.type}/${parsed.id}`;
-
   const existingResponse = await fetch(
     `${supabaseUrl}/rest/v1/places?select=id,provider&external_place_id=eq.${encodeURIComponent(osmExternalId)}&limit=1`,
     {
@@ -196,35 +216,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     return res.status(422).json({ error: 'OpenStreetMap returned an invalid place identity.' });
   }
 
-  const tags = record.tags && typeof record.tags === 'object'
-    ? Object.fromEntries(
-        Object.entries(record.tags as Record<string, unknown>)
-          .filter(([, value]) => typeof value === 'string')
-          .map(([key, value]) => [key, String(value)])
-      ) as Record<string, string>
-    : {};
-
+  const tags = parseTags(record.tags);
   const name = text(tags.name || tags['name:fr'] || tags['name:ar']);
   if (!name) return res.status(422).json({ error: 'OpenStreetMap place has no name.' });
 
-  const lat = typeof record.lat === 'number'
-    ? record.lat
-    : typeof (record.center as Record<string, unknown> | undefined)?.lat === 'number'
-      ? record.center as Record<string, unknown> as unknown as { lat: number }
-      : null;
-
-  const lng = typeof record.lon === 'number'
-    ? record.lon
-    : typeof (record.center as Record<string, unknown> | undefined)?.lon === 'number'
-      ? record.center as Record<string, unknown> as unknown as { lon: number }
-      : null;
-
-  const latitude = typeof lat === 'number' ? lat : (lat as { lat: number } | null)?.lat ?? null;
-  const longitude = typeof lng === 'number' ? lng : (lng as { lon: number } | null)?.lon ?? null;
-
-  if (latitude === null || longitude === null || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-    return res.status(422).json({ error: 'OpenStreetMap place has invalid coordinates.' });
-  }
+  const coords = coordinates(record);
+  if (!coords) return res.status(422).json({ error: 'OpenStreetMap place has invalid coordinates.' });
 
   const providerTypes = [
     tags.amenity,
@@ -256,8 +253,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     canonical_category: classification.canonicalCategory || null,
     primary_mood: classification.mood || 'explore',
     secondary_moods: [],
-    latitude,
-    longitude,
+    latitude: coords.latitude,
+    longitude: coords.longitude,
     address,
     neighborhood: text(tags['addr:suburb']) || null,
     city: text(tags['addr:city']) || null,
