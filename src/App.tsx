@@ -21,6 +21,10 @@ import { VybeCommandCenter } from "./components/vybe/VybeCommandCenter";
 import { VybeDailyDrop } from "./components/vybe/VybeDailyDrop";
 import { VybeSquadVote } from "./components/vybe/VybeSquadVote";
 import { VybeAiConcierge } from "./components/vybe/VybeAiConcierge";
+import { VybeSurpriseMe } from "./components/vybe/VybeSurpriseMe";
+import { VybeCheckIn } from "./components/vybe/VybeCheckIn";
+import { VybeProgressCard } from "./components/vybe/VybeProgressCard";
+import { VybeWeatherPill } from "./components/vybe/VybeWeatherPill";
 import { useData } from "./context/DataContext";
 import { useAuth } from "./context/AuthContext";
 
@@ -66,17 +70,20 @@ export const App: React.FC = () => {
     <div className="min-h-screen flex flex-col bg-[#F6F7FB] dark:bg-[#090A0F] text-slate-900 dark:text-slate-100 transition-colors duration-300">
       <CustomCursor />
       <Navbar />
+      <VybeWeatherPill />
       <VybeCommandCenter />
       <VybeAiConcierge />
+      <VybeSurpriseMe />
       <main className="flex-1">
         {activeTab === "explore" && <><ExploreExperience /><VybeDailyDrop /><VybeSquadVote /></>}
         {activeTab === "map" && <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4 animate-fadeIn"><FilterBar /><VybeMap /></div>}
         {activeTab === "plan" && (privateReady ? <><VybePlanBuilder /><VybeRouteSummary /></> : <RealAccountRequired title="Your plans are private" body="Sign in to create, save, edit and share real VYBE itineraries." />)}
         {activeTab === "saved" && (privateReady ? <CollectionsView /> : <RealAccountRequired title="Your saved VYBES are private" body="Sign in to access your real saved collections and places." />)}
-        {activeTab === "profile" && (privateReady ? <ProfileView /> : <RealAccountRequired title="Your VYBE profile" body="Sign in to manage your real profile, likes, saves and plans." />)}
+        {activeTab === "profile" && (privateReady ? <><ProfileView /><VybeProgressCard /></> : <RealAccountRequired title="Your VYBE profile" body="Sign in to manage your real profile, likes, saves and plans." />)}
         {activeTab === "admin" && (privateReady && currentUser.isAdmin ? <AdminPortal /> : <RealAccountRequired title="Admin access required" body="This area is restricted to authenticated VYBE administrators." />)}
       </main>
       <PlaceDetailModal />
+      <VybeCheckIn />
       <SelectedPlaceMapAction />
       <ReviewModal />
       <ShareStoryModal />
