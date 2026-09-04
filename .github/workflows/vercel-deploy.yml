@@ -34,7 +34,8 @@ jobs:
         run: npm run build
 
       - name: Check Vercel credentials
-        id: vercel-credentials
+        id: vercel_credentials
+        shell: bash
         run: |
           if [ -n "${{ secrets.VERCEL_TOKEN }}" ] && [ -n "${{ secrets.VERCEL_ORG_ID }}" ] && [ -n "${{ secrets.VERCEL_PROJECT_ID }}" ]; then
             echo "configured=true" >> "$GITHUB_OUTPUT"
@@ -43,29 +44,29 @@ jobs:
           fi
 
       - name: Report missing Vercel credentials
-        if: steps.vercel-credentials.outputs.configured != 'true'
+        if: steps.vercel_credentials.outputs.configured != 'true'
         run: echo "Vercel deployment skipped: VERCEL_TOKEN, VERCEL_ORG_ID and/or VERCEL_PROJECT_ID are not configured as GitHub Actions secrets."
 
       - name: Install Vercel CLI
-        if: steps.vercel-credentials.outputs.configured == 'true'
+        if: steps.vercel_credentials.outputs.configured == 'true'
         run: npm install --global vercel@latest
 
       - name: Pull Vercel production settings
-        if: steps.vercel-credentials.outputs.configured == 'true'
+        if: steps.vercel_credentials.outputs.configured == 'true'
         run: vercel pull --yes --environment=production --token="${{ secrets.VERCEL_TOKEN }}"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
       - name: Build with Vercel production environment
-        if: steps.vercel-credentials.outputs.configured == 'true'
+        if: steps.vercel_credentials.outputs.configured == 'true'
         run: vercel build --prod --token="${{ secrets.VERCEL_TOKEN }}"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
       - name: Deploy to Vercel production
-        if: steps.vercel-credentials.outputs.configured == 'true'
+        if: steps.vercel_credentials.outputs.configured == 'true'
         run: vercel deploy --prebuilt --prod --token="${{ secrets.VERCEL_TOKEN }}"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
