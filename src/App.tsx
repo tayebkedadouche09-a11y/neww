@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect } from "react";
 import { ArrowRight, Lock, MapPin } from "lucide-react";
 import { Navbar } from "./components/layout/Navbar";
 import { MobileNav } from "./components/layout/MobileNav";
@@ -20,7 +20,6 @@ import { AdminPortal } from "./components/admin/AdminPortal";
 import { VybeCommandCenter } from "./components/vybe/VybeCommandCenter";
 import { VybeDailyDrop } from "./components/vybe/VybeDailyDrop";
 import { VybeSquadVote } from "./components/vybe/VybeSquadVote";
-import { VybeAiConcierge } from "./components/vybe/VybeAiConcierge";
 import { useData } from "./context/DataContext";
 import { useAuth } from "./context/AuthContext";
 
@@ -53,13 +52,9 @@ export const App: React.FC = () => {
   const { activeTab, isDetailOpen, setIsDetailOpen } = useData();
   const { currentUser, loading: authLoading } = useAuth();
   const privateReady = !!currentUser && !authLoading;
-  const previousTabRef = useRef(activeTab);
 
   useEffect(() => {
-    if (previousTabRef.current !== activeTab && activeTab !== 'explore' && isDetailOpen) {
-      setIsDetailOpen(false);
-    }
-    previousTabRef.current = activeTab;
+    if (activeTab !== 'explore' && isDetailOpen) setIsDetailOpen(false);
   }, [activeTab, isDetailOpen, setIsDetailOpen]);
 
   return (
@@ -67,7 +62,6 @@ export const App: React.FC = () => {
       <CustomCursor />
       <Navbar />
       <VybeCommandCenter />
-      <VybeAiConcierge />
       <main className="flex-1">
         {activeTab === "explore" && <><ExploreExperience /><VybeDailyDrop /><VybeSquadVote /></>}
         {activeTab === "map" && <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4 animate-fadeIn"><FilterBar /><VybeMap /></div>}
