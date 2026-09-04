@@ -21,7 +21,8 @@ export const likesService = {
         { ignoreDuplicates: true, onConflict: 'user_id,place_id' }
       );
       if (error) {
-        if (error.code === '23505' || error.status === 409) {
+        const errorStatus = (error as typeof error & { status?: number }).status;
+        if (error.code === '23505' || errorStatus === 409) {
           const { data: existing, error: lookupError } = await db
             .from('likes')
             .select('id')
