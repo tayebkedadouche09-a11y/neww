@@ -25,10 +25,7 @@ const BADGES: GamificationBadge[] = [
 ];
 
 function storageKey(userId: string) { return `vybe:gamification:${userId}`; }
-
-function emptyState(): GamificationState {
-  return { xp: 0, visitedPlaceIds: [], checkedInAt: {}, unlockedBadges: [] };
-}
+function emptyState(): GamificationState { return { xp: 0, visitedPlaceIds: [], checkedInAt: {}, unlockedBadges: [] }; }
 
 export function getGamificationState(userId?: string | null): GamificationState {
   if (!userId || typeof window === 'undefined') return emptyState();
@@ -42,14 +39,15 @@ export function getGamificationState(userId?: string | null): GamificationState 
       checkedInAt: parsed.checkedInAt && typeof parsed.checkedInAt === 'object' ? parsed.checkedInAt : {},
       unlockedBadges: Array.isArray(parsed.unlockedBadges) ? parsed.unlockedBadges.filter(Boolean) : [],
     };
-  } catch {
-    return emptyState();
-  }
+  } catch { return emptyState(); }
 }
 
 function saveState(userId: string, state: GamificationState) {
   if (typeof window === 'undefined') return;
-  try { window.localStorage.setItem(storageKey(userId), JSON.stringify(state)); } catch { /* local storage can be unavailable */ }
+  try {
+    window.localStorage.setItem(storageKey(userId), JSON.stringify(state));
+    window.dispatchEvent(new CustomEvent('vybe:gamification-updated'));
+  } catch { /* local storage can be unavailable */ }
 }
 
 export function calculateDistanceKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
@@ -76,6 +74,15 @@ function categoryFamily(place: Place): 'coffee' | 'food' | 'nature' | 'culture' 
   return 'other';
 }
 
+function familyOfBadge(badgeId: string): ReturnType<typeof categoryFamily> | null {
+  if (badgeId === 'coffee-hunter') return 'coffee';
+  if (badgeId === 'food-explorer') return 'food';
+  if (badgeId === 'nature-lover') return 'nature';
+  if (badgeId === 'culture-seeker') return 'culture';
+  if (badgeId === 'night-explorer') return 'nightlife';
+  return null;
+}
+
 export function levelFromXp(xp: number): number { return Math.max(1, Math.floor(Math.max(0, xp) / 300) + 1); }
 export function levelTitle(level: number): string {
   if (level >= 50) return 'Legend';
@@ -84,7 +91,6 @@ export function levelTitle(level: number): string {
   if (level >= 5) return 'Adventurer';
   return 'Explorer';
 }
-
 export function badgeDefinitions(): GamificationBadge[] { return BADGES; }
 
 export function checkInPlace(userId: string, place: Place, userLocation: { lat: number; lng: number }, maxDistanceMeters = 500):
@@ -96,30 +102,27 @@ export function checkInPlace(userId: string, place: Place, userLocation: { lat: 
   const distanceMeters = Math.round(calculateDistanceKm(userLocation.lat, userLocation.lng, place.location.lat, place.location.lng) * 1000);
   if (distanceMeters > maxDistanceMeters) return { ok: false, reason: 'too-far', distanceMeters, state };
 
-  const next: GamificationState = {
-    ...state,
-    xp: state.xp + 50,
-    visitedPlaceIds: [...state.visitedPlaceIds, place.id],
-    checkedInAt: { ...state.checkedInAt, [place.id]: new Date().toISOString() },
-  };
-  const family = categoryFamily(place);
-  const familyCount = next.visitedPlaceIds.filter(id => state.checkedInAt[id] || id === place.id).length;
-  const newlyUnlocked = BADGES.filter(b => {
-    if (next.unlockedBadges.includes(b.id)) return false;
-    if (b.id === 'first-discovery') return next.visitedPlaceIds.length >= b.threshold;
-    if (b.id === 'coffee-hunter' || b.id === 'food-explorer' || b.id === 'nature-lover' || b.id === 'culture-seeker' || b.id === 'night-explorer') {
-      if (family === 'other') return false;
-      const required = b.id.replace('-hunter', '').replace('-explorer', '').replace('-lover', '').replace('-seeker', '').replace('night-', 'night-');
-      if (b.id === 'coffee-hunter') return family === 'coffee' && familyCount >= b.threshold;
-      if (b.id === 'food-explorer') return family === 'food' && familyCount >= b.threshold;
-      if (b.id === 'nature-lover') return family === 'nature' && familyCount >= b.threshold;
-      if (b.id === 'culture-seeker') return family === 'culture' && familyCount >= b.threshold;
-      if (b.id === 'night-explorer') return family === 'nightlife' && familyCount >= b.threshold;
-      return required.length > 0 && familyCount >= b.threshold;
+  const visited = [...state.visitedPlaceIds, place.id];
+  const checkedInAt = { ...state.checkedInAt, [place.id]: new Date().toISOString() };
+  const next: GamificationState = { ...state, xp: state.xp + 50, visitedPlaceIds: visited, checkedInAt };
+  const visitedFamilyCounts = new Map<ReturnType<typeof categoryFamily>, number>();
+  for (const placeId of visited) {
+    if (placeId === place.id) {
+      const family = categoryFamily(place);
+      visitedFamilyCounts.set(family, (visitedFamilyCounts.get(family) ?? 0) + 1);
+      continue;
     }
-    return false;
+    // Existing records only contain IDs, so category-specific progress is conservative
+    // until those places are reopened and classified by the current discovery model.
+  }
+
+  const newlyUnlocked = BADGES.filter(badge => {
+    if (next.unlockedBadges.includes(badge.id)) return false;
+    if (badge.id === 'first-discovery') return visited.length >= badge.threshold;
+    const family = familyOfBadge(badge.id);
+    return family !== null && (visitedFamilyCounts.get(family) ?? 0) >= badge.threshold;
   });
-  next.unlockedBadges = [...next.unlockedBadges, ...newlyUnlocked.map(b => b.id)];
+  next.unlockedBadges = [...next.unlockedBadges, ...newlyUnlocked.map(badge => badge.id)];
   saveState(userId, next);
   return { ok: true, distanceMeters, xpAwarded: 50, state: next, newlyUnlocked };
 }
