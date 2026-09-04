@@ -8,6 +8,9 @@ import { VYBE_CATEGORY_DEFINITIONS, categoryOsmClauses, categorySearchTypes, leg
 export interface DiscoveryOptions { userLat?: number; userLng?: number; radiusKm?: number; searchQuery?: string; filters?: Partial<FilterState>; }
 
 const NON_DISCOVERABLE_GOOGLE_TYPES = new Set(['airport','bus_station','train_station','transit_station','school','university','hospital','doctor','pharmacy','dentist','police','fire_station','courthouse','government_office','post_office']);
+const PERSISTENT_CACHE_VERSION = 'v1';
+const PERSISTENT_CACHE_TTL_MS = 30 * 60 * 1000;
+const PERSISTENT_CACHE_PREFIX = `vybe:discovery:${PERSISTENT_CACHE_VERSION}:`;
 
 function canonicalTargets(options: DiscoveryOptions): VybeCategory[] {
   const raw = options.searchQuery?.trim() || options.filters?.searchQuery?.trim() || '';
@@ -135,6 +138,22 @@ function isQuotaError(error:unknown):boolean { const message=error instanceof Er
 function friendlyProviderError(error:unknown,provider:'Google Places'|'OpenStreetMap'):Error { const message=error instanceof Error?error.message:String(error); if(provider==='Google Places'&&isQuotaError(error))return new Error('Google Places quota is currently exhausted. Showing alternative local results where available.'); if(/404|504|timeout|timed out|unavailable/i.test(message))return new Error(`${provider} is temporarily unavailable. Showing other available results.`); return new Error(`${provider} is temporarily unavailable.`); }
 const discoveryCache=new Map<string,{expiresAt:number;promise:Promise<Place[]>}>(); const DISCOVERY_CACHE_MS=20000;
 function discoveryKey(options:DiscoveryOptions,targets:VybeCategory[]):string { const lat=options.userLat?.toFixed(4)||''; const lng=options.userLng?.toFixed(4)||''; const filters=options.filters||{}; return [lat,lng,options.radiusKm??5,JSON.stringify({searchQuery:normalize(options.searchQuery??filters.searchQuery??''),categories:[...(filters.categories??[])].sort(),priceLevels:[...(filters.priceLevels??[])].sort(),moods:[...(filters.moods??[])].sort(),maxBudget:filters.maxBudget??null,maxDistanceKm:filters.maxDistanceKm??null,duration:filters.duration??null,companion:filters.companion??null,onlyOpenNow:filters.onlyOpenNow??false,onlyFree:filters.onlyFree??false,onlyHiddenGems:filters.onlyHiddenGems??false,onlyLateNight:filters.onlyLateNight??false,sortBy:filters.sortBy??'vybe-score',targets})].join('|'); }
+function persistentKey(key:string):string { return `${PERSISTENT_CACHE_PREFIX}${key}`; }
+function readPersistentCache(key:string):Place[]|null {
+  if(typeof window==='undefined') return null;
+  try {
+    const raw=window.localStorage.getItem(persistentKey(key)); if(!raw)return null;
+    const parsed=JSON.parse(raw) as {savedAt?:number;places?:Place[]};
+    if(!parsed.savedAt||Date.now()-parsed.savedAt>PERSISTENT_CACHE_TTL_MS||!Array.isArray(parsed.places))return null;
+    return parsed.places;
+  } catch { return null; }
+}
+function writePersistentCache(key:string,places:Place[]):void {
+  if(typeof window==='undefined'||!places.length)return;
+  try {
+    window.localStorage.setItem(persistentKey(key),JSON.stringify({savedAt:Date.now(),places:places.slice(0,250)}));
+  } catch { /* cache is best-effort */ }
+}
 
 export async function discoverPlaces(options:DiscoveryOptions):Promise<Place[]> {
   const targets=canonicalTargets(options); const key=discoveryKey(options,targets); const cached=discoveryCache.get(key); if(cached&&cached.expiresAt>Date.now())return cached.promise;
@@ -143,7 +162,13 @@ export async function discoverPlaces(options:DiscoveryOptions):Promise<Place[]> 
     const googlePlaces=googleResult.status==='fulfilled'?googleResult.value:[]; const osmPlaces=osmResult.status==='fulfilled'?osmResult.value:[];
     if(googleResult.status==='rejected')console.warn('Google discovery unavailable:',friendlyProviderError(googleResult.reason,'Google Places'));
     if(osmResult.status==='rejected')console.warn('OSM discovery unavailable:',friendlyProviderError(osmResult.reason,'OpenStreetMap'));
-    return enforceRadius(deduplicate([...googlePlaces,...osmPlaces]).map(analyzePlace),options.userLat,options.userLng,options.radiusKm??5).filter(place=>matchesFilters(place,options.filters,targets)).sort((a,b)=>(b.baseVybeScore-a.baseVybeScore)||((a.distanceKm??999)-(b.distanceKm??999))).slice(0,250);
+    const fresh=enforceRadius(deduplicate([...googlePlaces,...osmPlaces]).map(analyzePlace),options.userLat,options.userLng,options.radiusKm??5).filter(place=>matchesFilters(place,options.filters,targets)).sort((a,b)=>(b.baseVybeScore-a.baseVybeScore)||((a.distanceKm??999)-(b.distanceKm??999))).slice(0,250);
+    if(fresh.length){ writePersistentCache(key,fresh); return fresh; }
+    const offline=readPersistentCache(key);
+    if(offline?.length){
+      return enforceRadius(deduplicate(offline.map(analyzePlace)),options.userLat,options.userLng,options.radiusKm??5).filter(place=>matchesFilters(place,options.filters,targets)).slice(0,250);
+    }
+    return fresh;
   })();
   discoveryCache.set(key,{expiresAt:Date.now()+DISCOVERY_CACHE_MS,promise}); promise.catch(()=>{if(discoveryCache.get(key)?.promise===promise)discoveryCache.delete(key);}); return promise;
 }
