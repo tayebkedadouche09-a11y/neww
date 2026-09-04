@@ -37,7 +37,9 @@ export function getGamificationState(userId?: string | null): GamificationState 
     const raw = window.localStorage.getItem(storageKey(userId));
     if (!raw) return emptyState();
     const parsed = JSON.parse(raw) as Partial<GamificationState>;
-    const categoryVisits = parsed.categoryVisits && typeof parsed.categoryVisits === 'object' ? parsed.categoryVisits : {};
+    const categoryVisits = parsed.categoryVisits && typeof parsed.categoryVisits === 'object'
+      ? parsed.categoryVisits as Partial<Record<VisitCategory, unknown>>
+      : {};
     return {
       xp: typeof parsed.xp === 'number' ? Math.max(0, parsed.xp) : 0,
       visitedPlaceIds: Array.isArray(parsed.visitedPlaceIds) ? parsed.visitedPlaceIds.filter(Boolean) : [],
