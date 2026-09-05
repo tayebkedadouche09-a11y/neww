@@ -1,4 +1,4 @@
-import { classifyProviderPlace } from '../src/data/categoryTaxonomy';
+import { classifyProviderPlace } from './_shared/classify';
 
 type ApiRequest = {
   method?: string;
