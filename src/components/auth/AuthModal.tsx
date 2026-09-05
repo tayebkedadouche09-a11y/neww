@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, ArrowRight, KeyRound } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
@@ -18,14 +18,38 @@ export const AuthModal: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const firstInputRef = useRef<HTMLInputElement>(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
+    if (!isAuthModalOpen) return;
+    // Focus first field when modal opens — prevents timing races with automated/keyboard flows
+    const t = window.setTimeout(() => firstInputRef.current?.focus(), 30);
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setIsAuthModalOpen(false);
+      // Simple focus trap
+      if (e.key === 'Tab' && dialogRef.current) {
+        const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setIsAuthModalOpen]);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isAuthModalOpen, setIsAuthModalOpen]);
 
   if (!isAuthModalOpen) return null;
 
@@ -82,25 +106,25 @@ export const AuthModal: React.FC = () => {
       : 'Enter your email and we’ll send a reset link';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl animate-fadeIn cursor-pointer" data-testid="auth-modal" onClick={() => setIsAuthModalOpen(false)}>
-      <div className="relative w-full max-w-md rounded-3xl bg-white dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border shadow-2xl p-6 sm:p-8 space-y-6 cursor-default" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl animate-fadeIn cursor-pointer" data-testid="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title" onClick={() => setIsAuthModalOpen(false)}>
+      <div ref={dialogRef} className="relative w-full max-w-md rounded-3xl bg-white dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border shadow-2xl p-6 sm:p-8 space-y-6 cursor-default" onClick={e => e.stopPropagation()}>
         <button type="button" onClick={() => setIsAuthModalOpen(false)} className="absolute top-4 right-4 p-2 rounded-full text-slate-400 hover:text-white bg-slate-100 dark:bg-vybe-dark-surface transition-colors" aria-label="Close authentication dialog"><X className="w-4 h-4" /></button>
 
         <div className="text-center space-y-2">
           <div className="w-12 h-12 mx-auto rounded-2xl bg-black dark:bg-white text-vybe-lime dark:text-black font-black text-2xl flex items-center justify-center shadow-neon-lime">V</div>
-          <h3 className="font-display font-extrabold text-2xl text-slate-900 dark:text-white">{headerTitle}</h3>
+          <h3 id="auth-modal-title" className="font-display font-extrabold text-2xl text-slate-900 dark:text-white">{headerTitle}</h3>
           <p className="text-xs text-slate-600 dark:text-slate-400">{headerSub}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {authModalMode === 'register' && (
             <>
-              <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Your Full Name</label><input type="text" required placeholder="e.g. Alex Rivera" value={name} onChange={e => setName(e.target.value)} autoComplete="name" className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none" /></div>
+              <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Your Full Name</label><input ref={firstInputRef} type="text" required placeholder="e.g. Alex Rivera" value={name} onChange={e => setName(e.target.value)} autoComplete="name" className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none" /></div>
               <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Username</label><input type="text" required placeholder="e.g. alex_vybes" value={username} onChange={e => setUsername(e.target.value)} autoComplete="username" className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none" /></div>
             </>
           )}
 
-          <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Email Address</label><input type="email" required placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none" /></div>
+          <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Email Address</label><input ref={authModalMode !== 'register' ? firstInputRef : undefined} type="email" required placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none" /></div>
 
           {authModalMode !== 'forgot' && (
             <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Password</label><input type="password" required minLength={authModalMode === 'register' ? MIN_PASSWORD_LENGTH : 1} data-testid="auth-password" placeholder="••••••••••••" value={password} onChange={e => setPassword(e.target.value)} autoComplete={authModalMode === 'login' ? 'current-password' : 'new-password'} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none" />{authModalMode === 'register' && <p className="text-[11px] text-slate-500 dark:text-slate-400">Use 12+ characters with uppercase, lowercase, number, and symbol.</p>}</div>
