@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { haversineDistanceKm } from '../lib/distance';
+import { DEFAULT_VYBE_LOCATION } from '../data/locationPresets';
 
 export { haversineDistanceKm };
 
@@ -11,20 +12,32 @@ export interface GeoLocation {
 }
 
 export type GeoError = 'DENIED' | 'UNAVAILABLE' | 'TIMEOUT' | 'UNSUPPORTED';
+export type GeoLocationSource = 'device' | 'fallback';
 
 interface GeoState {
   location: GeoLocation | null;
   error: GeoError | null;
   loading: boolean;
   permissionState: PermissionState | null;
+  source: GeoLocationSource | null;
 }
 
+const FALLBACK_LOCATION: GeoLocation = {
+  lat: DEFAULT_VYBE_LOCATION.lat,
+  lng: DEFAULT_VYBE_LOCATION.lng,
+  // A fallback city is intentionally not represented as device accuracy.
+  accuracy: 25_000,
+  timestamp: Date.now(),
+};
+
 /**
- * Browser geolocation hook.
+ * Browser geolocation hook with a production-safe city fallback.
  *
- * - Requests location only on explicit user action (via requestLocation).
+ * - Requests device location when the app asks for it.
+ * - Uses the user's device coordinates when permission is granted.
+ * - Never leaves discovery without a usable location: denied/unavailable/
+ *   timeout/unsupported browsers fall back to the default VYBE city.
  * - Does not poll or track continuously.
- * - Gracefully handles denial, timeout, and unsupported browsers.
  */
 export function useGeolocation() {
   const [state, setState] = useState<GeoState>({
@@ -32,12 +45,11 @@ export function useGeolocation() {
     error: null,
     loading: false,
     permissionState: null,
+    source: null,
   });
 
-  // Check if geolocation is supported
   const isSupported = typeof navigator !== 'undefined' && 'geolocation' in navigator;
 
-  // Query permission state (where supported)
   useEffect(() => {
     if (!isSupported) {
       setState(prev => ({ ...prev, error: 'UNSUPPORTED' }));
@@ -61,7 +73,13 @@ export function useGeolocation() {
 
   const requestLocation = useCallback(() => {
     if (!isSupported) {
-      setState(prev => ({ ...prev, error: 'UNSUPPORTED' }));
+      setState({
+        location: FALLBACK_LOCATION,
+        error: 'UNSUPPORTED',
+        loading: false,
+        permissionState: null,
+        source: 'fallback',
+      });
       return;
     }
 
@@ -79,6 +97,7 @@ export function useGeolocation() {
           error: null,
           loading: false,
           permissionState: 'granted',
+          source: 'device',
         });
       },
       err => {
@@ -88,22 +107,23 @@ export function useGeolocation() {
         else if (err.code === err.TIMEOUT) error = 'TIMEOUT';
 
         setState({
-          location: null,
+          location: FALLBACK_LOCATION,
           error,
           loading: false,
           permissionState: err.code === err.PERMISSION_DENIED ? 'denied' : null,
+          source: 'fallback',
         });
       },
       {
         enableHighAccuracy: false,
         timeout: 10000,
-        maximumAge: 5 * 60 * 1000, // 5 minutes
+        maximumAge: 5 * 60 * 1000,
       }
     );
   }, [isSupported]);
 
   const clearLocation = useCallback(() => {
-    setState(prev => ({ ...prev, location: null, error: null }));
+    setState(prev => ({ ...prev, location: null, error: null, source: null }));
   }, []);
 
   return {
