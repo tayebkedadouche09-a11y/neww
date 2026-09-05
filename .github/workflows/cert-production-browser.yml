@@ -1,27 +1,87 @@
 name: CERT Production Browser
+
 on:
-  workflow_run:
-    workflows: ["VYBE Vercel Deploy"]
-    types: [completed]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
 permissions:
   contents: read
+
 jobs:
   browser-cert:
-    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout deployed revision
+      - name: Checkout target revision
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.sha }}
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+
       - name: Install dependencies
         run: npm ci
-      - name: Live production browser CERT
+
+      - name: Wait for Vercel production deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Waiting for Vercel check on ${TARGET_SHA}..."
+          for attempt in $(seq 1 60); do
+            state="$(curl -fsSL \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${TARGET_SHA}/status" \
+              | jq -r '[.statuses[]? | select(.context == "Vercel")] | .[0].state // empty')"
+            echo "attempt ${attempt}: Vercel=${state:-pending}"
+            case "${state}" in
+              success) exit 0 ;;
+              failure|error) echo "Vercel deployment check failed: ${state}"; exit 1 ;;
+            esac
+            sleep 10
+          done
+          echo "Timed out waiting for the Vercel production check."
+          exit 1
+
+      - name: Verify Chrome availability
+        run: |
+          google-chrome --version || chromium --version || chromium-browser --version
+
+      - name: Live Flow F certification
+        id: flow_f
+        continue-on-error: true
         env:
           VYBE_PRODUCTION_URL: https://neww-dun-chi.vercel.app/
-        run: node scripts/cert-production-browser.mjs
+          CERT_OUTPUT_DIR: cert-live-output/flow-f
+        run: node scripts/cert-flow-f-live.mjs
+
+      - name: Full live production CERT
+        id: full_cert
+        continue-on-error: true
+        env:
+          VYBE_PRODUCTION_URL: https://neww-dun-chi.vercel.app/
+        run: node scripts/cert-180-live.mjs
+
+      - name: Upload live CERT evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vybe-cert-live-${{ github.sha }}
+          path: |
+            cert-live-output/**
+            cert-evidence/**
+          if-no-files-found: ignore
+
+      - name: Certification summary
+        if: always()
+        run: |
+          echo "Flow F step outcome: ${{ steps.flow_f.outcome }}"
+          echo "Full live CERT step outcome: ${{ steps.full_cert.outcome }}"
+          echo "Live certification is an evidence job; unresolved provider quota/auth gates remain explicit in the generated reports."
