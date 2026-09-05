@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { classifyProviderPlace, evaluatePlaceRelevance, extractCategoryHint, parseUserIntent, isGooglePhotoIdentityExact, VYBE_CATEGORY_DEFINITIONS, type VybeCategory } from '../api/_shared/classify.ts';
 import { MAX_RESULTS, deduplicatePlaces, gatePlaces, rankPlaces, limitCoverage, distPlaces } from '../src/services/placePipeline.ts';
 import type { Place } from '../src/types/index.ts';
+import { googlePlaceToVybePlace } from '../src/services/googlePlacesAdapter.ts';
+import type { GooglePlaceResult, GooglePlacePhoto } from '../src/services/googlePlacesTypes.ts';
 
 type ProviderPlace = { providerTypes?: string[]; primaryType?: string; name: string };
 
@@ -325,9 +327,9 @@ describe('CERT 180 — Requirement 12: result coverage and deduplication behavio
 });
 
 describe('CERT 180 — Requirement 1/2: real photo metadata vs generic fallback', () => {
-  it('google adapter output must never treat a generic/local URL as a provider photo (identity enforced in adapter)', async () => {
-    // The adapter is browser-coupled; assert at engine level that the identity
-    // predicate the adapter uses rejects every non-Google-photo shape.
+  it('google adapter output must never treat a generic/local URL as a provider photo (identity enforced in adapter)', () => {
+    // Engine-level identity predicate the adapter uses: rejects every
+    // non-Google-photo shape.
     for (const candidate of [
       'https://images.unsplash.com/photo-1',
       'images/unsplash/1.jpg',
@@ -337,5 +339,73 @@ describe('CERT 180 — Requirement 1/2: real photo metadata vs generic fallback'
     ]) {
       assert.equal(isGooglePhotoIdentityExact('ChIJowner', candidate), false, candidate);
     }
+  });
+
+  const exactPhoto: GooglePlacePhoto = {
+    name: 'places/ChIJcafeAAA/photos/refexact',
+    photo_reference: 'https://places.googleapis.com/v1/places/ChIJcafeAAA/photos/refexact/media',
+    height: 300,
+    width: 400,
+    html_attributions: ['Photo by Alice'],
+    author_attributions: [{ displayName: 'Alice', uri: 'https://alice.example' }],
+  };
+  const crossPlacePhoto: GooglePlacePhoto = {
+    name: 'places/ChIJnearbyBBB/photos/refnearby',
+    photo_reference: 'https://places.googleapis.com/v1/places/ChIJnearbyBBB/photos/refnearby/media',
+    height: 300,
+    width: 400,
+    html_attributions: ['Photo by Bob'],
+    author_attributions: [{ displayName: 'Bob' }],
+  };
+  const unboundPhoto: GooglePlacePhoto = {
+    name: '',
+    photo_reference: 'https://places.googleapis.com/v1/media/refwithoutname',
+    height: 300,
+    width: 400,
+    html_attributions: ['Photo by Carol'],
+    author_attributions: [{ displayName: 'Carol' }],
+  };
+  const genericPhoto: GooglePlacePhoto = {
+    name: 'places/ChIJcafeAAA/photos/generic',
+    photo_reference: 'https://images.example.com/photo.jpg',
+    height: 300,
+    width: 400,
+    html_attributions: [],
+    author_attributions: [],
+  };
+
+  function result(photos: GooglePlacePhoto[]): GooglePlaceResult {
+    return {
+      place_id: 'ChIJcafeAAA',
+      name: 'Arcade Café',
+      geometry: { location: { lat: 36.75, lng: 3.05 } },
+      types: ['cafe', 'internet_cafe'],
+      primary_type: 'cafe',
+      rating: 4.5,
+      user_ratings_total: 120,
+      photos,
+    };
+  }
+
+  it('adapter keeps only photos whose name is places/{exactProviderPlaceId}/photos/{ref}', () => {
+    const place = googlePlaceToVybePlace(result([exactPhoto, crossPlacePhoto, unboundPhoto]));
+    assert.equal(place.images.length, 1, 'cross-place and unbound photos must be rejected, exact photo kept');
+    assert.equal(place.images[0], exactPhoto.photo_reference);
+  });
+  it('adapter never substitutes a generic/non-Google URL as a provider photo even when named like one', () => {
+    const place = googlePlaceToVybePlace(result([genericPhoto, exactPhoto]));
+    assert.equal(place.images.length, 1);
+    assert.equal(place.images[0], exactPhoto.photo_reference);
+    assert.ok(!place.images.some(image => image.includes('images.example.com')));
+  });
+  it('adapter preserves photo attributions only for accepted photos', () => {
+    const place = googlePlaceToVybePlace(result([exactPhoto, crossPlacePhoto]));
+    assert.deepEqual(place.photoAttributions, [{ displayName: 'Alice', uri: 'https://alice.example' }]);
+  });
+  it('adapter degrades safely when the provider returns no photos (no fake placeholder becomes a photo)', () => {
+    const place = googlePlaceToVybePlace(result([]));
+    assert.equal(place.images.length, 0);
+    assert.deepEqual(place.photoAttributions, []);
+    assert.equal(place.canonicalCategory, 'cafe', 'identity still comes from provider types');
   });
 });
