@@ -214,6 +214,18 @@ describe('CERT 180 — Requirement 6: place identity vs user intent', () => {
     assert.equal(intent.requestedCategory, 'entertainment');
     assert.ok(intent.kinds.includes('family'));
   });
+  it('short aliases (gym, bar, spa, tea) still resolve their category hint (3-char alias fix)', () => {
+    for (const [query, expected] of [['gym', 'gym'], ['gym nearby', 'gym'], ['cozy bar', 'nightlife'], ['spa day', 'wellness'], ['tea room', 'cafe'], ['art gallery', 'arts-culture']] as const) {
+      assert.equal(extractCategoryHint(query), expected, `extractCategoryHint('${query}')`);
+      assert.equal(parseUserIntent(query).requestedCategory, expected, `parseUserIntent('${query}').requestedCategory`);
+    }
+  });
+  it('short alias matching stays whole-word (no substring false-positives)', () => {
+    assert.equal(extractCategoryHint('gymnastique'), null, 'gym must not match inside gymnastique');
+    assert.equal(extractCategoryHint('bartender school'), null, 'bar must not match inside bartender');
+    assert.equal(extractCategoryHint('spaquettes house'), null, 'spa must not match inside spaquettes');
+    assert.equal(extractCategoryHint('pubg tournament arena'), null, 'pub must not match inside pubg');
+  });
 });
 
 describe('CERT 180 — Requirement 7: hard relevance gate before ranking', () => {
