@@ -1,76 +1,137 @@
-type CategoryType =
-  | 'food-drink'
-  | 'nightlife'
-  | 'arts-culture'
-  | 'outdoors-nature'
-  | 'entertainment'
-  | 'arcade-gaming'
-  | 'hidden-gems'
-  | 'chill-spots'
-  | 'shopping-vintage';
+export type CategoryType = 'food-drink' | 'nightlife' | 'arts-culture' | 'outdoors-nature' | 'entertainment' | 'arcade-gaming' | 'hidden-gems' | 'chill-spots' | 'shopping-vintage';
+export type MoodType = 'energetic' | 'chill' | 'romantic' | 'creative' | 'party' | 'curious' | 'hungry' | 'outdoor' | 'gaming' | 'music' | 'explore' | 'lazy';
+export type VybeCategory = 'restaurant' | 'cafe' | 'games' | 'cinema' | 'park' | 'gym' | 'shopping' | 'nightlife' | 'family-kids' | 'tourist' | 'arts-culture' | 'outdoors' | 'wellness' | 'hotel' | 'library' | 'worship' | 'entertainment';
+export type IntentKind = 'gaming' | 'quiet' | 'romantic' | 'family' | 'outdoor' | 'nightlife' | 'food' | 'coffee' | 'culture' | 'shopping' | 'wellness' | 'tourist' | 'entertainment';
 
-type MoodType =
-  | 'energetic' | 'chill' | 'romantic' | 'creative' | 'party' | 'curious'
-  | 'hungry' | 'outdoor' | 'gaming' | 'music' | 'explore' | 'lazy';
+export interface ProviderCategoryDefinition { id: VybeCategory; label: string; legacyCategory: CategoryType; mood: MoodType; aliases: string[]; googleIncludedTypes: string[]; googleTextQueries: string[]; osmClauses: string[]; signals: string[]; }
 
-type VybeCategory =
-  | 'restaurant' | 'cafe' | 'games' | 'cinema' | 'park' | 'gym' | 'shopping'
-  | 'nightlife' | 'family-kids' | 'tourist' | 'arts-culture' | 'outdoors'
-  | 'wellness' | 'hotel' | 'library' | 'worship' | 'entertainment';
-
-type Definition = { canonical: VybeCategory; legacy: CategoryType; mood: MoodType; types: string[]; signals: string[] };
-
-const DEFINITIONS: Definition[] = [
-  { canonical: 'games', legacy: 'arcade-gaming', mood: 'gaming', types: ['video_arcade','amusement_center','indoor_playground','bowling_alley','miniature_golf_course','paintball_center','go_karting_venue','internet_cafe','adventure_sports_center'], signals: ['arcade','gaming','game','game room','playstation','xbox','bowling','billiards','billard','cyber'] },
-  { canonical: 'cinema', legacy: 'entertainment', mood: 'chill', types: ['movie_theater'], signals: ['cinema','cinema','movie theater','film'] },
-  { canonical: 'restaurant', legacy: 'food-drink', mood: 'hungry', types: ['restaurant'], signals: ['restaurant','resto','pizzeria','pizza','burger','tacos','grill','snack'] },
-  { canonical: 'cafe', legacy: 'food-drink', mood: 'chill', types: ['cafe','coffee_shop'], signals: ['cafe','café','coffee','coffee shop','tea room','salon de thé'] },
-  { canonical: 'nightlife', legacy: 'nightlife', mood: 'party', types: ['bar','night_club','cocktail_bar','karaoke','live_music_venue'], signals: ['bar','pub','club','nightclub','karaoke','lounge','cocktail'] },
-  { canonical: 'gym', legacy: 'outdoors-nature', mood: 'energetic', types: ['gym','sports_complex','sports_club'], signals: ['gym','fitness','sports complex','sports club'] },
-  { canonical: 'park', legacy: 'outdoors-nature', mood: 'outdoor', types: ['park','city_park','state_park','national_park'], signals: ['park','parc'] },
-  { canonical: 'family-kids', legacy: 'entertainment', mood: 'energetic', types: ['playground','indoor_playground','amusement_center','amusement_park','water_park','zoo','aquarium','childrens_camp'], signals: ['kids','children','family','playground','amusement park','zoo','aquarium'] },
-  { canonical: 'shopping', legacy: 'shopping-vintage', mood: 'explore', types: ['shopping_mall','department_store','store','clothing_store','book_store','thrift_store','flea_market','toy_store','gift_shop'], signals: ['shopping','shop','store','mall','market','magasin','boutique','retail'] },
-  { canonical: 'tourist', legacy: 'hidden-gems', mood: 'explore', types: ['tourist_attraction','monument','observation_deck','cultural_landmark','historical_place','historical_landmark','castle','visitor_center','plaza'], signals: ['tourist','tourism','attraction','monument','landmark','historical','castle','sightseeing'] },
-  { canonical: 'arts-culture', legacy: 'arts-culture', mood: 'curious', types: ['museum','art_gallery','art_museum','performing_arts_theater','cultural_center','art_studio'], signals: ['museum','musée','gallery','galerie','theatre','theater','culture','cultural','art'] },
-  { canonical: 'outdoors', legacy: 'outdoors-nature', mood: 'outdoor', types: ['hiking_area','beach','garden','botanical_garden','campground','nature_preserve','wildlife_park','wildlife_refuge','scenic_spot','mountain_peak','lake','river','woods'], signals: ['outdoor','nature','hiking','beach','plage','garden','jardin','camping','scenic spot','mountain','lake','river'] },
-  { canonical: 'wellness', legacy: 'chill-spots', mood: 'lazy', types: ['spa','wellness_center','massage','massage_spa','yoga_studio','sauna'], signals: ['spa','wellness','relax','massage','yoga','sauna'] },
-  { canonical: 'hotel', legacy: 'chill-spots', mood: 'chill', types: ['hotel','lodging','hostel','guest_house','motel','resort_hotel'], signals: ['hotel','hôtel','hostel','lodging','resort','guest house','motel'] },
-  { canonical: 'library', legacy: 'arts-culture', mood: 'curious', types: ['library'], signals: ['library','bibliothèque','bibliotheque'] },
-  { canonical: 'worship', legacy: 'arts-culture', mood: 'curious', types: ['mosque','church','hindu_temple','synagogue'], signals: ['mosque','mosquée','masjid','مسجد','church','église','eglise','temple','synagogue'] },
-  { canonical: 'entertainment', legacy: 'entertainment', mood: 'energetic', types: ['amphitheatre','auditorium','comedy_club','concert_hall','event_venue','planetarium'], signals: ['entertainment','fun','activity','activities','amusement','events'] },
+const definitions: ProviderCategoryDefinition[] = [
+  { id:'restaurant', label:'Restaurant', legacyCategory:'food-drink', mood:'hungry', aliases:['restaurant','restaurants','resto','food','dining','eat','manger'], googleIncludedTypes:['restaurant'], googleTextQueries:['restaurants nearby'], osmClauses:['amenity="restaurant"','amenity="fast_food"','amenity="food_court"'], signals:['restaurant','resto','pizzeria','pizza','burger','tacos','grill','snack','fast food'] },
+  { id:'cafe', label:'Cafe', legacyCategory:'food-drink', mood:'chill', aliases:['cafe','cafes','café','coffee','coffee shop','coffee shops','salon de thé','tea'], googleIncludedTypes:['cafe','coffee_shop'], googleTextQueries:['cafes nearby','coffee shops nearby'], osmClauses:['amenity="cafe"'], signals:['cafe','café','coffee','coffee shop','tea room','salon de thé'] },
+  { id:'games', label:'Games', legacyCategory:'arcade-gaming', mood:'gaming', aliases:['games','game','gaming','arcade','arcades','game room','game center','game centre','salle de jeux','salle de jeu','jeux','jeux video','jeux vidéo','video games','kids games','recreation','bowling','billiards','billiard','billard','pool hall','play center','play centre'], googleIncludedTypes:['video_arcade','amusement_center','indoor_playground','bowling_alley','miniature_golf_course','paintball_center','go_karting_venue','internet_cafe','adventure_sports_center'], googleTextQueries:['arcade game room kids entertainment nearby','bowling billiards recreation nearby'], osmClauses:['leisure="amusement_arcade"','leisure="bowling_alley"','amenity="internet_cafe"','amenity="games_centre"','amenity="game_centre"','shop="video_games"'], signals:['arcade','gaming','game','game room','game center','game centre','salle de jeux','jeux','jeux video','jeux vidéo','video game','playstation','xbox','bowling','billiards','billiard','billard','pool hall','recreation','cyber'] },
+  { id:'cinema', label:'Cinema', legacyCategory:'entertainment', mood:'chill', aliases:['cinema','cinemas','cinéma','cinémas','movie','movie theater','movie theatre','film'], googleIncludedTypes:['movie_theater'], googleTextQueries:['cinemas nearby','movie theaters nearby'], osmClauses:['amenity="cinema"'], signals:['cinema','cinéma','movie theater','movie theatre','film'] },
+  { id:'park', label:'Park', legacyCategory:'outdoors-nature', mood:'outdoor', aliases:['park','parks','parc','parcs'], googleIncludedTypes:['park','city_park','state_park','national_park'], googleTextQueries:['parks nearby'], osmClauses:['leisure="park"'], signals:['park','parc','city park','state park','national park'] },
+  { id:'gym', label:'Gym', legacyCategory:'outdoors-nature', mood:'energetic', aliases:['gym','gyms','fitness','fitness center','fitness centre','sport','sports'], googleIncludedTypes:['gym','sports_complex','sports_club'], googleTextQueries:['gyms nearby','fitness centers nearby'], osmClauses:['leisure="fitness_centre"','leisure="sports_centre"','sport'], signals:['gym','fitness','sports complex','sports club'] },
+  { id:'shopping', label:'Shopping', legacyCategory:'shopping-vintage', mood:'explore', aliases:['shopping','shop','shops','stores','store','mall','malls','market','markets','magasin','shopping mall'], googleIncludedTypes:['shopping_mall','department_store','store','clothing_store','book_store','thrift_store','flea_market','toy_store','gift_shop'], googleTextQueries:['shopping malls nearby','stores nearby'], osmClauses:['shop','amenity="marketplace"'], signals:['shopping','shop','store','mall','market','magasin','boutique','retail'] },
+  { id:'nightlife', label:'Nightlife', legacyCategory:'nightlife', mood:'party', aliases:['nightlife','night life','bar','bars','club','clubs','nightclub','night club','pub','karaoke','live music'], googleIncludedTypes:['bar','night_club','cocktail_bar','karaoke','live_music_venue'], googleTextQueries:['nightlife nearby','bars and clubs nearby'], osmClauses:['amenity~"bar|pub|nightclub|biergarten"'], signals:['bar','pub','club','nightclub','night club','discotheque','karaoke','lounge','cocktail'] },
+  { id:'family-kids', label:'Family & Kids', legacyCategory:'entertainment', mood:'energetic', aliases:['family','family and kids','family kids','kids','children','childrens','playground','playgrounds'], googleIncludedTypes:['indoor_playground','playground','amusement_center','amusement_park','water_park','zoo','aquarium','childrens_camp'], googleTextQueries:['kids entertainment nearby','family entertainment nearby'], osmClauses:['leisure="playground"','tourism~"zoo|aquarium"'], signals:['kids','children','childrens','family','playground','play center','amusement center','amusement park','water park','zoo','aquarium'] },
+  { id:'tourist', label:'Tourist', legacyCategory:'hidden-gems', mood:'explore', aliases:['tourist','tourism','tourist attractions','attraction','attractions','monument','landmark','sightseeing','visiting'], googleIncludedTypes:['tourist_attraction','monument','observation_deck','cultural_landmark','historical_place','historical_landmark','castle','visitor_center','plaza'], googleTextQueries:['tourist attractions nearby','sightseeing nearby'], osmClauses:['tourism~"attraction|viewpoint"','historic'], signals:['tourist','tourism','attraction','monument','landmark','historical','castle','visitor center','sightseeing'] },
+  { id:'arts-culture', label:'Arts & Culture', legacyCategory:'arts-culture', mood:'curious', aliases:['arts','art','arts and culture','culture','museum','museums','gallery','galleries','theatre','theater'], googleIncludedTypes:['museum','art_gallery','art_museum','performing_arts_theater','cultural_center','art_studio'], googleTextQueries:['museums and galleries nearby','arts and culture nearby'], osmClauses:['tourism~"museum|gallery"','amenity~"theatre|arts_centre"'], signals:['museum','musée','gallery','galerie','theatre','theater','culture','cultural','art'] },
+  { id:'outdoors', label:'Outdoors', legacyCategory:'outdoors-nature', mood:'outdoor', aliases:['outdoors','outdoor','nature','hiking','hike','beach','beaches','garden','gardens','camping','campground'], googleIncludedTypes:['hiking_area','beach','garden','botanical_garden','campground','nature_preserve','wildlife_park','wildlife_refuge','scenic_spot','mountain_peak','lake','river','woods'], googleTextQueries:['outdoor activities nearby','nature spots nearby'], osmClauses:['leisure~"garden|nature_reserve|camp_site"','natural="beach"'], signals:['outdoors','outdoor','nature','hiking','hike','beach','plage','garden','jardin','camping','campground','scenic spot','mountain','lake','river','woods'] },
+  { id:'wellness', label:'Wellness', legacyCategory:'chill-spots', mood:'lazy', aliases:['wellness','spa','spas','relax','relaxation','massage','yoga'], googleIncludedTypes:['spa','wellness_center','massage','massage_spa','yoga_studio','sauna'], googleTextQueries:['spas nearby','wellness nearby'], osmClauses:['leisure="sauna"'], signals:['spa','wellness','relax','massage','yoga','sauna'] },
+  { id:'hotel', label:'Hotel', legacyCategory:'chill-spots', mood:'chill', aliases:['hotel','hotels','hôtel','hôtels','hostel','lodging','resort','guest house','guesthouse'], googleIncludedTypes:['hotel','lodging','hostel','guest_house','motel','resort_hotel'], googleTextQueries:['hotels nearby'], osmClauses:['tourism~"hotel|hostel|guest_house|motel"'], signals:['hotel','hôtel','hostel','lodging','resort','guest house','guesthouse','motel'] },
+  { id:'library', label:'Library', legacyCategory:'arts-culture', mood:'curious', aliases:['library','libraries','bibliothèque','bibliotheque'], googleIncludedTypes:['library'], googleTextQueries:['libraries nearby'], osmClauses:['amenity="library"'], signals:['library','libraries','bibliothèque','bibliotheque'] },
+  { id:'worship', label:'Places of Worship', legacyCategory:'arts-culture', mood:'curious', aliases:['mosque','mosques','mosquée','church','churches','temple','synagogue','worship'], googleIncludedTypes:['mosque','church','hindu_temple','synagogue'], googleTextQueries:['mosques nearby','churches nearby'], osmClauses:['amenity="place_of_worship"'], signals:['mosque','mosquée','masjid','مسجد','church','église','eglise','temple','synagogue'] },
+  { id:'entertainment', label:'Entertainment', legacyCategory:'entertainment', mood:'energetic', aliases:['entertainment','fun','activities','events','amusement'], googleIncludedTypes:['amphitheatre','auditorium','comedy_club','concert_hall','event_venue','ferris_wheel','roller_coaster','planetarium'], googleTextQueries:['entertainment nearby','fun activities nearby'], osmClauses:['amenity~"arts_centre|theatre|cinema"'], signals:['entertainment','fun','activity','activities','amusement','events'] },
 ];
 
-function normalize(value?: string): string {
-  return (value ?? '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+export const VYBE_CATEGORY_DEFINITIONS = Object.fromEntries(definitions.map(d => [d.id, d])) as Record<VybeCategory, ProviderCategoryDefinition>;
+const ALL_CATEGORIES = definitions.map(d => d.id);
+const PRECEDENCE: VybeCategory[] = ['games','cinema','restaurant','cafe','nightlife','gym','park','family-kids','shopping','tourist','arts-culture','library','worship','outdoors','wellness','hotel','entertainment'];
+export const LEGACY_CATEGORY_TO_CANONICAL: Record<CategoryType,VybeCategory[]> = {'food-drink':['restaurant','cafe'],'nightlife':['nightlife'],'arts-culture':['arts-culture','library','worship'],'outdoors-nature':['park','gym','outdoors'],'entertainment':['cinema','family-kids','entertainment'],'arcade-gaming':['games'],'hidden-gems':['tourist'],'chill-spots':['wellness','hotel'],'shopping-vintage':['shopping']};
+
+export interface UserIntent { rawQuery: string; requestedCategory: VybeCategory | null; kinds: IntentKind[]; terms: string[]; }
+export interface RelevanceEvidence { identityValid: boolean; providerEvidenceSufficient: boolean; providerIdentityConfidence: number; categoryMatch: 'YES'|'NO'|'N/A'; intentMatch: 'HIGH'|'MEDIUM'|'LOW'|'N/A'; distanceKm?: number; provider: 'google'|'osm'|'vybe'; decision: 'ACCEPT'|'REJECT'; reasons: string[]; }
+
+function normalizeText(value?: string): string { return (value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/g,' ').replace(/\s+/g,' ').trim(); }
+function providerToken(value?: string): string { return normalizeText(value).replace(/ /g,'_'); }
+function cleanedQuery(value?: string): string { return normalizeText(value).replace(/\b(near me|nearby|around me|a proximite|a proximite de moi|pres de moi|pres moi|ici)\b/g,' ').replace(/\s+/g,' ').trim(); }
+
+const STRONG_NON_VYBE_PRIMARY_TYPES = new Set(['hospital','doctor','pharmacy','dentist','police','fire_station','courthouse','government_office','post_office','school','university','airport','bus_station','train_station','transit_station']);
+const INTENT_TERMS: Array<[IntentKind,string[]]> = [
+  ['gaming',['gaming','game','games','arcade','playstation','xbox','bowling','billiards','billard','game room','jeux video','jeux vidéo','salle de jeux']],
+  ['quiet',['quiet','calm','chill','relax','peaceful','tranquil','study']],
+  ['romantic',['romantic','romance','date','couple','cozy','intimate']],
+  ['family',['family','kids','children','childrens','child friendly']],
+  ['outdoor',['outdoor','outdoors','nature','hiking','beach','garden','park']],
+  ['nightlife',['nightlife','bar','club','night club','nightclub','pub','karaoke']],
+  ['food',['food','eat','dining','restaurant','resto','pizza','burger','tacos']],
+  ['coffee',['coffee','cafe','café','tea','salon de thé']],
+  ['culture',['museum','gallery','theatre','theater','culture','art','library']],
+  ['shopping',['shopping','shop','store','mall','market']],
+  ['wellness',['wellness','spa','massage','yoga','relax']],
+  ['tourist',['tourist','tourism','attraction','landmark','monument','sightseeing']],
+  ['entertainment',['entertainment','fun','activity','activities','events','amusement','cinema','movie']],
+];
+
+export function normalizeCategoryQuery(query?: string): VybeCategory | null {
+  const n = cleanedQuery(query); if (!n) return null;
+  const exact = ALL_CATEGORIES.find(c => VYBE_CATEGORY_DEFINITIONS[c].aliases.some(a => normalizeText(a) === n));
+  if (exact) return exact;
+  const matches = ALL_CATEGORIES.filter(c => VYBE_CATEGORY_DEFINITIONS[c].aliases.some(a => { const x=normalizeText(a); return x.length >= 4 && (n.includes(x) || x.includes(n)); }));
+  return matches.length === 1 ? matches[0] : null;
 }
 
-function token(value?: string): string {
-  return normalize(value).replace(/ /g, '_');
+export function parseUserIntent(query?: string): UserIntent {
+  const raw = String(query ?? '').trim(); const n = cleanedQuery(raw); const requestedCategory = normalizeCategoryQuery(raw); const kinds: IntentKind[] = []; const terms: string[] = [];
+  for (const [kind, words] of INTENT_TERMS) { if (words.some(word => n.includes(normalizeText(word)))) { kinds.push(kind); terms.push(kind); } }
+  if (requestedCategory && !kinds.length) {
+    if (requestedCategory === 'games') kinds.push('gaming'); else if (requestedCategory === 'restaurant') kinds.push('food'); else if (requestedCategory === 'cafe') kinds.push('coffee'); else if (requestedCategory === 'nightlife') kinds.push('nightlife'); else if (requestedCategory === 'hotel') { /* identity only */ } else if (requestedCategory === 'outdoors' || requestedCategory === 'park') kinds.push('outdoor');
+  }
+  return { rawQuery: raw, requestedCategory, kinds, terms: [...new Set(terms)] };
 }
 
-export function classifyProviderPlace(
-  providerTypes: string[] = [],
-  providerPrimaryType?: string,
-  name?: string,
-): { canonicalCategory: VybeCategory; legacyCategory: CategoryType; mood: MoodType; confidence: number } {
-  const types = [...new Set(providerTypes.filter(Boolean).map(token))];
-  const primary = token(providerPrimaryType);
+function matchesType(definition: ProviderCategoryDefinition, types: string[]): boolean { const normalized = types.map(providerToken); return normalized.some(t => definition.googleIncludedTypes.some(x => providerToken(x) === t)); }
+function nameSignal(definition: ProviderCategoryDefinition, name?: string): boolean { const n=normalizeText(name); return definition.signals.some(s => n.includes(normalizeText(s))); }
+function strongestProviderType(types: string[], primary?: string): string { return providerToken(primary || types[0]); }
 
-  const exactPrimary = DEFINITIONS.find(d => d.types.some(t => token(t) === primary));
-  if (exactPrimary) return { canonicalCategory: exactPrimary.canonical, legacyCategory: exactPrimary.legacy, mood: exactPrimary.mood, confidence: 0.99 };
-
-  const byType = DEFINITIONS.find(d => types.some(t => d.types.some(x => token(x) === t)));
-  if (byType) return { canonicalCategory: byType.canonical, legacyCategory: byType.legacy, mood: byType.mood, confidence: 0.94 };
-
-  const n = normalize(name);
-  const byName = DEFINITIONS.find(d => d.signals.some(signal => n.includes(normalize(signal))));
-  if (byName) return { canonicalCategory: byName.canonical, legacyCategory: byName.legacy, mood: byName.mood, confidence: 0.78 };
-
-  return { canonicalCategory: 'entertainment', legacyCategory: 'entertainment', mood: 'explore', confidence: 0.35 };
+export function classifyProviderPlace(providerTypes: string[] = [], providerPrimaryType?: string, name?: string): { canonicalCategory: VybeCategory; legacyCategory: CategoryType; mood: MoodType; confidence: number; secondaryCategories: VybeCategory[]; evidenceSource: 'primaryType'|'types'|'name'; providerIdentityValid: boolean } {
+  const types = [...new Set(providerTypes.filter(Boolean))]; const primary = providerToken(providerPrimaryType); const strongNonVybe = STRONG_NON_VYBE_PRIMARY_TYPES.has(primary);
+  const primaryMatch = ALL_CATEGORIES.find(c => VYBE_CATEGORY_DEFINITIONS[c].googleIncludedTypes.some(t => providerToken(t) === primary));
+  let primaryCategory: VybeCategory | null = primaryMatch ?? null;
+  let evidenceSource: 'primaryType'|'types'|'name' = primaryMatch ? 'primaryType' : 'types';
+  if (!primaryCategory && !strongNonVybe) primaryCategory = PRECEDENCE.find(c => matchesType(VYBE_CATEGORY_DEFINITIONS[c], types)) ?? null;
+  if (!primaryCategory && !strongNonVybe) { primaryCategory = PRECEDENCE.find(c => nameSignal(VYBE_CATEGORY_DEFINITIONS[c], name)) ?? null; evidenceSource = 'name'; }
+  if (!primaryCategory) primaryCategory = 'entertainment';
+  const secondary = PRECEDENCE.filter(c => c !== primaryCategory && (matchesType(VYBE_CATEGORY_DEFINITIONS[c], types) || nameSignal(VYBE_CATEGORY_DEFINITIONS[c], name))).slice(0, 4);
+  const d = VYBE_CATEGORY_DEFINITIONS[primaryCategory]; const confidence = strongNonVybe ? 0.99 : primaryMatch ? 0.99 : types.some(t => matchesType(d,[t])) ? 0.94 : nameSignal(d,name) ? 0.78 : 0.35;
+  return { canonicalCategory: primaryCategory, legacyCategory:d.legacyCategory, mood:d.mood, confidence, secondaryCategories:secondary, evidenceSource, providerIdentityValid: !strongNonVybe };
 }
+
+export function placeMatchesCanonicalCategory(place: { canonicalCategory?: VybeCategory; providerTypes?: string[]; providerPrimaryType?: string; name: string }, requested: VybeCategory): boolean {
+  const analyzed = classifyProviderPlace(place.providerTypes ?? [], place.providerPrimaryType, place.name);
+  if (!analyzed.providerIdentityValid) return false;
+  if (analyzed.canonicalCategory === requested) return true;
+  const primary = providerToken(place.providerPrimaryType);
+  if (primary && VYBE_CATEGORY_DEFINITIONS[requested] && VYBE_CATEGORY_DEFINITIONS[requested].googleIncludedTypes.includes(primary)) return true;
+  return false;
+}
+
+function intentCompatible(category: VybeCategory, secondary: VybeCategory[], intent: UserIntent): 'HIGH'|'MEDIUM'|'LOW'|'N/A' {
+  if (!intent.rawQuery) return 'N/A';
+  if (intent.requestedCategory === category) return 'HIGH';
+  const secondarySet = new Set(secondary);
+  if (intent.kinds.includes('gaming') && (category === 'cafe' || category === 'games') && (secondarySet.has('games') || category === 'games')) return 'HIGH';
+  if (intent.kinds.includes('coffee') && category === 'cafe') return 'HIGH';
+  if (intent.kinds.includes('food') && category === 'restaurant') return 'HIGH';
+  if (intent.kinds.includes('nightlife') && category === 'nightlife') return 'HIGH';
+  if (intent.kinds.includes('culture') && ['arts-culture','library','worship'].includes(category)) return 'HIGH';
+  if (intent.kinds.includes('shopping') && category === 'shopping') return 'HIGH';
+  if (intent.kinds.includes('wellness') && category === 'wellness') return 'HIGH';
+  if (intent.kinds.includes('tourist') && category === 'tourist') return 'HIGH';
+  if (intent.kinds.includes('family') && (category === 'family-kids' || category === 'games' || secondarySet.has('family-kids'))) return 'MEDIUM';
+  if (intent.kinds.includes('outdoor') && ['park','outdoors'].includes(category)) return 'HIGH';
+  if (intent.kinds.includes('entertainment') && (category === 'entertainment' || category === 'cinema' || category === 'family-kids')) return 'MEDIUM';
+  if (intent.kinds.includes('quiet') && ['cafe','library','wellness','park','hotel'].includes(category)) return 'MEDIUM';
+  if (intent.kinds.includes('romantic') && ['restaurant','cafe','hotel','nightlife'].includes(category)) return 'MEDIUM';
+  return 'LOW';
+}
+
+export function evaluatePlaceRelevance(input: { provider?: 'google'|'osm'|'vybe'; providerPlaceId?: string; providerTypes?: string[]; providerPrimaryType?: string; canonicalCategory?: VybeCategory; name: string; query?: string; requestedCategory?: VybeCategory|null; distanceKm?: number; }): RelevanceEvidence & { canonicalCategory: VybeCategory; confidence: number; secondaryCategories: VybeCategory[]; mood: MoodType } {
+  const provider = input.provider ?? 'vybe'; const analysis = classifyProviderPlace(input.providerTypes ?? [], input.providerPrimaryType, input.name); const category = input.canonicalCategory ?? analysis.canonicalCategory; const secondary = analysis.secondaryCategories; const intent = parseUserIntent(input.query); const categoryTarget = input.requestedCategory ?? intent.requestedCategory;
+  const identityValid = provider === 'google' ? Boolean(input.providerPlaceId && /^[A-Za-z0-9_-]{1,300}$/.test(input.providerPlaceId) && analysis.providerIdentityValid) : provider === 'osm' ? Boolean(input.providerPlaceId?.startsWith('osm:')) : true;
+  const providerEvidenceSufficient = provider === 'google' ? Boolean(input.providerPlaceId && (input.providerPrimaryType || (input.providerTypes ?? []).length)) : Boolean((input.providerTypes ?? []).length || category);
+  const categoryMatch = categoryTarget ? (category === categoryTarget ? 'YES' : 'NO') : 'N/A';
+  const intentMatch = intentCompatible(category, secondary, intent);
+  const reasons: string[] = []; if (identityValid) reasons.push(`identity:${analysis.evidenceSource}`); else reasons.push('identity:invalid'); if (categoryMatch==='YES') reasons.push('category:match'); if (categoryMatch==='NO') reasons.push('category:mismatch'); if (intentMatch!=='N/A') reasons.push(`intent:${intentMatch.toLowerCase()}`); if (input.distanceKm !== undefined) reasons.push(`distance:${input.distanceKm.toFixed(2)}km`); reasons.push(`provider:${provider}`);
+  const accepted = identityValid && providerEvidenceSufficient && categoryMatch !== 'NO' && intentMatch !== 'LOW';
+  return { identityValid, providerEvidenceSufficient, providerIdentityConfidence: analysis.confidence, categoryMatch, intentMatch, distanceKm: input.distanceKm, provider, decision: accepted ? 'ACCEPT' : 'REJECT', reasons, canonicalCategory: category, confidence: analysis.confidence, secondaryCategories: secondary, mood: analysis.mood };
+}
+
+export function canonicalLabel(category?: VybeCategory): string { return category ? (VYBE_CATEGORY_DEFINITIONS[category]?.label ?? 'Place') : 'Place'; }
+export function legacyCategoryToCanonical(category: CategoryType): VybeCategory[] { return LEGACY_CATEGORY_TO_CANONICAL[category] ?? []; }
+export function categoryDefinition(category: VybeCategory): ProviderCategoryDefinition { return VYBE_CATEGORY_DEFINITIONS[category]; }
+export function categorySearchTypes(categories: VybeCategory[]): string[] { return [...new Set(categories.flatMap(c => VYBE_CATEGORY_DEFINITIONS[c]?.googleIncludedTypes ?? []))]; }
+export function categorySearchTextQueries(categories: VybeCategory[]): string[] { return [...new Set(categories.flatMap(c => VYBE_CATEGORY_DEFINITIONS[c]?.googleTextQueries ?? []))]; }
+export function categoryOsmClauses(categories: VybeCategory[]): string[] { return [...new Set(categories.flatMap(c => VYBE_CATEGORY_DEFINITIONS[c]?.osmClauses ?? []))]; }
+export function classifyPlace(types?: string[], name?: string): { category: CategoryType; mood: MoodType } { const x=classifyProviderPlace(types ?? [], undefined, name); return { category:x.legacyCategory, mood:x.mood }; }
