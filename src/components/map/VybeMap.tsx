@@ -12,7 +12,7 @@ import { GoogleMap } from './GoogleMap';
 import { isGoogleMapsConfigured } from '../../lib/env';
 import { useGeolocation } from '../../hooks/useGeolocation';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
-import { classifyPlace } from '../../services/googlePlacesAdapter';
+import { getPlaceCategoryEmoji } from './placeMarkerEmoji';
 
 const MAP_CATEGORY_FILTERS: Array<{ id: CategoryType | 'all'; label: string; emoji: string }> = [
   { id: 'all', label: 'All', emoji: '✨' },
@@ -34,41 +34,11 @@ const MapController: React.FC<{ center: [number, number]; zoom?: number }> = ({ 
   return null;
 };
 
-function getPlaceMarkerEmoji(place: Place): string {
-  const text = `${place.name} ${place.tags.join(' ')}`.toLowerCase();
-  const { category } = classifyPlace(place.tags, place.name);
-  if (/mosque|masjid|مسجد|جامع/.test(text)) return '🕌';
-  if (/church|eglise|église|كنيسة/.test(text)) return '⛪';
-  if (/synagogue|كنيس/.test(text)) return '🕍';
-  if (/hospital|clinic|pharmacy|hôpital|clinique|مستشفى|صيدلية/.test(text)) return '🏥';
-  if (/hotel|hostel|motel|hôtel|فندق/.test(text)) return '🏨';
-  if (/school|university|école|université|مدرسة|جامعة/.test(text)) return '🎓';
-  if (/restaurant|food|bakery|مطعم|مخبزة/.test(text)) return '🍽️';
-  if (/coffee|cafe|café|قهوة|مقهى/.test(text)) return '☕';
-  if (/game|arcade|jeux|gaming|video_arcade|ألعاب|bowling|mini golf/.test(text)) return '🎮';
-  if (/cinema|movie|theater|film|cinéma|سينما|مسرح/.test(text)) return '🎬';
-  if (/gym|fitness|sport|stadium|pool|tennis|رياضة|ملعب|مسبح/.test(text)) return '🏋️';
-  if (/park|garden|playground|nature|حديقة/.test(text)) return '🌳';
-  if (/shopping|mall|store|market|boutique|تسوق|سوق/.test(text)) return '🛍️';
-  if (/museum|gallery|library|متحف|مكتبة/.test(text)) return '🏛️';
-  if (/bar|club|nightlife|music|karaoke|موسيقى/.test(text)) return '🎵';
-  if (/airport|station|bus|train|transit|مطار|محطة/.test(text)) return '🚉';
-  switch (category) {
-    case 'food-drink': return '🍽️';
-    case 'nightlife': return '🎵';
-    case 'arcade-gaming': return '🎮';
-    case 'outdoors-nature': return '🌳';
-    case 'entertainment': return '🎬';
-    case 'arts-culture': return '🏛️';
-    case 'shopping-vintage': return '🛍️';
-    case 'chill-spots': return '☕';
-    default: return '📍';
-  }
-}
+
 
 function createCustomMarkerIcon(place: Place, isSelected: boolean) {
   const moodObj = INITIAL_MOODS.find(m => m.id === place.primaryMood);
-  const emoji = getPlaceMarkerEmoji(place);
+  const emoji = getPlaceCategoryEmoji(place);
   const color = moodObj?.accentColor || '#CCFF00';
   const imageUrl = place.images.find(image => /^https?:\/\//i.test(image?.trim()))?.trim();
   const fallback = `<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:20px;background:${color}">${emoji}</span>`;
@@ -99,7 +69,7 @@ const PlacePreview: React.FC<{
   const activeIndex = available.includes(imageIndex) ? imageIndex : (available[0] ?? -1);
   const imageUrl = activeIndex >= 0 ? imageUrls[activeIndex] : undefined;
   const hasDistance = typeof place.distanceKm === 'number' && Number.isFinite(place.distanceKm) && place.distanceKm >= 0;
-  const emoji = getPlaceMarkerEmoji(place);
+  const emoji = getPlaceCategoryEmoji(place);
   const categoryLabel = MAP_CATEGORY_FILTERS.find(item => item.id === place.category)?.label ?? place.category;
 
   return (

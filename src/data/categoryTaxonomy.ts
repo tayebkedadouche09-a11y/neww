@@ -1,1 +1,1 @@
-export * from '../../api/_shared/classify';
+export * from '../../api/_shared/classify.ts';

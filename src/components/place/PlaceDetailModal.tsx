@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, MapPin, Clock, Heart, Bookmark, Share2, Plus, Star, Sparkles, ExternalLink, Navigation, MessageSquarePlus, Gem } from 'lucide-react';
+import { X, MapPin, Clock, Heart, Bookmark, Share2, Plus, Star, Sparkles, ExternalLink, Navigation, MessageSquarePlus, Gem, BadgeCheck as BadgeCheckIcon } from 'lucide-react';
 import { Place } from '../../types';
 import { VybeScoreBadge } from '../common/VybeScoreBadge';
 import { calculateVybeScore } from '../../hooks/useVybeScore';
@@ -8,22 +8,35 @@ import { useData } from '../../context/DataContext';
 import { INITIAL_MOODS } from '../../data/initialMoods';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { getGoogleMapsPlaceUrl, getGooglePlaceDetails } from '../../services/googlePlaces';
+import { canonicalLabel } from '../../data/categoryTaxonomy';
 
 function getPlaceFallbackEmoji(place: Place): string {
-  const haystack = `${place.name} ${place.tags.join(' ')}`.toLowerCase();
-  if (/mosque|masjid|مسجد|جامع/.test(haystack)) return '🕌';
-  if (/church|eglise|église|كنيسة/.test(haystack)) return '⛪';
-  if (/hospital|clinic|hôpital|مستشفى/.test(haystack)) return '🏥';
-  if (/hotel|hôtel|فندق/.test(haystack)) return '🏨';
-  if (/restaurant|food|bakery|مطعم|مخبزة/.test(haystack)) return '🍽️';
-  if (/coffee|cafe|café|قهوة|مقهى/.test(haystack)) return '☕';
-  if (/game|arcade|jeux|gaming|ألعاب|bowling/.test(haystack)) return '🎮';
-  if (/cinema|movie|theater|film|سينما|مسرح/.test(haystack)) return '🎬';
-  if (/gym|fitness|sport|stadium|رياضة|ملعب/.test(haystack)) return '🏋️';
-  if (/park|garden|playground|حديقة/.test(haystack)) return '🌳';
-  if (/shopping|mall|store|تسوق|سوق/.test(haystack)) return '🛍️';
-  if (/museum|gallery|library|متحف|مكتبة/.test(haystack)) return '🏛️';
-  if (/bar|club|nightlife|music|موسيقى/.test(haystack)) return '🎵';
+  const canonical = place.canonicalCategory;
+  if (canonical === 'worship') {
+    const text = `${place.name} ${place.tags.join(' ')}`.toLowerCase();
+    if (/church|eglise|église|كنيسة/.test(text)) return '⛪';
+    if (/synagogue/.test(text)) return '🕍';
+    if (/temple|hindu|hindou|معبد/.test(text)) return '🛕';
+    return '🕌';
+  }
+  switch (canonical) {
+    case 'restaurant': return '🍽️';
+    case 'cafe': return '☕';
+    case 'games': return '🎮';
+    case 'cinema': return '🎬';
+    case 'park':
+    case 'outdoors': return '🌳';
+    case 'gym': return '🏋️';
+    case 'shopping': return '🛍️';
+    case 'nightlife': return '🎵';
+    case 'family-kids': return '🎪';
+    case 'tourist': return '🏛️';
+    case 'arts-culture': return '🎭';
+    case 'library': return '📚';
+    case 'wellness': return '🧘';
+    case 'hotel': return '🏨';
+    case 'entertainment': return '🎡';
+  }
   switch (place.category) {
     case 'food-drink': return '🍽️';
     case 'nightlife': return '🎵';
@@ -167,10 +180,7 @@ export const PlaceDetailModal: React.FC = () => {
               <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border"><span className="text-xs text-slate-400 font-mono">IDEAL DURATION</span><p className="font-display font-bold text-base text-slate-900 dark:text-white mt-1">{selectedPlace.estimatedDuration || 'Flexible'}</p></div>
               <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border"><span className="text-xs text-slate-400 font-mono">STATUS NOW</span><p className="font-display font-bold text-base mt-1 flex items-center gap-1.5"><span className={`w-2.5 h-2.5 rounded-full ${selectedPlace.openingHours.isOpenNow === true ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} /><span className={selectedPlace.openingHours.isOpenNow === true ? 'text-emerald-500 dark:text-emerald-400' : 'text-slate-400'}>{selectedPlace.openingHours.isOpenNow === undefined ? 'Status unavailable' : selectedPlace.openingHours.isOpenNow ? 'Open Now' : 'Closed'}</span></p></div>
               <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border"><span className="text-xs text-slate-400 font-mono">SUITABLE FOR</span><p className="font-display font-bold text-base text-slate-900 dark:text-white mt-1 capitalize">{selectedPlace.suitableFor.join(', ') || 'Everyone'}</p></div>
-            </div>
-
-            <div className="space-y-3"><h3 className="font-display font-bold text-lg text-slate-900 dark:text-white">About the Vibe</h3><p className="text-sm sm:text-base text-slate-700 dark:text-slate-300 leading-relaxed">{selectedPlace.description || 'A real place discovered through VYBE.'}</p></div>
-            <div className="space-y-3"><h3 className="font-display font-bold text-sm text-slate-900 dark:text-white uppercase tracking-wider">Highlights & Features</h3><div className="flex flex-wrap gap-2">{selectedPlace.tags.map(tag => <span key={tag} className="px-3 py-1 rounded-xl bg-vybe-lime/10 text-slate-900 dark:text-vybe-lime border border-vybe-lime/30 text-xs font-semibold">#{tag}</span>)}{selectedPlace.features.isSecretGem && <span className="px-3 py-1 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/30 text-xs font-semibold flex items-center gap-1"><Gem className="w-3.5 h-3.5"/> Secret Gem</span>}{selectedPlace.features.isOutdoor && <span className="px-3 py-1 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs font-semibold">🌿 Open Air / Outdoor</span>}{selectedPlace.features.isLateNight && <span className="px-3 py-1 rounded-xl bg-pink-500/10 text-pink-400 border border-pink-500/30 text-xs font-semibold">🌙 Late Night Spot</span>}{selectedPlace.features.isPetFriendly && <span className="px-3 py-1 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/30 text-xs font-semibold">🐾 Dog Friendly</span>}</div></div>
+            </div>            <div className="space-y-3"><h3 className="font-display font-bold text-lg text-slate-900 dark:text-white">About the Vibe</h3><p className="text-sm sm:text-base text-slate-700 dark:text-slate-300 leading-relaxed">{selectedPlace.description || 'A real place discovered through VYBE.'}</p></div>            {(selectedPlace.canonicalCategory || (selectedPlace.secondaryCategories && selectedPlace.secondaryCategories.length > 0) || selectedPlace.relevance) && <div className="p-5 rounded-2xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border space-y-3"><div className="flex items-center justify-between gap-3"><h3 className="font-display font-bold text-sm text-slate-900 dark:text-white uppercase tracking-wider">Place identity & match evidence</h3><span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${selectedPlace.relevance?.decision === 'ACCEPT' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/30' : 'bg-rose-500/10 text-rose-500 border border-rose-500/30'}`}>{selectedPlace.relevance?.decision === 'ACCEPT' ? 'Relevant match' : 'Identity only'}</span></div>{selectedPlace.canonicalCategory && <div className="text-xs text-slate-700 dark:text-slate-300 flex flex-wrap items-center gap-2"><span>Primary identity:</span><strong className="font-black text-slate-900 dark:text-white">{canonicalLabel(selectedPlace.canonicalCategory)}</strong>{selectedPlace.provider === 'google' && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-vybe-cyan/10 border border-vybe-cyan/20 text-vybe-cyan font-bold"><BadgeCheckIcon className="w-3 h-3"/>Google provider-verified</span>}{selectedPlace.provider === 'osm' && <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 font-bold">OpenStreetMap</span>}</div>}{(selectedPlace.secondaryCategories && selectedPlace.secondaryCategories.length > 0) && <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300"><span className="font-bold">Also offers:</span>{selectedPlace.secondaryCategories.map(secondary => <span key={secondary} className="px-2 py-0.5 rounded-md bg-vybe-lime/10 border border-vybe-lime/25 text-vybe-lime font-bold">{canonicalLabel(secondary)}</span>)}</div>}{selectedPlace.provider === 'google' && (selectedPlace.providerPrimaryType || (selectedPlace.providerTypes && selectedPlace.providerTypes.length > 0)) && <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400">provider types: {selectedPlace.providerPrimaryType || (selectedPlace.providerTypes || []).slice(0, 6).join(', ')}</div>}{selectedPlace.relevance && <div className="pt-2 border-t border-slate-200 dark:border-white/10 space-y-2"><div className="text-[11px] font-mono text-slate-500 dark:text-slate-400 flex flex-wrap gap-x-3 gap-y-1"><span>identity confidence: {Math.round((selectedPlace.relevance.providerIdentityConfidence || 0) * 100)}%</span>{selectedPlace.relevance.categoryMatch !== 'N/A' && <span>category: {selectedPlace.relevance.categoryMatch}</span>}{selectedPlace.relevance.intentMatch !== 'N/A' && <span>intent: {selectedPlace.relevance.intentMatch}</span>}</div><div className="flex flex-wrap gap-1.5">{selectedPlace.relevance.reasons.map(reason => <span key={reason} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 dark:bg-vybe-dark-card border border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400">{reason}</span>)}</div></div>}</div>}            <div className="space-y-3"><h3 className="font-display font-bold text-sm text-slate-900 dark:text-white uppercase tracking-wider">Highlights & Features</h3><div className="flex flex-wrap gap-2">{selectedPlace.tags.map(tag => <span key={tag} className="px-3 py-1 rounded-xl bg-vybe-lime/10 text-slate-900 dark:text-vybe-lime border border-vybe-lime/30 text-xs font-semibold">#{tag}</span>)}{selectedPlace.features.isSecretGem && <span className="px-3 py-1 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/30 text-xs font-semibold flex items-center gap-1"><Gem className="w-3.5 h-3.5"/> Secret Gem</span>}{selectedPlace.features.isOutdoor && <span className="px-3 py-1 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs font-semibold">🌿 Open Air / Outdoor</span>}{selectedPlace.features.isLateNight && <span className="px-3 py-1 rounded-xl bg-pink-500/10 text-pink-400 border border-pink-500/30 text-xs font-semibold">🌙 Late Night Spot</span>}{selectedPlace.features.isPetFriendly && <span className="px-3 py-1 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/30 text-xs font-semibold">🐾 Dog Friendly</span>}</div></div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-5 rounded-2xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border"><div className="space-y-2"><h4 className="font-display font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1.5"><Clock className="w-4 h-4 text-vybe-lime"/><span>Opening Timetable</span></h4><div className="text-xs space-y-1 font-mono text-slate-600 dark:text-slate-300"><div className="flex justify-between"><span>Mon - Thu:</span><span>{selectedPlace.openingHours.monday || '—'}</span></div><div className="flex justify-between"><span>Friday:</span><span>{selectedPlace.openingHours.friday || '—'}</span></div><div className="flex justify-between"><span>Saturday:</span><span>{selectedPlace.openingHours.saturday || '—'}</span></div><div className="flex justify-between"><span>Sunday:</span><span>{selectedPlace.openingHours.sunday || '—'}</span></div></div></div><div className="space-y-3 flex flex-col justify-between"><div><h4 className="font-display font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1.5"><Navigation className="w-4 h-4 text-vybe-cyan"/><span>Location & Directions</span></h4><p className="text-xs text-slate-600 dark:text-slate-300 mt-1">{selectedPlace.location.address}</p></div><button type="button" onClick={openInAppMap} className="w-full py-2.5 px-4 rounded-xl bg-vybe-lime text-black font-display font-bold text-xs flex items-center justify-center gap-2 shadow-neon-lime hover:scale-[1.02] transition-all"><MapPin className="w-4 h-4"/> View on VYBE Map</button><button type="button" onClick={openGoogleMaps} className="w-full py-2.5 px-4 rounded-xl bg-black text-white dark:bg-white dark:text-black font-display font-bold text-xs flex items-center justify-center gap-2 shadow-md hover:scale-[1.02] transition-all"><ExternalLink className="w-4 h-4"/> Open in Navigation / Maps</button></div></div>
 

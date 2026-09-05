@@ -1,14 +1,14 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 const read=file=>fs.readFileSync(new URL(`../${file}`,import.meta.url),'utf8');
-const shared=read('api/_shared/classify.ts'),taxonomy=read('src/data/categoryTaxonomy.ts'),discovery=read('src/services/discoveryService.ts'),adapter=read('src/services/googlePlacesAdapter.ts'),google=read('src/services/googlePlaces.ts'),types=read('src/types/index.ts'),materializer=read('api/materialize-google-place.ts');
+const shared=read('api/_shared/classify.ts'),taxonomy=read('src/data/categoryTaxonomy.ts'),discovery=read('src/services/discoveryService.ts'),pipeline=read('src/services/placePipeline.ts'),adapter=read('src/services/googlePlacesAdapter.ts'),google=read('src/services/googlePlaces.ts'),types=read('src/types/index.ts'),materializer=read('api/materialize-google-place.ts');
 const categories=['restaurant','cafe','games','cinema','park','gym','shopping','nightlife','family-kids','tourist','arts-culture','outdoors','wellness','hotel','library','worship','entertainment'];
-assert.equal(taxonomy.trim(),"export * from '../../api/_shared/classify';","frontend taxonomy must be a façade over the shared engine");
+assert.equal(taxonomy.trim(),"export * from '../../api/_shared/classify.ts';","frontend taxonomy must be a façade over the shared engine");
 for(const category of categories)assert.match(shared,new RegExp(`id:'${category}'`),`${category}: canonical definition missing`);
 assert.match(types,/export type VybeCategory/);assert.match(types,/PlacePhotoIdentity/);assert.match(types,/PlaceRelevanceEvidence/);
 assert.match(shared,/classifyProviderPlace/);assert.match(shared,/parseUserIntent/);assert.match(shared,/evaluatePlaceRelevance/);assert.match(shared,/isGooglePhotoIdentityExact/);assert.match(shared,/extractCategoryHint/);
 assert.match(shared,/STRONG_NON_VYBE_PRIMARY_TYPES/);assert.match(shared,/secondaryCategories/);
-assert.match(discovery,/evaluatePlaceRelevance/);assert.match(discovery,/deduplicatePlaces/);assert.match(discovery,/MAX_RESULTS/);assert.doesNotMatch(discovery,/classifyPlace\(/);
+assert.match(pipeline,/evaluatePlaceRelevance/);assert.match(pipeline,/deduplicatePlaces/);assert.match(pipeline,/MAX_RESULTS/);assert.match(pipeline,/limitCoverage\(ps: Place\[\]\): Place\[\] \{[\s\S]*?slice\(0, MAX_RESULTS\)/);assert.match(discovery,/discoverPlaces/);assert.doesNotMatch(discovery,/classifyPlace\(/);
 assert.match(adapter,/photoIdentities/);assert.match(adapter,/isGooglePhotoIdentityExact/);assert.match(adapter,/canonicalCategory/);assert.match(adapter,/providerIdentityConfidence/);
 assert.match(google,/photos/);assert.match(google,/getURI/);assert.match(google,/useStrictTypeFiltering\s*:/);assert.match(google,/includedType/);assert.match(google,/isGooglePhotoIdentityExact/);
 assert.match(materializer,/photos/);assert.match(materializer,/verifiedId!==placeId/);assert.match(materializer,/classifyProviderPlace/);assert.match(materializer,/provider_types/);
