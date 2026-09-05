@@ -13,6 +13,7 @@ assert(googleAdapter.includes('isGooglePhotoIdentityExact')&&googleAdapter.inclu
 assert(placeCard.includes('const displayCategory=place.category')&&!placeCard.includes('classifyPlace(place.tags'),'Cards render the canonical result instead of reclassifying it.');
 assert(googleServer.includes('photos')&&googleServer.includes('verifiedId!==placeId')&&googleServer.includes('classifyProviderPlace'),'Server-side materialization verifies Google identity and requests photo metadata through the shared classifier.');
 assert(placesService.includes("provider==='google'?[]")||placesService.includes("provider==='google' ? []"),'Google photo URLs are not persisted as durable catalog images.');
-assert(packageJson.includes('"test":"node --experimental-strip-types --test tests/place-intelligence.test.ts"')&&ci.includes('npm test'),'CERT regression tests are part of CI.');
+const certTestScript = /\"test\"\s*:\s*\"[^\"]*tests\/place-intelligence\.test\.ts[^\"]*tests\/race-guards\.test\.ts[^\"]*\"/.test(packageJson);
+assert(certTestScript&&ci.includes('npm test'),'CERT regression tests are part of CI.');
 assert(taxonomy.includes("'Hotel'")===false,'No legacy duplicate category-definition table remains in the frontend taxonomy module.');
 const failed=checks.filter(x=>!x.condition).length;if(failed){console.error(`\n${failed} production invariant(s) failed.`);process.exit(1)}console.log(`\n${checks.length} production invariants passed.`);
