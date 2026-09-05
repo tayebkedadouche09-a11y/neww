@@ -46,6 +46,7 @@ try {
   page.on('response', r => {
     const u = r.url();
     if (u.includes('/api/')) report.apiResponses.push(`${r.status()} ${u.replace(PRODUCTION_URL, '')}`);
+    else if (r.status() >= 400) report.apiResponses.push(`HTTP ${r.status()} ${u.replace(/(key=|X-Goog-Api-Key=)[^&]+/g, '$1REDACTED').replace(/.*maps\.googleapis\.com/, 'maps.googleapis.com').slice(0, 200)}`);
   });
   await page.setGeolocation({ latitude: FIXED_LAT, longitude: FIXED_LNG, accuracy: 20 });
   await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
