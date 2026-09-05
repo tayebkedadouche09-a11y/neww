@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { haversineDistanceKm } from '../lib/distance';
-import { DEFAULT_VYBE_LOCATION } from '../data/locationPresets';
+import { fetchGeoFallback, type GeoFallbackResult } from '../services/geoFallbackService';
 
 export { haversineDistanceKm };
 
@@ -12,32 +12,28 @@ export interface GeoLocation {
 }
 
 export type GeoError = 'DENIED' | 'UNAVAILABLE' | 'TIMEOUT' | 'UNSUPPORTED';
-export type GeoLocationSource = 'device' | 'fallback';
+
+export type LocationSource = 'browser' | 'vercel-edge' | 'country-city-default' | 'product-default' | null;
 
 interface GeoState {
   location: GeoLocation | null;
   error: GeoError | null;
   loading: boolean;
   permissionState: PermissionState | null;
-  source: GeoLocationSource | null;
+  /** Where the current coordinates came from (browser GPS vs IP/edge fallback). */
+  locationSource: LocationSource;
+  /** Human label when using approximate fallback (e.g. "Algiers"). */
+  locationLabel: string | null;
 }
 
-const FALLBACK_LOCATION: GeoLocation = {
-  lat: DEFAULT_VYBE_LOCATION.lat,
-  lng: DEFAULT_VYBE_LOCATION.lng,
-  // A fallback city is intentionally not represented as device accuracy.
-  accuracy: 25_000,
-  timestamp: Date.now(),
-};
-
 /**
- * Browser geolocation hook with a production-safe city fallback.
+ * Browser geolocation hook with Vercel edge IP fallback.
  *
- * - Requests device location when the app asks for it.
- * - Uses the user's device coordinates when permission is granted.
- * - Never leaves discovery without a usable location: denied/unavailable/
- *   timeout/unsupported browsers fall back to the default VYBE city.
- * - Does not poll or track continuously.
+ * Priority:
+ * 1. Browser Geolocation API (precise, requires permission)
+ * 2. GET /api/geo-fallback (Vercel x-vercel-ip-* headers + Algeria city defaults)
+ *
+ * Fallback never leaves the app with zero discovery coordinates.
  */
 export function useGeolocation() {
   const [state, setState] = useState<GeoState>({
@@ -45,8 +41,11 @@ export function useGeolocation() {
     error: null,
     loading: false,
     permissionState: null,
-    source: null,
+    locationSource: null,
+    locationLabel: null,
   });
+  const fallbackInFlight = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   const isSupported = typeof navigator !== 'undefined' && 'geolocation' in navigator;
 
@@ -71,15 +70,51 @@ export function useGeolocation() {
     }
   }, [isSupported]);
 
+  const applyFallback = useCallback(async (browserError: GeoError | null) => {
+    if (fallbackInFlight.current) return;
+    fallbackInFlight.current = true;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setState(prev => ({ ...prev, loading: true }));
+
+    try {
+      const fallback: GeoFallbackResult | null = await fetchGeoFallback(controller.signal);
+      if (fallback) {
+        setState({
+          location: {
+            lat: fallback.lat,
+            lng: fallback.lng,
+            accuracy: fallback.accuracy,
+            timestamp: fallback.timestamp,
+          },
+          // Keep the browser error visible so UI can still prompt to allow precise location.
+          error: browserError,
+          loading: false,
+          permissionState: browserError === 'DENIED' ? 'denied' : null,
+          locationSource: fallback.source,
+          locationLabel: fallback.label ?? fallback.city ?? null,
+        });
+        return;
+      }
+    } finally {
+      fallbackInFlight.current = false;
+    }
+
+    setState(prev => ({
+      ...prev,
+      location: null,
+      error: browserError ?? 'UNAVAILABLE',
+      loading: false,
+      locationSource: null,
+      locationLabel: null,
+    }));
+  }, []);
+
   const requestLocation = useCallback(() => {
     if (!isSupported) {
-      setState({
-        location: FALLBACK_LOCATION,
-        error: 'UNSUPPORTED',
-        loading: false,
-        permissionState: null,
-        source: 'fallback',
-      });
+      void applyFallback('UNSUPPORTED');
       return;
     }
 
@@ -97,7 +132,8 @@ export function useGeolocation() {
           error: null,
           loading: false,
           permissionState: 'granted',
-          source: 'device',
+          locationSource: 'browser',
+          locationLabel: null,
         });
       },
       err => {
@@ -105,14 +141,7 @@ export function useGeolocation() {
         if (err.code === err.PERMISSION_DENIED) error = 'DENIED';
         else if (err.code === err.POSITION_UNAVAILABLE) error = 'UNAVAILABLE';
         else if (err.code === err.TIMEOUT) error = 'TIMEOUT';
-
-        setState({
-          location: FALLBACK_LOCATION,
-          error,
-          loading: false,
-          permissionState: err.code === err.PERMISSION_DENIED ? 'denied' : null,
-          source: 'fallback',
-        });
+        void applyFallback(error);
       },
       {
         enableHighAccuracy: false,
@@ -120,11 +149,20 @@ export function useGeolocation() {
         maximumAge: 5 * 60 * 1000,
       }
     );
-  }, [isSupported]);
+  }, [isSupported, applyFallback]);
 
   const clearLocation = useCallback(() => {
-    setState(prev => ({ ...prev, location: null, error: null, source: null }));
+    abortRef.current?.abort();
+    setState(prev => ({
+      ...prev,
+      location: null,
+      error: null,
+      locationSource: null,
+      locationLabel: null,
+    }));
   }, []);
+
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   return {
     ...state,
