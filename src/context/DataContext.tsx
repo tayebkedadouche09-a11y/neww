@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Place, MoodType, FilterState, Collection, VybePlan, PlanItem, PlaceReview } from '../types';
 import { calculateVybeScore } from '../hooks/useVybeScore';
-import { useGeolocation, GeoLocation } from '../hooks/useGeolocation';
+import { useGeolocation, GeoLocation, LocationSource } from '../hooks/useGeolocation';
 import { useAuth } from './AuthContext';
 import { dataMode } from '../lib/dataMode';
 import { newUuid } from '../services/mappers';
@@ -18,7 +18,7 @@ interface DataContextType {
   places: Place[]; activeTab: ActiveTab; setActiveTab: (tab: ActiveTab) => void;
   activeHeroMood: MoodType | null; setActiveHeroMood: (mood: MoodType | null) => void;
   filters: FilterState; setFilters: React.Dispatch<React.SetStateAction<FilterState>>; resetFilters: () => void;
-  discoveryLoading: boolean; discoveryError: string | null; locationError: string | null; userLocation: GeoLocation | null;
+  discoveryLoading: boolean; discoveryError: string | null; locationError: string | null; userLocation: GeoLocation | null; locationLabel: string | null; locationSource: LocationSource;
   requestLocationAndDiscover: () => void; discover: (overrideFilters?: FilterState) => void; discoverAtLocation: (location: GeoLocation, overrideFilters?: FilterState) => void;
   selectedPlace: Place | null; setSelectedPlace: (place: Place | null) => void; isDetailOpen: boolean; setIsDetailOpen: (open: boolean) => void;
   openPlaceDetail: (place: Place) => void; isReviewModalOpen: boolean; setIsReviewModalOpen: (open: boolean) => void;
@@ -372,7 +372,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const value: DataContextType = {
     places, activeTab, setActiveTab, activeHeroMood, setActiveHeroMood, filters, setFilters, resetFilters,
-    discoveryLoading, discoveryError, locationError: geo.error, userLocation: geo.location,
+    discoveryLoading, discoveryError, locationError: geo.error, userLocation: geo.location, locationLabel: geo.locationLabel, locationSource: geo.locationSource,
     requestLocationAndDiscover, discover, discoverAtLocation,
     selectedPlace, setSelectedPlace, isDetailOpen, setIsDetailOpen, openPlaceDetail,
     isReviewModalOpen, setIsReviewModalOpen, isShareModalOpen, setIsShareModalOpen, shareTargetPlace, openShareModal,
