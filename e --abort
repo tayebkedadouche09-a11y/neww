@@ -1,0 +1,372 @@
+[33mcommit 61f54d5ddd1a3c872165dd19d2a475ef3989208c[m[33m ([m[1;32mmain[m[33m)[m
+Author: tayebkedadouche09-a11y <tayebkedadouche09-a11y@users.noreply.github.com>
+Date:   Fri Sep 4 12:33:46 2026 +0100
+
+    save local changes
+
+[1mdiff --git a/.freebuff/preview-26d0c656-078b-49d2-be57-c58c561fde8d.log.err b/.freebuff/preview-26d0c656-078b-49d2-be57-c58c561fde8d.log.err[m
+[1mnew file mode 100644[m
+[1mindex 0000000..da64c8d[m
+[1m--- /dev/null[m
+[1m+++ b/.freebuff/preview-26d0c656-078b-49d2-be57-c58c561fde8d.log.err[m
+[36m@@ -0,0 +1,2 @@[m
+[32m+[m[32mnpm notice run vybe@1.0.0 dev[m
+[32m+[m[32mnpm notice run vite[m
+[1mdiff --git a/.freebuff/project-id b/.freebuff/project-id[m
+[1mnew file mode 100644[m
+[1mindex 0000000..9150afc[m
+[1m--- /dev/null[m
+[1m+++ b/.freebuff/project-id[m
+[36m@@ -0,0 +1 @@[m
+[32m+[m[32mef6114f4-4a0f-4dc0-8784-90125c9f9d8a[m
+[1mdiff --git a/.freebuff/run.md b/.freebuff/run.md[m
+[1mnew file mode 100644[m
+[1mindex 0000000..9d444dc[m
+[1m--- /dev/null[m
+[1m+++ b/.freebuff/run.md[m
+[36m@@ -0,0 +1,31 @@[m
+[32m+[m[32m# VYBE — local run doc[m
+[32m+[m
+[32m+[m[32m## Reproduce uncommitted artifacts[m
+[32m+[m
+[32m+[m[32mThis thread's workspace IS the main checkout (`C:\Users\tayeb\Desktop\neww`), so[m
+[32m+[m[32mno copying from another worktree is needed.[m
+[32m+[m
+[32m+[m[32m1. `.env` — already present in the checkout (contains `VITE_SUPABASE_URL`,[m
+[32m+[m[32m   `VITE_SUPABASE_ANON_KEY`, `VITE_GOOGLE_MAPS_API_KEY`, `VITE_SITE_URL`,[m
+[32m+[m[32m   `VITE_DEMO_MODE=false`). Copy from `.env.example` and fill values if missing.[m
+[32m+[m[32m2. Dependencies — `node_modules` already installed. Reinstall only if missing:[m
+[32m+[m[32m   `npm install`.[m
+[32m+[m
+[32m+[m[32m## Run the dev server[m
+[32m+[m
+[32m+[m[32m```bash[m
+[32m+[m[32mnpm run dev[m
+[32m+[m[32m```[m
+[32m+[m
+[32m+[m[32m- Vite dev server, port **5173** (config: `vite.config.ts`).[m
+[32m+[m[32m- `vite.config.ts` mounts a dev-only middleware that runs the real[m
+[32m+[m[32m  `api/osm-discovery.ts` serverless function locally (no 404s for `/api/*`).[m
+[32m+[m[32m- Live mode is on: real Supabase backend + Google Places.[m
+[32m+[m
+[32m+[m[32mDetached start (Windows):[m
+[32m+[m
+[32m+[m[32m```powershell[m
+[32m+[m[32mpowershell -NoProfile -Command "(Start-Process -FilePath 'npm.cmd' -ArgumentList 'run','dev' -RedirectStandardOutput '.freebuff\preview-26d0c656-078b-49d2-be57-c58c561fde8d.log' -RedirectStandardError '.freebuff\preview-26d0c656-078b-49d2-be57-c58c561fde8d.log.err' -WindowStyle Hidden -PassThru).Id"[m
+[32m+[m[32m```[m
+[32m+[m
+[32m+[m[32mHealth check: `curl -s -o /dev/null -w '%{http_code}' http://localhost:5173/`[m
+[1mdiff --git a/.freebuff/tmp/mt1_msgs.txt b/.freebuff/tmp/mt1_msgs.txt[m
+[1mnew file mode 100644[m
+[1mindex 0000000..6972570[m
+[1m--- /dev/null[m
+[1m+++ b/.freebuff/tmp/mt1_msgs.txt[m
+[36m@@ -0,0 +1 @@[m
+[32m+[m[32m6a99f5a2af77f54f2bd448ea|Reset your password;;6a99a9cf2f755d164ed6ecb7|Confirm your email address[m
+[1mdiff --git a/.freebuff/tmp/mt2_creds.txt b/.freebuff/tmp/mt2_creds.txt[m
+[1mnew file mode 100644[m
+[1mindex 0000000..d3b9409[m
+[1m--- /dev/null[m
+[1m+++ b/.freebuff/tmp/mt2_creds.txt[m
+[36m@@ -0,0 +1 @@[m
+[32m+[m[32mvybe.finalqa.221949@uberip.com|Vb!q9a6ceae6172ddAa1[m
+[1mdiff --git a/.freebuff/tmp/mt2_token.txt b/.freebuff/tmp/mt2_token.txt[m
+[1mnew file mode 100644[m
+[1mindex 0000000..8b13789[m
+[1m--- /dev/null[m
+[1m+++ b/.freebuff/tmp/mt2_token.txt[m
+[36m@@ -0,0 +1 @@[m
+[32m+[m
+[1mdiff --git a/.freebuff/tmp/osm_gym.json b/.freebuff/tmp/osm_gym.json[m
+[1mnew file mode 100644[m
+[1mindex 0000000..44742c8[m
+[1m--- /dev/null[m
+[1m+++ b/.freebuff/tmp/osm_gym.json[m
+[36m@@ -0,0 +1,156 @@[m
+[32m+[m[32m{[m
+[32m+[m[32m  "version": 0.6,[m
+[32m+[m[32m  "generator": "Overpass API 0.7.62.11 87bfad18",[m
+[32m+[m[32m  "osm3s": {[m
+[32m+[m[32m    "timestamp_osm_base": "2026-05-06T03:25:00Z",[m
+[32m+[m[32m    "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."[m
+[32m+[m[32m  },[m
+[32m+[m[32m  "elements": [[m
+[32m+[m
+[32m+[m[32m{[m
+[32m+[m[32m  "type": "node",[m
+[32m+[m[32m  "id": 4271806891,[m
+[32m+[m[32m  "lat": 36.7661472,[m
+[32m+[m[32m  "lon": 3.0075016,[m
+[32m+[m[32m  "tags": {[m
+[32m+[m[32m    "leisure": "fitness_centre",[m
+[32m+[m[32m    "name": "Centre nationale de médecine de sport"[m
+[32m+[m[32m  }[m
+[32m+[m[32m},[m
+[32m+[m[32m{[m
+[32m+[m[32m  "type": "node",[m
+[32m+[m[32m  "id": 4383565797,[m
+[32m+[m[32m  "lat": 36.7451315,[m
+[32m+[m[32m  "lon": 3.0790137,[m
+[32m+[m[32m  "tags": {[m
+[32m+[m[32m    "leisure": "fitness_centre",[m
+[32m+[m[32m    "name": "Body Fitness Center"[m
+[32m+[m[32m  }[m
+[32m+[m[32m},[m
+[32m+[m[32m{[m
+[32m+[m[32m  "type": "node",[m
+[32m+[m[32m  "id": 4415288889,[m
+[32m+[m[32m  "lat": 36.7121418,[m
+[32m+[m[32m  "lon": 3.0587230,[m
+[32m+[m[32m  "tags": {[m
+[32m+[m[32m    "leisure": "fitness_centre",[m
+[32m+[m[32m    "name": "salle de sports de Birkhadem",[m
+[32m+[m[32m    "name:fr": "salle de sports de Birkhadem"[m
+[32m+[m[32m  }[m
+[32m+[m[32m},[m
+[32m+[m[32m{[m
+[32m+[m[32m  "type": "node",[m
+[32m+[m[32m  "id": 4537629192,[m
+[32m+[m[32m  "lat": 36.7189215,[m
+[32m+[m[32m  "lon": 3.1101180,[m
+[32m+[m[32m  "tags": {[m
+[32m+[m[32m    "leisure": "fitness_centre",[m
+[32m+[m[32m    "name": "قاعة كمال الأجسام",[m
+[32m+[m[32m    "name:ar": "قاعة كمال الأجسام",[m
+[32m+[m[32m    "name:en": "Salle de musculation",[m
+[32m+[m[32m    "name:fr": "Salle de musculation"[m
+[32m+[m[32m  }[m
+[32m+[m[32m},[m
+[32m+[m[32m{[m
+[32m+[m[32m  "type": "node",[m
+[32m+[m[32m  "id": 4690093889,[m
+[32m+[m[32m  "lat": 36.7152941,[m
+[32m+[m[32m  "lon": 3.0592286,[m
+[32m+[m[32m  "tags": {[m
+[32m+[m[32m    "leisure": "fitness_centre",[m
+[32m+[m[32m    "name": "حمام سي لخضر",[m
+[32m+[m[32m    "name:ar": "حمام سي لخضر",[m
+[32m+[m[32m    "name:fr": "Hammam et spa et piscine Si Lakhdar"[m
+[32m+[m[32m  }[m
+[32m+[m[32m},[m
+[32m+[m[32m{[m
+[32m+[m[32m  "type": "node",[m
+[32m+[m[32m  "id": 4748621721,[m
+[32m+[m[32m  "lat": 36.7304260,[m
+[32m+[m[32m  "lon": 3.0872916,[m
+[32m+[m[32m  "tags": {[m
+[32m+[m[32m    "leisure": "fitness_centre"[m
+[32m+[m[32m  }[m
+[32m+[m[32m},[m
+[32m+[m[32m{[m
+[32m+[m[32m  "type": "node",[m
+[32m+[m[32m  "id": 5130708254,[m
+[32m+[m[32m  "lat": 36.7461707,[m
+[32m+[m[32m  "lon": 3.0890377,[m
+[32m+[m[32m  "tags": {[m
+[32m+[m[32m    "leisure": "fitness_centre"[m
+[32m+[m[32m  }[m
+[32m+[m[32m},[m
+[32m+[m[32m{[m
+[32m+[m[32m  "type": "node",[m
+[32m+[m[32m  "id": 5206212525,[m
+[32m+[m[32m  "lat": 36.7581712,[m
+[32m+[m[32m  "lon": 3.0531540,[m
+[32m+[m[32m  "tags": {[m
+[32m+[m[32m    "addr:housenumber": "26",[m
+[32m+[m[32m    "addr:postcode": "16000",[m
+[32m+[m[32m    "addr:street": "Avenue Ghermoul Ahmed",[m
+[32m+[m[32m    "leisure": "fitness_centre",[m
+[32m+[m[32m    "name": "ZAWECH NUTRITION"[m
+[32m+[m[32m  }[m
+[32m+[m[32m},[m
+[32m+[m[32m{[m
+[32m+[m[32m  "type": "node",[m
+[32m+[m[32m  "id": 5277747621,[m
+[32m+[m[32m  "lat": 36.7365366,[m
+[32m+[m[32m  "lon": 3.0637715,[m
+[32m+[m[32m  "tags": {[m
+[32m+[m[32m    "addr:postcode": "16000",[m
+[32m+[m[32m    "addr:street": "Rue Slimane Harched",[m
+[32m+[m[32m    "leisure": "fitness_centre",[m
+[32m+[m[32m    "name": "Salle de sport abderahmane El 3afia",[m
+[32m+[m[32m    "name:ar": "قاعة الرياضة عبد الرحمن العافية"[m
+[32m+[m[32m  }[m
+[32m+[m[32m},[m
+[32m+[m[32m{[m
+[32m+[m[32m  "type": "node",[m
+[32m+[m[32m  "id": 7260599985,[m
+[32m+[m[32m  "lat": 36.7241128,[m
+[32m+[m[32m  "lon": 3.0602899,[m
+[32m+[m[32m  "tags": {[m
+[32m+[m[32m    "leisure": "fitness_centre",[m
+[32m+[m[32m    "name:en": "fitzone",[m
+[32m+[m[32m    "name:fr": "fitzone"[m
+[32m+[m[32m  }[m
+[32m+[m[32m},[m
+[32m+[m[32m{[m
+[32m+[m[32m  "type": "way",[m
+[32m+[m[32m  "id": 1171809718,[m
+[32m+[m[32m  "center": {[m
+[32m+[m[32m    "lat": 36.7838936,[m
+[32m+[m[32m    "lon": 3.0158286[m
+[32m+[m[32m  },[m
+[32m+[m[32m  "tags": {[m
+[32m+[m[32m    "addr:city": "Bouzareah",[m
+[32m+[m[32m    "building": "yes",[m
+[32m+[m[32m    "leisure": "fitness_centre",[m
+[32m+[m[32m    "name": "Salle de musculation",[m
+[32m+[m[32m    "source": "FB: Algerie Mapper Team : (Superadlen)"[m
+[32m+[m[32m  }[m
+[32m+[m[32m},[m
+[32m+[m[32m{[m
+[32m+[m[32m  "type": "way",[m
+[32m+[m[32m  "id": 1173894722,[m
+[32m+[m[32m  "center": {[m
+[32m+[m[32m    "lat": 36.7548019,[m
+[32m+[m[32m    "lon": 3.0445225[m
+[32m+[m[32m  },[m
+[32m+[m[32m  "tags": {[m
+[32m+[m[32m    "addr:city": "المرادية",[m
+[32m+[m[32m    "building": "yes",[m
+[32m+[m[32m    "leisure": "fitness_centre",[m
+[32m+[m[32m    "name": "جم زد",[m
+[32m+[m[32m    "name:ar": "جم زد",[m
+[32m+[m[32m    "name:en": "GymZ",[m
+[32m+[m[32m    "name:fr": "GymZ",[m
+[32m+[m[32m    "source": "Algerie Mapper Team (Superadlen)"[m
+[32m+[m[32m  }[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m  ][m
+[32m+[m[32m}[m
+[1mdiff --git a/.freebuff/tmp/vybeqa926_pw.txt b/.freebuff/tmp/vybeqa926_pw.txt[m
+[1mnew file mode 100644[m
+[1mindex 0000000..651b8d3[m
+[1m--- /dev/null[m
+[1m+++ b/.freebuff/tmp/vybeqa926_pw.txt[m
+[36m@@ -0,0 +1 @@[m
+[32m+[m[32mVb!Final89fb93ba4613Qa1[m
+[1mdiff --git a/QA_REPORT.md b/QA_REPORT.md[m
+[1mnew file mode 100644[m
+[1mindex 0000000..4033e8d[m
+[1m--- /dev/null[m
+[1m+++ b/QA_REPORT.md[m
+[36m@@ -0,0 +1,187 @@[m
+[32m+[m[32m# VYBE — Real Browser QA Report[m
+[32m+[m
+[32m+[m[32m**Date:** 2026-09-03 · **Environment:** Live mode (real Supabase + Google Maps), Vite dev server at `http://localhost:5173` · **Method:** Real-browser interaction (click / type / refresh / persistence), DevTools console + network, Supabase REST probe.[m
+[32m+[m[32m**Test account:** `vybeqa926@emalupe.com` (confirmed via disposable inbox).[m
+[32m+[m
+[32m+[m[32m---[m
+[32m+[m
+[32m+[m[32m## Overall Score[m
+[32m+[m
+[32m+[m[32m**≈ 50 %** — roughly half of the shipped functionality actually works end-to-end in the real browser. The core read/browse surface (discovery, details, search, auth) works, but every *user-owned persistence* action is broken by a backend schema mismatch, the map renders no markers, venue discovery leaks cross-continent results, and there are no photos anywhere.[m
+[32m+[m
+[32m+[m[32m**Production Verdict: `NOT PRODUCTION READY`**[m
+[32m+[m
+[32m+[m[32m---[m
+[32m+[m
+[32m+[m[32m## Working Features ✅[m
+[32m+[m
+[32m+[m[32m| Feature | Evidence |[m
+[32m+[m[32m| --- | --- |[m
+[32m+[m[32m| App boots & renders | No blank page / white screen / infinite spinner at load; dark theme, layout, assets OK |[m
+[32m+[m[32m| Landing + Explore + bottom nav | All tabs navigate (Explore / Map / Plans / Saved / Profile), mood-hop, theme toggle work |[m
+[32m+[m[32m| Real discovery (Google Places SearchNearby) | 20 real Algiers places loaded from `places.googleapis.com` → HTTP 200, with address, rating, distance |[m
+[32m+[m[32m| Category chips (17 of 18) | Mosques, Restaurants, Cafés, Parks, Cinema, Gyms, Hotels, Shopping, Libraries, Museums, Sports, Arcades, Music, Hospitals, Theatre, Playgrounds, Beaches return real local places |[m
+[32m+[m[32m| Text search (good query) | "museum" → real results; query auto-maps to a category chip |[m
+[32m+[m[32m| Place detail modal | Opens per card with real name/address/score; Escape + ✕ close correctly |[m
+[32m+[m[32m| Register / Login / Logout | Signup 200 + confirmation email delivered (rate limit delayed it); verify link activated account; password login 200; session survives browser refresh; Sign Out clears the session and restores guest UI |[m
+[32m+[m[32m| Auth gates (guest) | Like, Save, Add-to-Plan, Plans, Saved, Profile, "Build Plan" all open the Sign In modal for guests instead of failing |[m
+[32m+[m[32m| Collection CRUD | "My Favorite VYBE Spots" created → POST `collections` 201; visible in Saved + Profile |[m
+[32m+[m[32m| Plan CRUD | "QA Night Out in Algiers" created → plan row persists across refresh (Profile shows "1 Itineraries") |[m
+[32m+[m[32m| Profile (authenticated) | Avatar, handle, stats, Saved/Liked/Plans lists, Edit Profile / Sign Out |[m
+[32m+[m[32m| VYBE Matcher | Picking mood/time + "Apply & refresh" fires a fresh SearchNearby (200) and re-ranks results |[m
+[32m+[m[32m| Toast infrastructure | Works (success / warning / error toasts render and auto-dismiss) |[m
+[32m+[m[32m| Share buttons | Copy-to-clipboard path fails gracefully in a sandboxed webview ("Copy failed — use browser share…" toast) |[m
+[32m+[m[32m| Squad Vote / Daily Drop | Vote cast, persists in localStorage across reload |[m
+[32m+[m
+[32m+[m[32m---[m
+[32m+[m
+[32m+[m[32m## Partially Working Features ⚠️[m
+[32m+[m
+[32m+[m[32m| Feature | Details |[m
+[32m+[m[32m| --- | --- |[m
+[32m+[m[32m| Like / Save | Click toggles instantly (optimistic UI) but backend sync fails with HTTP 400 → state silently rolls back; nothing persists |[m
+[32m+[m[32m| Add place to Plan | Stop appears in the itinerary while the page is open, but is **lost on refresh** (plan_item insert fails 400) |[m
+[32m+[m[32m| Map | Tiles/pan/zoom + "My Location" (centers Algiers) work, but **zero markers** render and Google shows an auth/"demo key limit" dialog |[m
+[32m+[m[32m| Build My Night planner | Opens, budget/mood inputs work, but Smart Picks + Night Preview are filled with US venues for an Algiers location |[m
+[32m+[m[32m| Nightlife category | "🌙 Nightlife near you" feed returns US venues (Austin, Houston, Seattle, LA, Phoenix) at 6 600–10 000 km, labeled "🇩🇿 Algeria · Google verified" |[m
+[32m+[m[32m| Photos | Place cards use category icons (no `<img>` at all); detail hero is an empty black rectangle; no photo network requests anywhere |[m
+[32m+[m
+[32m+[m[32m---[m
+[32m+[m
+[32m+[m[32m## Broken Features ❌[m
+[32m+[m
+[32m+[m[32m| Feature | Failure |[m
+[32m+[m[32m| --- | --- |[m
+[32m+[m[32m| **All user-owned persistence on Google places** | Like, Save, add-to-collection, add-to-plan, and Publish Review all hit `GET /rest/v1/places?select=id&id=eq.google:ChIJ…` → **HTTP 400 `invalid input syntax for type uuid`**. Root cause: **live Supabase schema predates migration `0005_place_id_text_google_ids.sql`** — `places.id` (and FKs) are still `uuid`, while the app stores TEXT Google IDs (`google:ChIJ…`). Console: `[VYBE auth] like sync failed` / `save sync failed` |[m
+[32m+[m[32m| Map markers | Code uses only `AdvancedMarkerElement`, which requires a map `mapId`; `.env` has no `VITE_GOOGLE_MAPS_MAP_ID` → console "map initialized without a valid map ID — advanced markers unusable", marker creation TypeErrors, no fallback to classic markers. A marker crash previously produced a black React screen (recoverable only by reload) |[m
+[32m+[m[32m| Review publish | Fails with 400 (same root cause) — reviews on any Google place cannot be written |[m
+[32m+[m[32m| Wrong-geography results | Hero "Nightlife" chip + planner feed return real US nightlife venues 8 900+ km away for "My location = Algiers" |[m
+[32m+[m
+[32m+[m[32m---[m
+[32m+[m
+[32m+[m[32m## Missing Features 🚫[m
+[32m+[m
+[32m+[m[32m- **Place photos** — no photo URL is ever fetched or displayed (gallery code exists; images arrays are empty)[m
+[32m+[m[32m- **Map markers / place pins** — the Map tab shows no results on the canvas[m
+[32m+[m[32m- **Working offline/OSM fallback** — `/api/osm-discovery` returns 404 under the dev server (Vercel-only route); empty/error states leak the raw message[m
+[32m+[m[32m- No visible "check your email" post-signup screen (user stays logged out with only a toast)[m
+[32m+[m[32m- Real multi-device squad aggregation (Squad Vote is localStorage-only)[m
+[32m+[m
+[32m+[m[32m---[m
+[32m+[m
+[32m+[m[32m## Button Audit (broken / no-op / misleading)[m
+[32m+[m
+[32m+[m[32m| Location | Button | Expected | Actual | Status |[m
+[32m+[m[32m| --- | --- | --- | --- | --- |[m
+[32m+[m[32m| Place card / detail | Like (signed in) | persist like | 400, icon reverts | ❌ |[m
+[32m+[m[32m| Place card / detail | Save (signed in) | persist save | 400, reverts; Saved stays 0 | ❌ |[m
+[32m+[m[32m| Detail modal | Save → collection | add spot to collection | 400 (place verify) | ❌ |[m
+[32m+[m[32m| Detail modal | Add to Plan | add stop to plan | shows in-session, lost on refresh | ❌ |[m
+[32m+[m[32m| Detail modal | Leave Vibe Review → Publish | store review | 400; no review appears | ❌ |[m
+[32m+[m[32m| Map FAB | Floating "Build My Night" (z-[55]) | stays under modals | draws **over** auth/place-detail modals (z-50); mis-clicks | ❌ |[m
+[32m+[m[32m| Bottom nav | Map | switch tab | works but also draws over an open detail modal | ⚠️ |[m
+[32m+[m[32m| Explore feed | Nightlife chip | Algiers nightlife | US bars/clubs 8 900–10 000 km away | ❌ |[m
+[32m+[m[32m| Planner | Build Plan (guest) | gate to login | opens Sign In (correct) — after login, plan adds fail (400) | ⚠️ |[m
+[32m+[m[32m| Planner | Share | copy VYBE link | clipboard blocked in webview → graceful error toast | ⚠️ |[m
+[32m+[m[32m| Navbar search (desktop) | — | — | hidden below `md` breakpoint (not reachable on mobile) | 🚫 |[m
+[32m+[m[32m| Hero / generic browse | ranking | relevant top picks | TV station/presidential palace/hospital ranked in top picks; "Food" mood tops with a sports hall | ⚠️ |[m
+[32m+[m
+[32m+[m[32m---[m
+[32m+[m
+[32m+[m[32m## Photo Audit[m
+[32m+[m
+[32m+[m[32m- **Photos working:** none — zero `<img>` elements exist for places on any screen tested[m
+[32m+[m[32m- **Broken images:** the place-detail hero renders as a **black rectangle** (src is empty/undefined)[m
+[32m+[m[32m- **Missing photos:** every card shows a lucide **category icon** instead of a photo[m
+[32m+[m[32m- **Wrong images:** N/A (no images at all)[m
+[32m+[m[32m- No image requests appear in the network log (photo lookup is never attempted)[m
+[32m+[m
+[32m+[m[32m---[m
+[32m+[m
+[32m+[m[32m## Explore Audit[m
+[32m+[m
+[32m+[m[32m- **Discovery:** ✅ 20 real nearby places (SearchNearby 200) after granting location[m
+[32m+[m[32m- **Search:** ✅ real queries work; ⚠️ nonsense query shows raw error `OpenStreetMap is temporarily unavailable. OSM discovery failed (404)` as the empty state[m
+[32m+[m[32m- **Filters / matcher:** ✅ "Apply & refresh" triggers a fresh SearchNearby + re-rank (deterministic heuristic — see AI Audit)[m
+[32m+[m[32m- **Categories:** ⚠️ 17/18 fine; **Nightlife leaks US venues**[m
+[32m+[m[32m- **Cards:** ⚠️ name/address/rating/distance real, but no photo; distance shown unrounded (`0.4318004950479981 km`)[m
+[32m+[m[32m- **Details:** ⚠️ score mismatch card vs modal (82 vs 77 for same place), `~$0 ($$)` cost contradiction, "View on VYBE Map" works (opens map tab), external maps link present[m
+[32m+[m[32m- **Persistence:** ❌ like/save/collection/plan/review writes all fail (see Broken Features)[m
+[32m+[m
+[32m+[m[32m---[m
+[32m+[m
+[32m+[m[32m## Map Audit[m
+[32m+[m
+[32m+[m[32m- Google Maps script loads (200); tiles render; pan/zoom + "My Location" work (centers on Algiers)[m
+[32m+[m[32m- **No markers ever render** (AdvancedMarkerElement without a mapId → "advanced markers unusable" + TypeErrors)[m
+[32m+[m[32m- Google auth dialog "This page can't load Google Maps correctly" (demo-key limit) appears on the canvas; network-location provider 403s in console[m
+[32m+[m[32m- A marker-related error previously crashed the map into a black screen (recov
