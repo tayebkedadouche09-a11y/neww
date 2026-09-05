@@ -1,4 +1,4 @@
-import { classifyProviderPlace } from '../src/data/categoryTaxonomy';
+import { classifyProviderPlace } from './_shared/classify';
 
 type ApiRequest = { method?: string; headers: Record<string, string | string[] | undefined>; body?: unknown; };
 type ApiResponse = { status:(code:number)=>ApiResponse; json:(body:unknown)=>void; setHeader:(name:string,value:string)=>void; };
