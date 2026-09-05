@@ -45,6 +45,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [places, setPlaces] = useState<Place[]>([]);
   const [discoveryLoading, setDiscoveryLoading] = useState(false);
   const [discoveryError, setDiscoveryError] = useState<string | null>(null);
+  const discoveryRequestIdRef = useRef(0);
   const [activeTab, setActiveTab] = useState<ActiveTab>('explore');
   const [activeHeroMood, setActiveHeroMood] = useState<MoodType | null>(null);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
@@ -85,18 +86,28 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const activeFilters = overrideFilters ?? filters;
     if (!Number.isFinite(location.lat) || !Number.isFinite(location.lng)) return;
     const radiusKm = (location.accuracy ?? 0) >= 15_000 ? 20 : 5;
+    const requestId = ++discoveryRequestIdRef.current;
     setDiscoveryLoading(true);
     setDiscoveryError(null);
     discoverPlaces({ userLat: location.lat, userLng: location.lng, radiusKm, searchQuery: activeFilters.searchQuery.trim() || undefined, filters: activeFilters })
-      .then(result => { setPlaces(result); })
+      .then(result => {
+        // Ignore stale responses from earlier searches (rapid A → B)
+        if (requestId !== discoveryRequestIdRef.current) return;
+        setPlaces(result);
+      })
       .catch(err => {
+        if (requestId !== discoveryRequestIdRef.current) return;
         console.error('[DataContext] Discovery failed:', err);
         setPlaces([]);
         const message = err instanceof Error ? err.message : 'Unable to load places right now.';
         setDiscoveryError(message);
         showToast(message, '⚠️', 'info');
       })
-      .finally(() => setDiscoveryLoading(false));
+      .finally(() => {
+        if (requestId === discoveryRequestIdRef.current) {
+          setDiscoveryLoading(false);
+        }
+      });
   }, [filters, showToast]);
 
   const discover = useCallback((overrideFilters?: FilterState) => {
@@ -313,75 +324,69 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const newReview: PlaceReview = { ...reviewData, id: newUuid(), createdAt: 'Just now', likesCount: 0 };
     const updatedPlace = { ...target, reviews: [newReview, ...target.reviews], rating: Number(((target.rating * target.reviewCount + reviewData.rating) / (target.reviewCount + 1)).toFixed(1)), reviewCount: target.reviewCount + 1 };
     setPlaces(prev => prev.map(p => p.id === placeId ? updatedPlace : p));
-    setSelectedPlace(cur => cur?.id === placeId ? updatedPlace : cur);
-    void reviewsService.create({ placeId, userId: reviewData.userId, rating: reviewData.rating, vibeRating: reviewData.vibeRating, moodTags: reviewData.moodTags, comment: reviewData.comment, id: newReview.id }).catch(e => {
-      console.error('[VYBE] publish review failed', e);
+    if (selectedPlace?.id === placeId) setSelectedPlace(updatedPlace);
+    void reviewsService.create(placeId, newReview).catch(e => {
+      console.error('[VYBE] add review failed', e);
       setPlaces(prev => prev.map(p => p.id === placeId ? target : p));
-      setSelectedPlace(cur => cur?.id === placeId ? target : cur);
-      rollbackToast('Your review could not be published. Please try again.');
+      if (selectedPlace?.id === placeId) setSelectedPlace(target);
+      rollbackToast('Could not post your review. Please try again.');
     });
   };
 
   const addPlace = (placeData: Omit<Place, 'id' | 'rating' | 'reviewCount' | 'baseVybeScore' | 'reviews'>) => {
-    if (!realUserId) return { ...placeData, id: newUuid(), rating: 4.8, reviewCount: 1, baseVybeScore: 92, reviews: [] } as Place;
-    const newPlace: Place = { ...placeData, id: newUuid(), rating: 4.8, reviewCount: 1, baseVybeScore: 92, reviews: [] };
+    const newPlace: Place = { ...placeData, id: newUuid(), rating: 0, reviewCount: 0, baseVybeScore: 70, reviews: [] };
     setPlaces(prev => [newPlace, ...prev]);
-    void placesService.create(newPlace).catch(e => console.error(e));
+    if (dataMode === 'supabase') void placesService.create(newPlace).catch(e => console.error('[VYBE] add place failed', e));
     return newPlace;
   };
+
   const updatePlace = (placeId: string, updates: Partial<Place>) => {
-    if (!realUserId) return;
     setPlaces(prev => prev.map(p => p.id === placeId ? { ...p, ...updates } : p));
     if (selectedPlace?.id === placeId) setSelectedPlace(prev => prev ? { ...prev, ...updates } : null);
-    void placesService.update(placeId, updates).catch(e => console.error(e));
+    if (dataMode === 'supabase') void placesService.update(placeId, updates).catch(e => console.error('[VYBE] update place failed', e));
   };
+
   const deletePlace = (placeId: string) => {
-    if (!realUserId) return;
     setPlaces(prev => prev.filter(p => p.id !== placeId));
     if (selectedPlace?.id === placeId) { setSelectedPlace(null); setIsDetailOpen(false); }
-    void placesService.remove(placeId).catch(e => console.error(e));
+    if (dataMode === 'supabase') void placesService.remove(placeId).catch(e => console.error('[VYBE] delete place failed', e));
   };
 
   const filteredPlaces = useMemo(() => {
-    const effectiveMoods = activeHeroMood ? [activeHeroMood, ...filters.moods.filter(m => m !== activeHeroMood)] : filters.moods;
-    return places
-      .filter(place => {
-        if (filters.categories.length && !filters.categories.includes(place.category)) return false;
-        if (filters.priceLevels.length && !filters.priceLevels.includes(place.priceLevel)) return false;
-        if (filters.onlyOpenNow && place.openingHours.isOpenNow !== true) return false;
-        if (filters.onlyFree && !place.features.isFree) return false;
-        if (filters.onlyHiddenGems && !place.features.isSecretGem) return false;
-        if (filters.onlyLateNight && !place.features.isLateNight) return false;
-        if (filters.maxDistanceKm !== undefined && (place.distanceKm === undefined || place.distanceKm > filters.maxDistanceKm)) return false;
-        return true;
-      })
-      .map(place => ({ place, scoreInfo: calculateVybeScore(place, { selectedMoods: effectiveMoods, budget: filters.maxBudget || (filters.priceLevels.length === 1 ? filters.priceLevels[0] : undefined), duration: filters.duration, companion: filters.companion }) }))
-      .sort((a, b) => {
-        if (filters.sortBy === 'rating') return b.place.rating - a.place.rating;
-        if (filters.sortBy === 'price-asc') return a.place.approxCostUsd - b.place.approxCostUsd;
-        if (filters.sortBy === 'distance') return (a.place.distanceKm || 0) - (b.place.distanceKm || 0);
-        if (filters.sortBy === 'trending') return (b.place.isTrending ? 1 : 0) - (a.place.isTrending ? 1 : 0);
-        return b.scoreInfo.score - a.scoreInfo.score;
-      });
-  }, [places, filters, activeHeroMood]);
+    return places.map(place => ({ place, scoreInfo: calculateVybeScore(place, { moods: filters.moods, companion: filters.companion, maxBudget: filters.maxBudget, duration: filters.duration }) }));
+  }, [places, filters.moods, filters.companion, filters.maxBudget, filters.duration]);
 
-  return (
-    <DataContext.Provider value={{
-      places, activeTab, setActiveTab, activeHeroMood, setActiveHeroMood, filters, setFilters, resetFilters,
-      discoveryLoading, discoveryError, locationError: geo.error, userLocation: geo.location,
-      requestLocationAndDiscover, discover, discoverAtLocation,
-      selectedPlace, setSelectedPlace, isDetailOpen, setIsDetailOpen, openPlaceDetail,
-      isReviewModalOpen, setIsReviewModalOpen, isShareModalOpen, setIsShareModalOpen, shareTargetPlace, openShareModal,
-      isAuthModalOpen, setIsAuthModalOpen, authModalMode, setAuthModalMode,
-      plans, activePlan, setActivePlan, createPlan, addPlaceToPlan, removePlaceFromPlan, updatePlanItem, deletePlan,
-      collections, createCollection, addPlaceToCollection, removePlaceFromCollection, deleteCollection,
-      addReview, addPlace, updatePlace, deletePlace, filteredPlaces, toasts, showToast, removeToast,
-    }}>{children}</DataContext.Provider>
-  );
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const placeId = params.get('place');
+    if (!placeId || deepLinkHandledRef.current === placeId) return;
+    deepLinkHandledRef.current = placeId;
+    const existing = places.find(p => p.id === placeId);
+    if (existing) { openPlaceDetail(existing); return; }
+    if (placeId.startsWith('google:')) {
+      void getGooglePlaceDetails(placeId.slice('google:'.length)).then(place => {
+        if (place) { setPlaces(prev => prev.some(p => p.id === place.id) ? prev : [place, ...prev]); openPlaceDetail(place); }
+      }).catch(() => showToast('That place could not be loaded.', '⚠️', 'info'));
+    }
+  }, [places]);
+
+  const value: DataContextType = {
+    places, activeTab, setActiveTab, activeHeroMood, setActiveHeroMood, filters, setFilters, resetFilters,
+    discoveryLoading, discoveryError, locationError: geo.error, userLocation: geo.location,
+    requestLocationAndDiscover, discover, discoverAtLocation,
+    selectedPlace, setSelectedPlace, isDetailOpen, setIsDetailOpen, openPlaceDetail,
+    isReviewModalOpen, setIsReviewModalOpen, isShareModalOpen, setIsShareModalOpen, shareTargetPlace, openShareModal,
+    isAuthModalOpen, setIsAuthModalOpen, authModalMode, setAuthModalMode,
+    plans, activePlan, setActivePlan, createPlan, addPlaceToPlan, removePlaceFromPlan, updatePlanItem, deletePlan,
+    collections, createCollection, addPlaceToCollection, removePlaceFromCollection, deleteCollection,
+    addReview, addPlace, updatePlace, deletePlace, filteredPlaces, toasts, showToast, removeToast,
+  };
+
+  return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 };
 
 export const useData = () => {
-  const context = useContext(DataContext);
-  if (!context) throw new Error('useData must be used within DataProvider');
-  return context;
+  const ctx = useContext(DataContext);
+  if (!ctx) throw new Error('useData must be used within DataProvider');
+  return ctx;
 };
