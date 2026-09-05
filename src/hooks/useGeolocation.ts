@@ -49,27 +49,6 @@ export function useGeolocation() {
 
   const isSupported = typeof navigator !== 'undefined' && 'geolocation' in navigator;
 
-  useEffect(() => {
-    if (!isSupported) {
-      setState(prev => ({ ...prev, error: 'UNSUPPORTED' }));
-      return;
-    }
-
-    if (navigator.permissions?.query) {
-      navigator.permissions
-        .query({ name: 'geolocation' })
-        .then(result => {
-          setState(prev => ({ ...prev, permissionState: result.state }));
-          result.onchange = () => {
-            setState(prev => ({ ...prev, permissionState: result.state }));
-          };
-        })
-        .catch(() => {
-          // permissions.query may not be supported for geolocation in all browsers
-        });
-    }
-  }, [isSupported]);
-
   const applyFallback = useCallback(async (browserError: GeoError | null) => {
     if (fallbackInFlight.current) return;
     fallbackInFlight.current = true;
@@ -111,6 +90,26 @@ export function useGeolocation() {
       locationLabel: null,
     }));
   }, []);
+
+  useEffect(() => {
+    // Leave error null when unsupported so DataContext still triggers requestLocation,
+    // which routes through applyFallback('UNSUPPORTED').
+    if (!isSupported) return;
+
+    if (navigator.permissions?.query) {
+      navigator.permissions
+        .query({ name: 'geolocation' })
+        .then(result => {
+          setState(prev => ({ ...prev, permissionState: result.state }));
+          result.onchange = () => {
+            setState(prev => ({ ...prev, permissionState: result.state }));
+          };
+        })
+        .catch(() => {
+          // permissions.query may not be supported for geolocation in all browsers
+        });
+    }
+  }, [isSupported]);
 
   const requestLocation = useCallback(() => {
     if (!isSupported) {
