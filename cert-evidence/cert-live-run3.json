@@ -1,0 +1,545 @@
+{
+  "productionUrl": "https://neww-dun-chi.vercel.app/",
+  "startedAt": "2026-09-05T17:35:37.532Z",
+  "initialExplore": {
+    "cardCount": 12,
+    "distinctNames": 12,
+    "withImages": 0,
+    "sample": [
+      {
+        "name": "Salle omnisport Harcha Hacene",
+        "category": "",
+        "googleVerified": true,
+        "hasImage": false
+      },
+      {
+        "name": "Monument aux Martyrs",
+        "category": "",
+        "googleVerified": true,
+        "hasImage": false
+      },
+      {
+        "name": "Jardin Botanique du Hamma",
+        "category": "",
+        "googleVerified": true,
+        "hasImage": false
+      },
+      {
+        "name": "ساحه أول ماي",
+        "category": "",
+        "googleVerified": true,
+        "hasImage": false
+      },
+      {
+        "name": "Sofitel Algiers Hamma Garden",
+        "category": "",
+        "googleVerified": true,
+        "hasImage": false
+      },
+      {
+        "name": "Hotel El Djazair - Ex St George",
+        "category": "",
+        "googleVerified": true,
+        "hasImage": false
+      }
+    ]
+  },
+  "searches": [
+    {
+      "query": "restaurant",
+      "elapsedMs": 17391,
+      "cardCount": 100,
+      "distinctNames": 96,
+      "withImages": 0,
+      "googleVerified": 27,
+      "empty": false,
+      "categories": [],
+      "cards": [
+        {
+          "name": "DARNA",
+          "category": "",
+          "googleVerified": true,
+          "hasImage": false,
+          "photoPlaceId": null
+        },
+        {
+          "name": "Hussein dey",
+          "category": "",
+          "googleVerified": true,
+          "hasImage": false,
+          "photoPlaceId": null
+        },
+        {
+          "name": "Restaurant la Sopa",
+          "category": "",
+          "googleVerified": true,
+          "hasImage": false,
+          "photoPlaceId": null
+        },
+        {
+          "name": "Dwiret El azz دويرة العز",
+          "category": "",
+          "googleVerified": true,
+          "hasImage": false,
+          "photoPlaceId": null
+        },
+        {
+          "name": "Dar Zellige Restaurant",
+          "category": "",
+          "googleVerified": true,
+          "hasImage": false,
+          "photoPlaceId": null
+        },
+        {
+          "name": "L'Empreinte",
+          "category": "",
+          "googleVerified": true,
+          "hasImage": false,
+          "photoPlaceId": null
+        }
+      ]
+    },
+    {
+      "query": "cafe",
+      "elapsedMs": 16604,
+      "cardCount": 11,
+      "distinctNames": 11,
+      "withImages": 0,
+      "googleVerified": 11,
+      "empty": false,
+      "categories": [],
+      "cards": [
+        {
+          "name": "Bent Bladi, Yulmaz",
+          "category": "",
+          "googleVerified": true,
+          "hasImage": false,
+          "photoPlaceId": null
+        },
+        {
+          "name": "DAR LAHBAB Restaurant",
+          "category": "",
+          "googleVerified": true,
+          "hasImage": false,
+          "photoPlaceId": null
+        },
+        {
+          "name": "Restaurant Le Ciloc",
+          "category": "",
+          "googleVerified": true,
+          "hasImage": false,
+          "photoPlaceId": null
+        },
+        {
+          "name": "The Boat Restaurant",
+          "category": "",
+          "googleVerified": true,
+          "hasImage": false,
+          "photoPlaceId": null
+        },
+        {
+          "name": "Bellagiorno",
+          "category": "",
+          "googleVerified": true,
+          "hasImage": false,
+          "photoPlaceId": null
+        },
+        {
+          "name": "Restaurant Couzina",
+          "category": "",
+          "googleVerified": true,
+          "hasImage": false,
+          "photoPlaceId": null
+        }
+      ]
+    },
+    {
+      "query": "hotel",
+      "elapsedMs": 16495,
+      "cardCount": 10,
+      "distinctNames": 10,
+      "withImages": 0,
+      "googleVerified": 10,
+      "empty": false,
+      "categories": [],
+      "cards": [
+        {
+          "name": "مطاعم",
+          "category": "",
+          "googleVerified": true,
+          "hasImage": false,
+          "photoPlaceId": null
+        },
+        {
+          "name": "LE DIFA",
+          "category": "",
+          "googleVerified": true,
+          "hasImage": false,
+          "photoPlaceId": null
+        },
+        {
+          "name": "La galerie lounge",
+          "category": "",
+          "googleVerified": true,
+          "hasImage": false,
+          "photoPlaceId": null
+        },
+        {
+          "name": "Restaurant MOMENTO by B2rb",
+          "category": "",
+          "googleVerified": true,
+          "hasImage": false,
+          "photoPlaceId": null
+        },
+        {
+          "name": "Restaurant Villa Arena",
+          "category": "",
+          "googleVerified": true,
+          "hasImage": false,
+          "photoPlaceId": null
+        },
+        {
+          "name": "Galatée",
+          "category": "",
+          "googleVerified": true,
+          "hasImage": false,
+          "photoPlaceId": null
+        }
+      ]
+    },
+    {
+      "query": "games",
+      "elapsedMs": 54411,
+      "cardCount": 0,
+      "distinctNames": 0,
+      "withImages": 0,
+      "googleVerified": 0,
+      "empty": true,
+      "categories": [],
+      "cards": []
+    },
+    {
+      "query": "gaming cafe",
+      "elapsedMs": 17085,
+      "cardCount": 1,
+      "distinctNames": 1,
+      "withImages": 0,
+      "googleVerified": 1,
+      "empty": false,
+      "categories": [],
+      "cards": [
+        {
+          "name": "Cyber café",
+          "category": "",
+          "googleVerified": true,
+          "hasImage": false,
+          "photoPlaceId": null
+        }
+      ]
+    },
+    {
+      "query": "quiet cafe",
+      "elapsedMs": 16609,
+      "cardCount": 1,
+      "distinctNames": 1,
+      "withImages": 0,
+      "googleVerified": 1,
+      "empty": false,
+      "categories": [],
+      "cards": [
+        {
+          "name": "Cyber café",
+          "category": "",
+          "googleVerified": true,
+          "hasImage": false,
+          "photoPlaceId": null
+        }
+      ]
+    },
+    {
+      "query": "romantic restaurant",
+      "elapsedMs": 54845,
+      "cardCount": 0,
+      "distinctNames": 0,
+      "withImages": 0,
+      "googleVerified": 0,
+      "empty": true,
+      "categories": [],
+      "cards": []
+    },
+    {
+      "query": "cinema",
+      "elapsedMs": 54401,
+      "cardCount": 0,
+      "distinctNames": 0,
+      "withImages": 0,
+      "googleVerified": 0,
+      "empty": true,
+      "categories": [],
+      "cards": []
+    },
+    {
+      "query": "park",
+      "elapsedMs": 54262,
+      "cardCount": 0,
+      "distinctNames": 0,
+      "withImages": 0,
+      "googleVerified": 0,
+      "empty": true,
+      "categories": [],
+      "cards": []
+    },
+    {
+      "query": "gym",
+      "elapsedMs": 54261,
+      "cardCount": 0,
+      "distinctNames": 0,
+      "withImages": 0,
+      "googleVerified": 0,
+      "empty": true,
+      "categories": [],
+      "cards": []
+    },
+    {
+      "query": "shopping",
+      "elapsedMs": 54310,
+      "cardCount": 0,
+      "distinctNames": 0,
+      "withImages": 0,
+      "googleVerified": 0,
+      "empty": true,
+      "categories": [],
+      "cards": []
+    },
+    {
+      "query": "nightlife",
+      "elapsedMs": 54349,
+      "cardCount": 0,
+      "distinctNames": 0,
+      "withImages": 0,
+      "googleVerified": 0,
+      "empty": true,
+      "categories": [],
+      "cards": []
+    },
+    {
+      "query": "tourist",
+      "elapsedMs": 54316,
+      "cardCount": 0,
+      "distinctNames": 0,
+      "withImages": 0,
+      "googleVerified": 0,
+      "empty": true,
+      "categories": [],
+      "cards": []
+    },
+    {
+      "query": "museum",
+      "elapsedMs": 54286,
+      "cardCount": 0,
+      "distinctNames": 0,
+      "withImages": 0,
+      "googleVerified": 0,
+      "empty": true,
+      "categories": [],
+      "cards": []
+    },
+    {
+      "query": "library",
+      "elapsedMs": 54317,
+      "cardCount": 0,
+      "distinctNames": 0,
+      "withImages": 0,
+      "googleVerified": 0,
+      "empty": true,
+      "categories": [],
+      "cards": []
+    },
+    {
+      "query": "mosque",
+      "elapsedMs": 54267,
+      "cardCount": 0,
+      "distinctNames": 0,
+      "withImages": 0,
+      "googleVerified": 0,
+      "empty": true,
+      "categories": [],
+      "cards": []
+    },
+    {
+      "query": "wellness",
+      "elapsedMs": 54416,
+      "cardCount": 0,
+      "distinctNames": 0,
+      "withImages": 0,
+      "googleVerified": 0,
+      "empty": true,
+      "categories": [],
+      "cards": []
+    }
+  ],
+  "deepDives": [
+    {
+      "query": "cafe",
+      "cardName": "Bent Bladi, Yulmaz",
+      "evidencePanel": false,
+      "decisionBadge": "ACCEPT",
+      "primaryIdentity": "Restaurant Google provider-verified provider types: restaurant identity confidence: 99% intent: HIGH identity:primaryTy",
+      "alsoOffers": "",
+      "providerTypes": "restaurant",
+      "confidence": "99",
+      "reasonsSample": "identity confidence: 99% intent: HIGH identity:primaryType intent:high distance:1.76km provider:google HIGHLIGHTS & FEATURES #restaurant #catering_service #meal_delivery #food_delivery #food #point_of_interest #service #establishment Opening Timetable Mon - Th",
+      "placeIdHref": "",
+      "heroImage": "",
+      "imageCount": 0,
+      "placeId": "",
+      "heroPhotoPlaceId": null,
+      "exactPhotoIdentity": null,
+      "crossPlaceViolation": false,
+      "photoStatus": "no-photo-available",
+      "nonProviderHeroImage": false
+    },
+    {
+      "query": "hotel",
+      "cardName": "مطاعم",
+      "evidencePanel": false,
+      "decisionBadge": "ACCEPT",
+      "primaryIdentity": "Restaurant Google provider-verified provider types: restaurant identity confidence: 99% intent: HIGH identity:primaryTy",
+      "alsoOffers": "",
+      "providerTypes": "restaurant",
+      "confidence": "99",
+      "reasonsSample": "identity confidence: 99% intent: HIGH identity:primaryType intent:high distance:3.10km provider:google HIGHLIGHTS & FEATURES #restaurant #food #point_of_interest #establishment Opening Timetable Mon - Thu: — Friday: — Saturday: — Sunday: — Location & Direction",
+      "placeIdHref": "",
+      "heroImage": "",
+      "imageCount": 0,
+      "placeId": "",
+      "heroPhotoPlaceId": null,
+      "exactPhotoIdentity": null,
+      "crossPlaceViolation": false,
+      "photoStatus": "no-photo-available",
+      "nonProviderHeroImage": false
+    },
+    {
+      "query": "gaming cafe",
+      "cardName": "Cyber café",
+      "evidencePanel": false,
+      "decisionBadge": "ACCEPT",
+      "primaryIdentity": "Cafe Google provider-verified provider types: cafe identity confidence: 99% intent: HIGH identity:primaryType intent:hi",
+      "alsoOffers": "",
+      "providerTypes": "cafe",
+      "confidence": "99",
+      "reasonsSample": "identity confidence: 99% intent: HIGH identity:primaryType intent:high distance:3.37km provider:google HIGHLIGHTS & FEATURES #cafe #food #point_of_interest #establishment Opening Timetable Mon - Thu: — Friday: — Saturday: — Sunday: — Location & Directions 1 Ru",
+      "placeIdHref": "",
+      "heroImage": "",
+      "imageCount": 0,
+      "placeId": "",
+      "heroPhotoPlaceId": null,
+      "exactPhotoIdentity": null,
+      "crossPlaceViolation": false,
+      "photoStatus": "no-photo-available",
+      "nonProviderHeroImage": false
+    },
+    {
+      "query": "quiet cafe",
+      "cardName": "Cyber café",
+      "evidencePanel": false,
+      "decisionBadge": "ACCEPT",
+      "primaryIdentity": "Cafe Google provider-verified provider types: cafe identity confidence: 99% intent: HIGH identity:primaryType intent:hi",
+      "alsoOffers": "",
+      "providerTypes": "cafe",
+      "confidence": "99",
+      "reasonsSample": "identity confidence: 99% intent: HIGH identity:primaryType intent:high distance:3.37km provider:google HIGHLIGHTS & FEATURES #cafe #food #point_of_interest #establishment Opening Timetable Mon - Thu: — Friday: — Saturday: — Sunday: — Location & Directions 1 Ru",
+      "placeIdHref": "",
+      "heroImage": "",
+      "imageCount": 0,
+      "placeId": "",
+      "heroPhotoPlaceId": null,
+      "exactPhotoIdentity": null,
+      "crossPlaceViolation": false,
+      "photoStatus": "no-photo-available",
+      "nonProviderHeroImage": false
+    }
+  ],
+  "map": null,
+  "hydration": {
+    "googleCards": 0,
+    "googleCardsWithImage": 0,
+    "brokenImgElements": 0,
+    "note": "cards without photos must show the canonical category fallback, never a fake provider photo"
+  },
+  "mobile": {
+    "cardCount": 12,
+    "bodySample": "V VYBE FIND YOUR NEXT VIBE Sign In Create Account Build My Night Ask VYBE AI Surprise Me REAL-TIME CITY DISCOVERY Find your VYBE. Pick what you want nearby. VYBE finds real places, ranks the best matches, and keeps the same results on Map. 🇩🇿 Alger",
+    "consoleErrors": []
+  },
+  "stability": {
+    "query": "restaurant",
+    "elapsedMs": 52413,
+    "cardCount": 0,
+    "distinctNames": 0,
+    "withImages": 0,
+    "googleVerified": 0,
+    "empty": true,
+    "categories": [],
+    "cards": []
+  },
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 404 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()"
+  ],
+  "pageErrors": [],
+  "failedRequests": [
+    "https://api.open-meteo.com/v1/forecast?latitude=36.7538&longitude=3.0588&current=temperature_2m,precipitation,weather_code,wind_speed_10m :: net::ERR_ABORTED"
+  ],
+  "apiResponses": [
+    "200 api/osm-discovery",
+    "HTTP 429 https://places.googleapis.com/$rpc/google.maps.places.v1.Places/GetPlace",
+    "HTTP 429 https://places.googleapis.com/$rpc/google.maps.places.v1.Places/GetPlace",
+    "HTTP 429 https://places.googleapis.com/$rpc/google.maps.places.v1.Places/GetPlace",
+    "HTTP 429 https://places.googleapis.com/$rpc/google.maps.places.v1.Places/GetPlace",
+    "HTTP 429 https://places.googleapis.com/$rpc/google.maps.places.v1.Places/GetPlace",
+    "HTTP 429 https://places.googleapis.com/$rpc/google.maps.places.v1.Places/GetPlace",
+    "HTTP 429 https://places.googleapis.com/$rpc/google.maps.places.v1.Places/GetPlace"
+  ],
+  "network": {
+    "googlePlacesRequests": 43,
+    "http429": 7,
+    "quotaErrors": 7
+  },
+  "summary": {
+    "totalSearchQueries": 17,
+    "queriesWithResults": 5,
+    "queriesWithResultsList": [
+      "games",
+      "romantic restaurant",
+      "cinema",
+      "park",
+      "gym",
+      "shopping",
+      "nightlife",
+      "tourist",
+      "museum",
+      "library",
+      "mosque",
+      "wellness"
+    ],
+    "deepDiveCount": 4,
+    "exactPhotoIdentityVerified": 0,
+    "crossPlacePhotoViolations": 0,
+    "consoleErrorCount": 8,
+    "relevantConsoleErrors": [],
+    "pageErrorCount": 0,
+    "failedRequestCount": 1,
+    "network": {
+      "googlePlacesRequests": 43,
+      "http429": 7,
+      "quotaErrors": 7
+    }
+  }
+}

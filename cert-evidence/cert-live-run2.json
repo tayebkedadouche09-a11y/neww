@@ -1,0 +1,257 @@
+{
+  "productionUrl": "https://neww-dun-chi.vercel.app/",
+  "startedAt": "2026-09-05T14:37:14.391Z",
+  "searches": [
+    {
+      "query": "cafe",
+      "elapsedMs": 10251,
+      "cardCount": 100,
+      "empty": false,
+      "cards": [
+        {
+          "name": "L'onyx pastry & coffee shop",
+          "text": "FOOD & DRINK 98 VYBE EPIC VIBE 🌙 Chill $$ 🇩🇿 Algeria · 10 Rue Didouche Mourad, Sidi M'Hamed 16000, Algérie · 1.8 km FOOD & DRINK Google verified L'onyx pastry & coffee shop 10 Rue Didouche Mourad, Sidi M'Hamed Add to ",
+          "images": []
+        },
+        {
+          "name": "Qahwa The Coffee",
+          "text": "FOOD & DRINK 97 VYBE EPIC VIBE 🌙 Chill $$ 🇩🇿 Algeria · Rue Mohamed BAG, Hydra 16000, Algérie · 1.9 km FOOD & DRINK Google verified Qahwa The Coffee Rue Mohamed BAG, Hydra Add to Plan Map",
+          "images": []
+        },
+        {
+          "name": "Kahwawakteb",
+          "text": "FOOD & DRINK 97 VYBE EPIC VIBE 🌙 Chill $$ 🇩🇿 Algeria · 18 Rue de Cirta, Hydra 16000, Algérie · 1.5 km FOOD & DRINK Google verified Kahwawakteb 18 Rue de Cirta, Hydra Add to Plan Map",
+          "images": []
+        },
+        {
+          "name": "Santo Coffee",
+          "text": "FOOD & DRINK 97 VYBE EPIC VIBE 🌙 Chill $$ 🇩🇿 Algeria · P2RR+5PP, Hydra, Algérie · 2.1 km FOOD & DRINK Google verified Santo Coffee P2RR+5PP, Hydra Add to Plan Map",
+          "images": []
+        },
+        {
+          "name": "El khan coffee shop الخّان",
+          "text": "FOOD & DRINK 97 VYBE EPIC VIBE 🌙 Chill $$ 🇩🇿 Algeria · BT N 01, Résidence Chabani, 08 Chem. de Val d'Hydra, El Biar 16000, Algérie · 2.4 km FOOD & DRINK Google verified El khan coffee shop الخّان BT N 01, Résidence Ch",
+          "images": []
+        },
+        {
+          "name": "Heycat Coffee Shop",
+          "text": "FOOD & DRINK 96 VYBE EPIC VIBE 🌙 Chill $$ 🇩🇿 Algeria · Heycat Coffee Shop, Hydra, Algérie · 3.2 km FOOD & DRINK Google verified Heycat Coffee Shop Heycat Coffee Shop, Hydra Add to Plan Map",
+          "images": []
+        },
+        {
+          "name": "قهوة باب البحر",
+          "text": "FOOD & DRINK 96 VYBE EPIC VIBE 🌙 Chill $$ 🇩🇿 Algeria · Q3M7+P75, Bd Ernesto Che Guevara, Casbah, Algérie · 3.4 km FOOD & DRINK Google verified قهوة باب البحر Q3M7+P75, Bd Ernesto Che Guevara, Casbah Add to Plan Map",
+          "images": []
+        },
+        {
+          "name": "Bouchaib pâtisserie - drink - glace",
+          "text": "FOOD & DRINK 96 VYBE EPIC VIBE 🌙 Chill $ 🇩🇿 Algeria · Q3P7+GCG, 1 Av. du 1er Novembre, Casbah, Algérie · 3.6 km FOOD & DRINK Google verified Bouchaib pâtisserie - drink - glace Q3P7+GCG, 1 Av. du 1er Novembre, Casbah ",
+          "images": []
+        }
+      ],
+      "totalDistinct": 98
+    },
+    {
+      "query": "hotel",
+      "elapsedMs": 10027,
+      "cardCount": 0,
+      "empty": true,
+      "cards": [],
+      "totalDistinct": 0
+    },
+    {
+      "query": "gaming cafe",
+      "elapsedMs": 10029,
+      "cardCount": 0,
+      "empty": true,
+      "cards": [],
+      "totalDistinct": 0
+    },
+    {
+      "query": "quiet cafe",
+      "elapsedMs": 10025,
+      "cardCount": 0,
+      "empty": true,
+      "cards": [],
+      "totalDistinct": 0
+    },
+    {
+      "query": "romantic restaurant",
+      "elapsedMs": 10030,
+      "cardCount": 0,
+      "empty": true,
+      "cards": [],
+      "totalDistinct": 0
+    },
+    {
+      "query": "museum",
+      "elapsedMs": 10020,
+      "cardCount": 0,
+      "empty": true,
+      "cards": [],
+      "totalDistinct": 0
+    },
+    {
+      "query": "mosque",
+      "elapsedMs": 10022,
+      "cardCount": 0,
+      "empty": true,
+      "cards": [],
+      "totalDistinct": 0
+    },
+    {
+      "query": "gym",
+      "elapsedMs": 10029,
+      "cardCount": 0,
+      "empty": true,
+      "cards": [],
+      "totalDistinct": 0
+    },
+    {
+      "query": "restaurant",
+      "elapsedMs": 10026,
+      "cardCount": 0,
+      "empty": true,
+      "cards": [],
+      "totalDistinct": 0
+    }
+  ],
+  "surfaces": [],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 404 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()"
+  ],
+  "pageErrors": [],
+  "failedRequests": [
+    "https://api.open-meteo.com/v1/forecast?latitude=36.7538&longitude=3.0588&current=temperature_2m,precipitation,weather_code,wind_speed_10m :: net::ERR_ABORTED"
+  ],
+  "apiResponses": [
+    "200 https://maps.googleapis.com/maps/api/js?key=AIzaSyDgDa2PRUB2l2Vd4scyMJvTWST5mzzkjDI&loading=async",
+    "200 https://maps.googleapis.com/maps-api-v3/api/js/66/3d/intl/fr_ALL/main.js",
+    "200 https://maps.googleapis.com/maps-api-v3/api/js/66/3d/intl/fr_ALL/common.js",
+    "200 https://maps.googleapis.com/maps-api-v3/api/js/66/3d/intl/fr_ALL/map.js",
+    "200 https://maps.googleapis.com/maps-api-v3/api/js/66/3d/intl/fr_ALL/marker.js",
+    "200 https://maps.googleapis.com/maps-api-v3/api/js/66/3d/intl/fr_ALL/util.js",
+    "200 https://maps.googleapis.com/maps-api-v3/api/js/66/3d/intl/fr_ALL/controls.js",
+    "200 https://maps.googleapis.com/maps-api-v3/api/js/66/3d/intl/fr_ALL/places_impl.js",
+    "200 https://maps.googleapis.com/maps-api-v3/api/js/66/3d/intl/fr_ALL/places.js",
+    "200 https://maps.googleapis.com/maps-api-v3/api/js/66/3d/intl/fr_ALL/geometry.js",
+    "200 https://maps.googleapis.com/maps-api-v3/api/js/66/3d/intl/fr_ALL/poly.js",
+    "200 https://maps.googleapis.com/maps-api-v3/api/js/66/3d/intl/fr_ALL/log.js",
+    "200 https://maps.googleapis.com/maps/api/mapsjs/gen_204?csp_test=true",
+    "200 api/osm-discovery",
+    "200 api/osm-discovery"
+  ],
+  "initialExplore": {
+    "cardCount": 12,
+    "sample": [
+      {
+        "name": "Salle omnisport Harcha Hacene",
+        "images": 0
+      },
+      {
+        "name": "Monument aux Martyrs",
+        "images": 0
+      },
+      {
+        "name": "Jardin Botanique du Hamma",
+        "images": 0
+      },
+      {
+        "name": "ساحه أول ماي",
+        "images": 0
+      },
+      {
+        "name": "Sofitel Algiers Hamma Garden",
+        "images": 0
+      },
+      {
+        "name": "Hotel El Djazair - Ex St George",
+        "images": 0
+      }
+    ]
+  },
+  "hydration": {
+    "googleCards": []
+  },
+  "mobile": {
+    "cardCount": 12,
+    "bodySample": "V VYBE FIND YOUR NEXT VIBE Sign In Create Account Build My Night Ask VYBE AI Surprise Me REAL-TIME CITY DISCOVERY Find your VYBE. Pick what you want nearby. VYBE finds real places, ranks the best matches, and keeps the same results on Map. 🇩🇿 Algeria USD / DZD 12 discovered 🕌 Mosques 🇩🇿 🍽️ Res",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 429 ()",
+      "Failed to load resource: the server responded with a status of 429 ()",
+      "Failed to load resource: the server responded with a status of 429 ()",
+      "Failed to load resource: the server responded with a status of 429 ()",
+      "Failed to load resource: the server responded with a status of 429 ()",
+      "Failed to load resource: the server responded with a status of 429 ()",
+      "Failed to load resource: the server responded with a status of 429 ()",
+      "Failed to load resource: the server responded with a status of 429 ()",
+      "Failed to load resource: the server responded with a status of 429 ()",
+      "Failed to load resource: the server responded with a status of 429 ()",
+      "Failed to load resource: the server responded with a status of 429 ()",
+      "Failed to load resource: the server responded with a status of 429 ()"
+    ]
+  },
+  "summary": {
+    "totalSearchQueries": 9,
+    "consoleErrorCount": 39,
+    "relevantConsoleErrors": [],
+    "pageErrorCount": 0,
+    "failedRequestCount": 1,
+    "relevantFailedRequests": [],
+    "apiResponses": [
+      "200 https://maps.googleapis.com/maps/api/js?key=AIzaSyDgDa2PRUB2l2Vd4scyMJvTWST5mzzkjDI&loading=async",
+      "200 https://maps.googleapis.com/maps-api-v3/api/js/66/3d/intl/fr_ALL/main.js",
+      "200 https://maps.googleapis.com/maps-api-v3/api/js/66/3d/intl/fr_ALL/common.js",
+      "200 https://maps.googleapis.com/maps-api-v3/api/js/66/3d/intl/fr_ALL/map.js",
+      "200 https://maps.googleapis.com/maps-api-v3/api/js/66/3d/intl/fr_ALL/marker.js",
+      "200 https://maps.googleapis.com/maps-api-v3/api/js/66/3d/intl/fr_ALL/util.js",
+      "200 https://maps.googleapis.com/maps-api-v3/api/js/66/3d/intl/fr_ALL/controls.js",
+      "200 https://maps.googleapis.com/maps-api-v3/api/js/66/3d/intl/fr_ALL/places_impl.js",
+      "200 https://maps.googleapis.com/maps-api-v3/api/js/66/3d/intl/fr_ALL/places.js",
+      "200 https://maps.googleapis.com/maps-api-v3/api/js/66/3d/intl/fr_ALL/geometry.js",
+      "200 https://maps.googleapis.com/maps-api-v3/api/js/66/3d/intl/fr_ALL/poly.js",
+      "200 https://maps.googleapis.com/maps-api-v3/api/js/66/3d/intl/fr_ALL/log.js",
+      "200 https://maps.googleapis.com/maps/api/mapsjs/gen_204?csp_test=true",
+      "200 api/osm-discovery",
+      "200 api/osm-discovery"
+    ]
+  }
+}
