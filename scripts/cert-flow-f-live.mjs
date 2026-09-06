@@ -8,6 +8,11 @@ const candidates = [
   '/usr/bin/google-chrome-stable',
   '/usr/bin/chromium',
   '/usr/bin/chromium-browser',
+  // Windows fallbacks for local verification runs (CI runners resolve the paths above).
+  'C:/Program Files/Google/Chrome/Application/chrome.exe',
+  'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
+  'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
+  'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
 ];
 const executablePath = candidates.find(p => fs.existsSync(p));
 if (!executablePath) throw new Error('No Chrome/Chromium executable found on runner.');
@@ -100,10 +105,11 @@ try {
 
   await sleep(5000);
   const finalState = await readState('hotel');
-  const finalText = finalState.body.toLowerCase();
+  // Judge only rendered card names — body text contains UI chrome (category labels
+  // like "Hotels"/"Restaurants") that produced false positives when no cards rendered.
   const finalNames = finalState.cards.map(c => c.name).filter(Boolean);
-  const looksHotel = /hotel|hôtel|hostel|resort|motel/.test(finalText) || finalNames.some(name => /hotel|hôtel|hostel|resort|motel/i.test(name));
-  const hasAArtifacts = /restaurant|resto|pizza|burger/.test(finalText);
+  const looksHotel = finalNames.some(name => /hotel|hôtel|hostel|resort|motel/i.test(name));
+  const hasAArtifacts = finalNames.some(name => /restaurant|resto|pizza|burger/i.test(name));
 
   result.searchA = {
     query: 'restaurant',
@@ -136,7 +142,7 @@ try {
     for (const button of buttons) {
       const label = (await button.evaluate(el => el.textContent || '')).trim();
       if (label === 'Map') {
-        await button.click();
+        await button.evaluate(el => el.click());
         mapOpened = true;
         break;
       }
@@ -148,7 +154,7 @@ try {
     for (const el of navCandidates) {
       const label = (await el.evaluate(node => (node.textContent || '').trim())).replace(/\s+/g, ' ');
       if (label === 'Map') {
-        await el.click();
+        await el.evaluate(node => node.click());
         mapOpened = true;
         break;
       }
@@ -169,7 +175,7 @@ try {
     for (const el of links) {
       const label = (await el.evaluate(node => (node.textContent || '').trim())).replace(/\s+/g, ' ');
       if (/^Explore( filter)?$/i.test(label) || /^Back$/i.test(label)) {
-        await el.click();
+        await el.evaluate(node => node.click());
         break;
       }
     }
@@ -184,7 +190,7 @@ try {
   for (const button of detailButtons) {
     const label = (await button.evaluate(el => el.textContent || '')).trim();
     if (label === 'Details' || label === 'Open details') {
-      await button.click();
+      await button.evaluate(el => el.click());
       detailsOpened = true;
       break;
     }
@@ -205,6 +211,15 @@ try {
     }
   } else {
     result.details = { opened: false, note: 'Details control not discoverable after Map/Back.' };
+  }
+
+  // Make externally quota-blocked runs self-describing in the evidence artifact.
+  if (
+    result.latestSearchWins &&
+    result.latestSearchWins.finalCardCount === 0 &&
+    result.consoleErrors.some(e => /429/.test(e))
+  ) {
+    result.quotaBlocked = true;
   }
 
   result.completedAt = new Date().toISOString();
