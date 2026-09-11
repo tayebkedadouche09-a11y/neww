@@ -10,7 +10,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test tests/place-intelligence.test.ts tests/race-guards.test.ts",
+    "test": "node --experimental-strip-types --test tests/place-intelligence.test.ts tests/race-guards.test.ts tests/osm-clause-contract.test.ts",
     "category-contract": "node scripts/category-contract-check.mjs",
     "preview": "vite preview"
   },

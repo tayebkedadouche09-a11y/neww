@@ -27,6 +27,15 @@ function rateLimited(key: string): boolean { const now = Date.now(); const curre
 function jsonBody(req: ApiRequest): Record<string, unknown> { if (!req.body) return {}; if (typeof req.body === 'string') { try { return JSON.parse(req.body) as Record<string, unknown>; } catch { return {}; } } return typeof req.body === 'object' ? req.body as Record<string, unknown> : {}; }
 function buildQuery(lat:number,lng:number,radiusMeters:number,clauses:string[]):string { return `[out:json][timeout:10];(${clauses.map(c=>`nwr(around:${radiusMeters},${lat},${lng})[${c}];`).join('')});out center tags;`; }
 function isSafeNameClause(clause:string):boolean { return /^name~"[A-Za-z0-9 .,_'()&+\-/\u00C0-\u024F\u0600-\u06FF]{1,100}",i$/.test(clause); }
+// The VYBE category taxonomy owns the OSM clauses per category; this function
+// validates that grammar instead of enumerating literal clause strings, so a
+// taxonomy clause can never silently drift out of the allowlist again (which
+// used to make whole categories return HTTP 400 "No supported discovery
+// filters supplied."). Values/keys stay strictly tokenised, so nothing that
+// could break out of `nwr(around:...)[<clause>]` can pass.
+const SAFE_OSM_KEYS = new Set(['amenity','leisure','tourism','shop','natural','sport','historic','boundary','craft','office','healthcare','man_made','waterway','place','highway','railway','aeroway','club','emergency','military','power','public_transport','telecom','attraction','viewpoint']);
+const SAFE_OSM_TOKEN = /^[A-Za-z0-9_]{1,64}$/;
+function isSafeTaxonomyClause(clause:string):boolean { const value=clause.trim(); if(!value)return false; if(SAFE_OSM_TOKEN.test(value))return SAFE_OSM_KEYS.has(value); const match=/^([a-z_]{2,24})(=|~)"([^"\\]{1,120})"$/.exec(value); if(!match)return false; const key=match[1],operator=match[2],raw=match[3]; if(!SAFE_OSM_KEYS.has(key))return false; if(operator==='=')return SAFE_OSM_TOKEN.test(raw); return raw.split('|').every(token=>SAFE_OSM_TOKEN.test(token)); }
 async function requestMirror(endpoint:string, query:string):Promise<Response> { const controller=new AbortController(); const timeout=setTimeout(()=>controller.abort(),7000); try{return await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8','User-Agent':'VYBE discovery proxy/1.0'},body:new URLSearchParams({data:query}),signal:controller.signal});}finally{clearTimeout(timeout);}}
 
 export default async function handler(req:ApiRequest,res:ApiResponse){
@@ -34,7 +43,7 @@ export default async function handler(req:ApiRequest,res:ApiResponse){
   if(req.method!=='POST'){res.setHeader('Allow','POST');return res.status(405).json({error:'Method not allowed'});}
   if(rateLimited(clientIdentity(req)))return res.status(429).json({error:'Too many discovery requests. Please try again later.'});
   const payload=jsonBody(req),lat=Number(payload.lat),lng=Number(payload.lng),radiusMeters=Number(payload.radiusMeters);
-  const clauses=Array.isArray(payload.clauses)?payload.clauses.filter((v):v is string=>typeof v==='string'&&v.length>0&&v.length<=300).filter(c=>ALLOWED_STATIC_CLAUSES.has(c)||ALLOWED_BROAD_CLAUSES.has(c)||isSafeNameClause(c)).slice(0,8):[];
+  const clauses=Array.isArray(payload.clauses)?payload.clauses.filter((v):v is string=>typeof v==='string'&&v.length>0&&v.length<=300).filter(c=>ALLOWED_STATIC_CLAUSES.has(c)||ALLOWED_BROAD_CLAUSES.has(c)||isSafeNameClause(c)||isSafeTaxonomyClause(c)).slice(0,8):[];
   if(!Number.isFinite(lat)||lat<-90||lat>90||!Number.isFinite(lng)||lng<-180||lng>180)return res.status(400).json({error:'Invalid coordinates.'});
   if(!Number.isFinite(radiusMeters)||radiusMeters<=0||radiusMeters>MAX_RADIUS_METERS)return res.status(400).json({error:'Invalid radius.'});
   if(!clauses.length)return res.status(400).json({error:'No supported discovery filters supplied.'});

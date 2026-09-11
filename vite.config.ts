@@ -2,9 +2,25 @@ import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
 const OSM_ENDPOINTS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
-const ALLOWED_CLAUSE = /^(?:amenity|leisure|tourism|shop|natural|sport)="[A-Za-z0-9_|-]+"(?:\[[A-Za-z0-9_:="|~\- ]+\])?$|^(?:amenity|leisure|tourism|shop)~"[A-Za-z0-9_|-]+"$/;
 const SAFE_NAME_CLAUSE = /^name~"[A-Za-z0-9 .,_'()&+\-/\u00C0-\u024F\u0600-\u06FF]{1,100}",i$/;
-const SAFE_BARE_CLAUSES = new Set(['sport']);
+// Mirrors api/osm-discovery.ts so local development accepts exactly the same
+// clauses production does (the taxonomy owns them; a drifted allowlist here
+// silently hid whole categories locally).
+const SAFE_OSM_KEYS = new Set(['amenity','leisure','tourism','shop','natural','sport','historic','boundary','craft','office','healthcare','man_made','waterway','place','highway','railway','aeroway','club','emergency','military','power','public_transport','telecom','attraction','viewpoint']);
+const SAFE_OSM_TOKEN = /^[A-Za-z0-9_]{1,64}$/;
+function isSafeTaxonomyClause(clause: string): boolean {
+  const value = clause.trim();
+  if (!value) return false;
+  if (SAFE_OSM_TOKEN.test(value)) return SAFE_OSM_KEYS.has(value);
+  const match = /^([a-z_]{2,24})(=|~)"([^"\\]{1,120})"$/.exec(value);
+  if (!match) return false;
+  const key = match[1];
+  const operator = match[2];
+  const raw = match[3];
+  if (!SAFE_OSM_KEYS.has(key)) return false;
+  if (operator === '=') return SAFE_OSM_TOKEN.test(raw);
+  return raw.split('|').every(token => SAFE_OSM_TOKEN.test(token));
+}
 
 async function readJsonBody(req: import('node:http').IncomingMessage): Promise<Record<string, unknown>> {
   const chunks: Buffer[] = [];
@@ -57,7 +73,7 @@ function devOsmProxy(): Plugin {
         const radiusMeters = Number(body.radiusMeters);
         const clauses = Array.isArray(body.clauses)
           ? body.clauses
-              .filter((v): v is string => typeof v === 'string' && (ALLOWED_CLAUSE.test(v) || SAFE_NAME_CLAUSE.test(v) || SAFE_BARE_CLAUSES.has(v)))
+              .filter((v): v is string => typeof v === 'string' && (SAFE_NAME_CLAUSE.test(v) || isSafeTaxonomyClause(v)))
               .slice(0, 6)
           : [];
         if (
