@@ -10,6 +10,7 @@ dist-ssr/
 logs/
 *.log
 npm-debug.log*
+opencode.log*
 
 # QA run artifacts
 qa-out.log
@@ -22,9 +23,15 @@ qa-debug.mjs
 tsc-out.txt
 tsc-out2.txt
 
-# Editor
-.vscode/
-.idea/
+# Diagnostic scripts and JSON evidence from live / local audits
+scripts/audit-*.mjs
+scripts/diag-*.mjs
+scripts/verify-*.mjs
+audit-*.json
+cert-map-probe.json
+diag-*.json
+diag-*.out
+verify-*.json
 
 # AI tool local state
 .opencode/

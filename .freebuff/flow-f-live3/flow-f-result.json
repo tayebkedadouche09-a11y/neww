@@ -1,0 +1,48 @@
+{
+  "productionUrl": "https://neww-dun-chi.vercel.app/",
+  "startedAt": "2026-09-05T23:53:50.212Z",
+  "searchA": {
+    "query": "restaurant",
+    "startedAtMs": 1788652434991,
+    "issuedAtMs": 1788652436155,
+    "cardCount": 0,
+    "sampleNames": []
+  },
+  "searchB": {
+    "query": "hotel",
+    "startedAtMs": 1788652436157,
+    "issuedAtMs": 1788652436643,
+    "cardCount": 0,
+    "sampleNames": []
+  },
+  "latestSearchWins": {
+    "pass": false,
+    "finalCardCount": 0,
+    "finalSampleNames": [],
+    "finalLooksHotel": false,
+    "staleRestaurantArtifacts": false,
+    "overlapMs": 488
+  },
+  "map": {
+    "opened": true,
+    "rendered": true,
+    "includesHotelContext": true
+  },
+  "details": {
+    "opened": false,
+    "note": "Details control not discoverable after Map/Back."
+  },
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "[DataContext] Discovery failed: Error: Live discovery hit a temporary Google rate limit (429). Please wait a moment and search again.",
+    "Failed to load resource: the server responded with a status of 429 ()"
+  ],
+  "pageErrors": [],
+  "failedRequests": [
+    "https://api.open-meteo.com/v1/forecast?latitude=35.7105&longitude=4.5438&current=temperature_2m,precipitation,weather_code,wind_speed_10m :: net::ERR_ABORTED"
+  ],
+  "quotaBlocked": true,
+  "completedAt": "2026-09-05T23:54:53.321Z"
+}

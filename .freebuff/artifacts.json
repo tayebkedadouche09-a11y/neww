@@ -1,0 +1,25 @@
+{
+  "total_count": 1,
+  "artifacts": [
+    {
+      "id": 9978944345,
+      "node_id": "MDg6QXJ0aWZhY3Q5OTc4OTQ0MzQ1",
+      "name": "vybe-cert-live-0272bb1fd5bc5d3da1455c9d2a3c4e6fd29a6c52",
+      "size_in_bytes": 2292675,
+      "url": "https://api.github.com/repos/tayebkedadouche09-a11y/neww/actions/artifacts/9978944345",
+      "archive_download_url": "https://api.github.com/repos/tayebkedadouche09-a11y/neww/actions/artifacts/9978944345/zip",
+      "expired": false,
+      "digest": "sha256:eaa8b78bd0b1ccba43d9c2b5eb8351d2b4c3c705ea5e31ba2669b59bdcc2a47a",
+      "created_at": "2026-09-05T23:36:34Z",
+      "updated_at": "2026-09-05T23:36:34Z",
+      "expires_at": "2026-12-04T23:18:08Z",
+      "workflow_run": {
+        "id": 33998301464,
+        "repository_id": 1355181496,
+        "head_repository_id": 1355181496,
+        "head_branch": "main",
+        "head_sha": "0272bb1fd5bc5d3da1455c9d2a3c4e6fd29a6c52"
+      }
+    }
+  ]
+}

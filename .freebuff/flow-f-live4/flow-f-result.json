@@ -1,0 +1,48 @@
+{
+  "productionUrl": "https://neww-dun-chi.vercel.app/",
+  "startedAt": "2026-09-06T00:09:31.589Z",
+  "searchA": {
+    "query": "restaurant",
+    "startedAtMs": 1788653379170,
+    "issuedAtMs": 1788653380705,
+    "cardCount": 0,
+    "sampleNames": []
+  },
+  "searchB": {
+    "query": "hotel",
+    "startedAtMs": 1788653380707,
+    "issuedAtMs": 1788653380975,
+    "cardCount": 0,
+    "sampleNames": []
+  },
+  "latestSearchWins": {
+    "pass": false,
+    "finalCardCount": 0,
+    "finalSampleNames": [],
+    "finalLooksHotel": false,
+    "staleRestaurantArtifacts": false,
+    "overlapMs": 270
+  },
+  "map": {
+    "opened": true,
+    "rendered": true,
+    "includesHotelContext": true
+  },
+  "details": {
+    "opened": false,
+    "note": "Details control not discoverable after Map/Back."
+  },
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "[DataContext] Discovery failed: Error: Live discovery hit a temporary Google rate limit (429). Please wait a moment and search again.",
+    "Failed to load resource: the server responded with a status of 429 ()",
+    "Failed to load resource: the server responded with a status of 429 ()"
+  ],
+  "pageErrors": [],
+  "failedRequests": [
+    "https://maps.gstatic.com/mapfiles/transparent.png :: net::ERR_ABORTED"
+  ],
+  "quotaBlocked": true,
+  "completedAt": "2026-09-06T00:10:37.747Z"
+}
