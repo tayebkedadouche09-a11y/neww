@@ -37,15 +37,16 @@ jobs:
         id: vercel_credentials
         shell: bash
         run: |
-          if [ -n "${{ secrets.VERCEL_TOKEN }}" ] && [ -n "${{ secrets.VERCEL_ORG_ID }}" ] && [ -n "${{ secrets.VERCEL_PROJECT_ID }}" ]; then
-            echo "configured=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "configured=false" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          missing=()
+          [ -n "${{ secrets.VERCEL_TOKEN }}" ] || missing+=(VERCEL_TOKEN)
+          [ -n "${{ secrets.VERCEL_ORG_ID }}" ] || missing+=(VERCEL_ORG_ID)
+          [ -n "${{ secrets.VERCEL_PROJECT_ID }}" ] || missing+=(VERCEL_PROJECT_ID)
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "Missing required GitHub Actions secret(s): ${missing[*]}"
+            exit 1
           fi
-
-      - name: Report missing Vercel credentials
-        if: steps.vercel_credentials.outputs.configured != 'true'
-        run: echo "Vercel deployment skipped: VERCEL_TOKEN, VERCEL_ORG_ID and/or VERCEL_PROJECT_ID are not configured as GitHub Actions secrets."
+          echo "configured=true" >> "$GITHUB_OUTPUT"
 
       - name: Install Vercel CLI
         if: steps.vercel_credentials.outputs.configured == 'true'
