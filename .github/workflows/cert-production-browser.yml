@@ -48,32 +48,57 @@ jobs:
             esac
             sleep 10
           done
-
           echo "Vercel commit check was not successful within the polling window. Verifying production directly..."
           code="$(curl -sS -o /tmp/vybe-home.html -w '%{http_code}' -L --max-time 30 "${PROD_URL}")"
           echo "Production HTTP status: ${code}"
           test "${code}" = "200"
           grep -qi "VYBE" /tmp/vybe-home.html
-          echo "Production is reachable; proceeding with live browser evidence against the active deployment."
 
       - name: Verify Chrome availability
         run: |
           google-chrome --version || chromium --version || chromium-browser --version
 
       - name: Live Flow F certification
-        id: flow_f
-        continue-on-error: true
         env:
           VYBE_PRODUCTION_URL: https://neww-dun-chi.vercel.app/
           CERT_OUTPUT_DIR: cert-live-output/flow-f
         run: node scripts/cert-flow-f-live.mjs
 
-      - name: Full live production CERT
-        id: full_cert
-        continue-on-error: true
+      - name: Full live CERT 180
         env:
           VYBE_PRODUCTION_URL: https://neww-dun-chi.vercel.app/
         run: node scripts/cert-180-live.mjs
+
+      - name: Enforce CERT 180 verdict
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f cert-live-run3.json
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const r = JSON.parse(fs.readFileSync('cert-live-run3.json', 'utf8'));
+          const s = r.summary || {};
+          const n = r.network || s.network || {};
+          const failures = [];
+          if ((r.initialExplore?.cardCount ?? 0) < 1) failures.push('Explore has no live place cards');
+          if ((s.totalSearchQueries ?? 0) !== 17) failures.push(`expected 17 search queries, got ${s.totalSearchQueries ?? 0}`);
+          if ((s.queriesWithResults ?? 0) < 15) failures.push(`too many empty queries: ${s.queriesWithResults ?? 0}/17`);
+          if ((s.deepDiveCount ?? 0) < 4) failures.push(`insufficient deep dives: ${s.deepDiveCount ?? 0}`);
+          if ((s.exactPhotoIdentityVerified ?? 0) < 1) failures.push('no exact Google photo identity was verified');
+          if ((s.crossPlacePhotoViolations ?? 0) !== 0) failures.push(`cross-place photo violations: ${s.crossPlacePhotoViolations}`);
+          if (!r.map?.googleMapRendered) failures.push('Google Map did not render');
+          if (!r.map?.previewMatchesName) failures.push('Map preview does not match selected place');
+          if ((r.mobile?.cardCount ?? 0) < 1) failures.push('mobile viewport has no place cards');
+          if ((s.pageErrorCount ?? 0) !== 0) failures.push(`page errors: ${s.pageErrorCount}`);
+          if ((n.http429 ?? 0) !== 0) failures.push(`Google HTTP 429 responses: ${n.http429}`);
+          if ((n.quotaErrors ?? 0) !== 0) failures.push(`Google/Maps provider error responses: ${n.quotaErrors}`);
+          if (failures.length) {
+            console.error('CERT 180 FAIL');
+            for (const f of failures) console.error(` - ${f}`);
+            process.exit(1);
+          }
+          console.log('CERT 180 PASS — all production gates satisfied');
+          NODE
 
       - name: Upload live CERT evidence
         if: always()
@@ -83,11 +108,5 @@ jobs:
           path: |
             cert-live-output/**
             cert-evidence/**
+            cert-live-run3.json
           if-no-files-found: ignore
-
-      - name: Certification summary
-        if: always()
-        run: |
-          echo "Flow F step outcome: ${{ steps.flow_f.outcome }}"
-          echo "Full live CERT step outcome: ${{ steps.full_cert.outcome }}"
-          echo "Live certification is evidence collection; blocked provider quota/auth gates must remain explicit in reports."

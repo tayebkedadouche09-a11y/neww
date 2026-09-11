@@ -23,11 +23,9 @@ export const AuthModal: React.FC = () => {
 
   useEffect(() => {
     if (!isAuthModalOpen) return;
-    // Focus first field when modal opens — prevents timing races with automated/keyboard flows
     const t = window.setTimeout(() => firstInputRef.current?.focus(), 30);
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setIsAuthModalOpen(false);
-      // Simple focus trap
       if (e.key === 'Tab' && dialogRef.current) {
         const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
           'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
@@ -88,8 +86,7 @@ export const AuthModal: React.FC = () => {
       if (res.ok) {
         showToast(
           res.needsEmailConfirmation ? 'Account created — check your email to confirm!' : `Welcome to VYBE, ${name.trim()}!`,
-          '🎉',
-          'success'
+          '🎉', 'success'
         );
         setIsAuthModalOpen(false);
       } else showToast(res.error ?? 'Sign up failed', '⚠️', 'info');
@@ -108,7 +105,7 @@ export const AuthModal: React.FC = () => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl animate-fadeIn cursor-pointer" data-testid="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title" onClick={() => setIsAuthModalOpen(false)}>
       <div ref={dialogRef} className="relative w-full max-w-md rounded-3xl bg-white dark:bg-vybe-dark-card border border-slate-200 dark:border-vybe-dark-border shadow-2xl p-6 sm:p-8 space-y-6 cursor-default" onClick={e => e.stopPropagation()}>
-        <button type="button" onClick={() => setIsAuthModalOpen(false)} className="absolute top-4 right-4 p-2 rounded-full text-slate-400 hover:text-white bg-slate-100 dark:bg-vybe-dark-surface transition-colors" aria-label="Close authentication dialog"><X className="w-4 h-4" /></button>
+        <button type="button" onClick={() => setIsAuthModalOpen(false)} className="absolute top-4 right-4 p-2 rounded-full text-slate-400 hover:text-white bg-slate-100 dark:bg-vybe-dark-surface transition-colors" aria-label="Close authentication dialog" data-testid="auth-close"><X className="w-4 h-4" /></button>
 
         <div className="text-center space-y-2">
           <div className="w-12 h-12 mx-auto rounded-2xl bg-black dark:bg-white text-vybe-lime dark:text-black font-black text-2xl flex items-center justify-center shadow-neon-lime">V</div>
@@ -116,7 +113,7 @@ export const AuthModal: React.FC = () => {
           <p className="text-xs text-slate-600 dark:text-slate-400">{headerSub}</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" data-testid="auth-form">
           {authModalMode === 'register' && (
             <>
               <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Your Full Name</label><input ref={firstInputRef} type="text" required placeholder="e.g. Alex Rivera" value={name} onChange={e => setName(e.target.value)} autoComplete="name" className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none" /></div>
@@ -124,13 +121,13 @@ export const AuthModal: React.FC = () => {
             </>
           )}
 
-          <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Email Address</label><input ref={authModalMode !== 'register' ? firstInputRef : undefined} type="email" required placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none" /></div>
+          <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Email Address</label><input ref={authModalMode !== 'register' ? firstInputRef : undefined} type="email" required placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" data-testid="auth-email" className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none" /></div>
 
           {authModalMode !== 'forgot' && (
-            <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Password</label><input type="password" required minLength={authModalMode === 'register' ? MIN_PASSWORD_LENGTH : 1} data-testid="auth-password" placeholder="••••••••••••" value={password} onChange={e => setPassword(e.target.value)} autoComplete={authModalMode === 'login' ? 'current-password' : 'new-password'} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none" />{authModalMode === 'register' && <p className="text-[11px] text-slate-500 dark:text-slate-400">Use 12+ characters with uppercase, lowercase, number, and symbol.</p>}</div>
+            <div className="space-y-1"><label className="text-xs font-bold text-slate-700 dark:text-slate-300">Password</label><input type="password" required minLength={authModalMode === 'register' ? MIN_PASSWORD_LENGTH : 1} data-testid="auth-password" placeholder="••••••••••••" value={password} onChange={e => setPassword(e.target.value)} autoComplete={authModalMode === 'login' ? 'current-password' : 'new-password'} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-vybe-dark-surface border border-slate-200 dark:border-vybe-dark-border text-sm text-slate-900 dark:text-white focus:outline-none" /></div>
           )}
 
-          <button type="submit" disabled={busy} className="w-full py-3.5 rounded-2xl bg-vybe-lime text-black font-display font-extrabold text-xs uppercase tracking-wider shadow-neon-lime hover:scale-105 transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:hover:scale-100">
+          <button type="submit" disabled={busy} data-testid="auth-submit" className="w-full py-3.5 rounded-2xl bg-vybe-lime text-black font-display font-extrabold text-xs uppercase tracking-wider shadow-neon-lime hover:scale-105 transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:hover:scale-100">
             <span>{authModalMode === 'login' ? 'Sign In & Discover' : authModalMode === 'register' ? 'Create Account' : 'Send Reset Link'}</span>
             {authModalMode === 'forgot' ? <KeyRound className="w-4 h-4" /> : <ArrowRight className="w-4 h-4" />}
           </button>
