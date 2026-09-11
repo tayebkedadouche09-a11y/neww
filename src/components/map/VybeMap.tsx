@@ -13,6 +13,7 @@ import { isGoogleMapsConfigured } from '../../lib/env';
 import { useGeolocation } from '../../hooks/useGeolocation';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
 import { getPlaceCategoryEmoji } from './placeMarkerEmoji';
+import { canonicalLabel } from '../../data/categoryTaxonomy';
 
 const MAP_CATEGORY_FILTERS: Array<{ id: CategoryType | 'all'; label: string; emoji: string }> = [
   { id: 'all', label: 'All', emoji: '✨' },
@@ -70,7 +71,11 @@ const PlacePreview: React.FC<{
   const imageUrl = activeIndex >= 0 ? imageUrls[activeIndex] : undefined;
   const hasDistance = typeof place.distanceKm === 'number' && Number.isFinite(place.distanceKm) && place.distanceKm >= 0;
   const emoji = getPlaceCategoryEmoji(place);
-  const categoryLabel = MAP_CATEGORY_FILTERS.find(item => item.id === place.category)?.label ?? place.category;
+  // Show the place's real category (canonical identity) so the map preview
+  // agrees with the details panel instead of a coarse legacy bucket.
+  const categoryLabel = place.canonicalCategory
+    ? canonicalLabel(place.canonicalCategory)
+    : (MAP_CATEGORY_FILTERS.find(item => item.id === place.category)?.label ?? place.category);
 
   return (
     <div className="absolute bottom-6 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-xl z-[45] animate-fadeIn">
