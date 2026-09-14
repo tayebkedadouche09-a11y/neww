@@ -7,7 +7,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { INITIAL_MOODS } from '../../data/initialMoods';
 import { useRequireAuth } from '../../hooks/useRequireAuth';
-import { getGooglePlaceDetails } from '../../services/googlePlaces';
+import { getGooglePlaceDetails, isGoogleDetailQuotaBlocked } from '../../services/googlePlaces';
+import { resolvePlaceImages } from '../../services/photoFallback';
 import { canonicalLabel } from '../../data/categoryTaxonomy';
 
 interface PlaceCardProps { place: Place; scoreInfo?: ReturnType<typeof calculateVybeScore>; featured?: boolean; }
@@ -91,9 +92,6 @@ function formatLocationLine(place: Place): string {
   return parts.length > 0 ? parts.join(' · ') : 'Nearby';
 }
 
-// Shared stagger so 19 cards don't all fire detail requests at once
-let hydrateSlot = 0;
-
 export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
   const { toggleLikePlace, toggleSavePlace, isPlaceLiked, isPlaceSaved } = useAuth();
   const { openPlaceDetail, openShareModal, addPlaceToPlan, plans, showToast, setActiveTab, setSelectedPlace } = useData();
@@ -109,12 +107,19 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
   const isSaved = isPlaceSaved(place.id);
   const moodObj = INITIAL_MOODS.find(m => m.id === displayMood);
   const calculatedScore = scoreInfo || calculateVybeScore(place, {});
-  const imageList = refreshedImages ?? place.images;
+
+  // Always have at least one displayable image (Google or category fallback)
+  const baseImages = resolvePlaceImages({
+    ...place,
+    images: refreshedImages ?? place.images,
+  });
+  const imageList = baseImages;
   const availableImageIndexes = imageList.map((_, i) => i).filter(i => !failedImageIndexes.includes(i));
   const activeImageIndex = availableImageIndexes.includes(currentImageIndex)
     ? currentImageIndex
     : (availableImageIndexes[0] ?? -1);
   const imageUrl = activeImageIndex >= 0 ? imageList[activeImageIndex]?.trim() : undefined;
+
   const FallbackIcon = getPlaceFallbackIcon(place, displayCategory);
   const categoryLabel = displayCategoryLabel(place);
   const openState = place.openingHours.isOpenNow;
@@ -123,8 +128,11 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
 
   const refreshGoogleImages = async () => {
     if (refreshAttemptedRef.current) return;
+    if (isGoogleDetailQuotaBlocked()) return;
     const isGoogle = place.provider === 'google' && Boolean(place.providerPlaceId);
     if (!isGoogle) return;
+    // Only try when we don't already have a real Google photo
+    if (place.images.length > 0) return;
     refreshAttemptedRef.current = true;
     try {
       const fresh = await getGooglePlaceDetails(place.providerPlaceId!);
@@ -134,31 +142,25 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
         setFailedImageIndexes([]);
         setCurrentImageIndex(0);
       }
-    } catch (error) {
-      console.warn('[PlaceCard] Google photo hydration failed', place.providerPlaceId, error);
-      // Allow one more attempt later if quota recovers
-      refreshAttemptedRef.current = false;
+    } catch {
+      // Quota or network — fallback photo already shown via resolvePlaceImages
+      refreshAttemptedRef.current = true;
     }
   };
 
   const cardRef = useRef<HTMLDivElement | null>(null);
 
-  // Always try to hydrate Google places that have no images.
-  // Use IntersectionObserver + a staggered immediate attempt for cards already on screen.
+  // Optional upgrade to real Google photo when quota allows (does not block UI)
   useEffect(() => {
     if (place.provider !== 'google' || place.images.length > 0) return;
+    if (isGoogleDetailQuotaBlocked()) return;
 
     let cancelled = false;
     let observer: IntersectionObserver | null = null;
-    const slot = hydrateSlot++;
-    const delayMs = 150 + (slot % 12) * 220;
 
     const run = () => {
       if (!cancelled) void refreshGoogleImages();
     };
-
-    // Staggered attempt so first-screen cards get photos quickly
-    const timer = window.setTimeout(run, delayMs);
 
     if (typeof IntersectionObserver !== 'undefined' && cardRef.current) {
       observer = new IntersectionObserver(
@@ -169,23 +171,21 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
             run();
           }
         },
-        { rootMargin: '400px' }
+        { rootMargin: '200px' }
       );
       observer.observe(cardRef.current);
     }
 
     return () => {
       cancelled = true;
-      window.clearTimeout(timer);
       observer?.disconnect();
     };
   }, [place.id, place.provider, place.images.length]);
 
-  const handleImageError = async () => {
+  const handleImageError = () => {
     if (activeImageIndex >= 0) {
       setFailedImageIndexes(prev => (prev.includes(activeImageIndex) ? prev : [...prev, activeImageIndex]));
     }
-    if (place.provider === 'google') await refreshGoogleImages();
   };
 
   const handleQuickAddPlan = (e: React.MouseEvent) => {
@@ -217,9 +217,7 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
             loading="lazy"
             referrerPolicy="no-referrer"
-            onError={() => {
-              void handleImageError();
-            }}
+            onError={handleImageError}
           />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-slate-300 bg-gradient-to-br from-slate-950 via-slate-900 to-vybe-dark-surface">
@@ -239,11 +237,11 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
                 if (!requireAuth()) return;
                 toggleLikePlace(place.id);
               }}
-              className="p-2 rounded-full bg-black/60 text-white"
+              className={`p-2 rounded-full bg-black/60 text-white ${isLiked ? 'text-rose-400' : ''}`}
               title="Like this spot"
               aria-label={`Like ${place.name}`}
             >
-              <Heart className="w-3.5 h-3.5" />
+              <Heart className={`w-3.5 h-3.5 ${isLiked ? 'fill-current' : ''}`} />
             </button>
             <button
               onClick={e => {
@@ -251,11 +249,11 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
                 if (!requireAuth()) return;
                 toggleSavePlace(place.id);
               }}
-              className="p-2 rounded-full bg-black/60 text-white"
+              className={`p-2 rounded-full bg-black/60 text-white ${isSaved ? 'text-vybe-lime' : ''}`}
               title="Save to My VYBES"
               aria-label={`Save ${place.name}`}
             >
-              <Bookmark className="w-3.5 h-3.5" />
+              <Bookmark className={`w-3.5 h-3.5 ${isSaved ? 'fill-current' : ''}`} />
             </button>
           </div>
         </div>
