@@ -71,7 +71,6 @@ function getTrustLabel(place: Place) {
   return place.provider === 'google' ? 'Google verified' : place.provider === 'osm' ? 'OpenStreetMap' : 'VYBE curated';
 }
 
-/** Build a clean, non-hardcoded location line from place data. */
 function formatLocationLine(place: Place): string {
   const parts: string[] = [];
   const neighborhood = place.location.neighborhood?.trim();
@@ -81,7 +80,6 @@ function formatLocationLine(place: Place): string {
   if (neighborhood) parts.push(neighborhood);
   else if (city) parts.push(city);
   else if (address) {
-    // Prefer a short readable fragment from the full address
     const short = address.split(',').slice(0, 2).join(',').trim();
     parts.push(short || address);
   }
@@ -92,6 +90,9 @@ function formatLocationLine(place: Place): string {
 
   return parts.length > 0 ? parts.join(' · ') : 'Nearby';
 }
+
+// Shared stagger so 19 cards don't all fire detail requests at once
+let hydrateSlot = 0;
 
 export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
   const { toggleLikePlace, toggleSavePlace, isPlaceLiked, isPlaceSaved } = useAuth();
@@ -127,7 +128,7 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
     refreshAttemptedRef.current = true;
     try {
       const fresh = await getGooglePlaceDetails(place.providerPlaceId!);
-      const imgs = fresh?.images?.filter(Boolean) ?? [];
+      const imgs = (fresh?.images ?? []).filter(Boolean);
       if (imgs.length) {
         setRefreshedImages(imgs);
         setFailedImageIndexes([]);
@@ -135,33 +136,50 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
       }
     } catch (error) {
       console.warn('[PlaceCard] Google photo hydration failed', place.providerPlaceId, error);
+      // Allow one more attempt later if quota recovers
+      refreshAttemptedRef.current = false;
     }
   };
 
-  // Only hydrate photos for cards that scroll into view (avoids rate-limit storms).
   const cardRef = useRef<HTMLDivElement | null>(null);
+
+  // Always try to hydrate Google places that have no images.
+  // Use IntersectionObserver + a staggered immediate attempt for cards already on screen.
   useEffect(() => {
-    if (place.provider !== 'google' || place.images.length) return;
-    if (typeof IntersectionObserver === 'undefined') {
-      void refreshGoogleImages();
-      return;
-    }
-    const el = cardRef.current;
-    if (!el) return;
+    if (place.provider !== 'google' || place.images.length > 0) return;
+
+    let cancelled = false;
     let observer: IntersectionObserver | null = null;
-    observer = new IntersectionObserver(
-      entries => {
-        if (entries.some(e => e.isIntersecting)) {
-          observer?.disconnect();
-          observer = null;
-          void refreshGoogleImages();
-        }
-      },
-      { rootMargin: '200px' }
-    );
-    observer.observe(el);
-    return () => observer?.disconnect();
-  }, [place.id]);
+    const slot = hydrateSlot++;
+    const delayMs = 150 + (slot % 12) * 220;
+
+    const run = () => {
+      if (!cancelled) void refreshGoogleImages();
+    };
+
+    // Staggered attempt so first-screen cards get photos quickly
+    const timer = window.setTimeout(run, delayMs);
+
+    if (typeof IntersectionObserver !== 'undefined' && cardRef.current) {
+      observer = new IntersectionObserver(
+        entries => {
+          if (entries.some(e => e.isIntersecting)) {
+            observer?.disconnect();
+            observer = null;
+            run();
+          }
+        },
+        { rootMargin: '400px' }
+      );
+      observer.observe(cardRef.current);
+    }
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      observer?.disconnect();
+    };
+  }, [place.id, place.provider, place.images.length]);
 
   const handleImageError = async () => {
     if (activeImageIndex >= 0) {
@@ -198,6 +216,7 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, scoreInfo }) => {
             alt={place.name}
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
             loading="lazy"
+            referrerPolicy="no-referrer"
             onError={() => {
               void handleImageError();
             }}
