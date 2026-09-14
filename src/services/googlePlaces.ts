@@ -33,9 +33,7 @@ interface RawPlacePhoto {
   getUrl?: (options?: { maxWidth?: number; maxHeight?: number }) => string | undefined;
 }
 
-/** Build a usable <img src> for a Google Places photo. */
-function photoToUrl(photo: RawPlacePhoto, _expectedPlaceId: string): string | null {
-  // 1) Library helpers (preferred — already scoped to this place)
+function photoToUrl(photo: RawPlacePhoto): string | null {
   try {
     if (typeof photo.getURI === 'function') {
       const uri = photo.getURI({ maxWidthPx: 1200, maxHeightPx: 800 });
@@ -53,17 +51,11 @@ function photoToUrl(photo: RawPlacePhoto, _expectedPlaceId: string): string | nu
     /* ignore */
   }
 
-  // 2) Construct Places Photo media URL from resource name
   const name = typeof photo.name === 'string' ? photo.name.trim() : '';
   if (!name) return null;
-
-  // name is usually: places/ChIJ.../photos/AUc7t...
   const key = googleMapsConfig.apiKey;
   if (!key) return null;
-
-  // Normalize: accept full resource name or already-prefixed path
-  const resource = name.startsWith('places/') ? name : name;
-  return `https://places.googleapis.com/v1/${resource}/media?maxHeightPx=800&maxWidthPx=1200&key=${encodeURIComponent(key)}`;
+  return `https://places.googleapis.com/v1/${name}/media?maxHeightPx=800&maxWidthPx=1200&key=${encodeURIComponent(key)}`;
 }
 
 async function importPlacesLibrary(): Promise<google.maps.PlacesLibrary> {
@@ -92,7 +84,7 @@ async function libraryPlaceToResult(p: google.maps.places.Place): Promise<Google
 
   const photos: GooglePlacePhoto[] = (p.photos ?? []).flatMap(raw => {
     const photo = raw as RawPlacePhoto;
-    const uri = photoToUrl(photo, placeId);
+    const uri = photoToUrl(photo);
     if (!uri) return [];
     const authors = (photo.authorAttributions ?? [])
       .map(a => ({
@@ -231,39 +223,48 @@ export async function searchGooglePlacesText(
 }
 
 const DETAIL_GATE = { inflight: 0, lastStartAt: 0, backoffUntil: 0 };
-const DETAIL_MAX_CONCURRENCY = 3;
-const DETAIL_START_SPACING_MS = 180;
-const DETAIL_QUOTA_BACKOFF_MS = 45000;
+const DETAIL_MAX_CONCURRENCY = 2;
+const DETAIL_START_SPACING_MS = 300;
+const DETAIL_QUOTA_BACKOFF_MS = 60 * 60 * 1000; // 1h when daily quota is hit
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+function isQuotaError(error: unknown): boolean {
+  const message = String(error instanceof Error ? error.message : error);
+  return /quota|exhausted|resource_exhausted|over_query|rate.limit|\b429\b/i.test(message);
+}
 
 async function runPacedDetail<T>(task: () => Promise<T>): Promise<T> {
   if (DETAIL_GATE.backoffUntil > Date.now()) {
-    throw new Error('Google Places is temporarily rate-limited. Please try again shortly.');
+    throw new Error('Google Places detail quota temporarily exhausted. Using fallback photos.');
   }
   for (;;) {
     const now = Date.now();
     const waitMs = Math.max(
       0,
       DETAIL_GATE.backoffUntil - now,
-      DETAIL_GATE.inflight >= DETAIL_MAX_CONCURRENCY ? 120 : 0,
+      DETAIL_GATE.inflight >= DETAIL_MAX_CONCURRENCY ? 200 : 0,
       DETAIL_GATE.lastStartAt + DETAIL_START_SPACING_MS - now
     );
     if (waitMs === 0) break;
-    await sleep(Math.min(waitMs, 200));
+    await sleep(Math.min(waitMs, 250));
   }
   DETAIL_GATE.inflight += 1;
   DETAIL_GATE.lastStartAt = Date.now();
   try {
     return await task();
   } catch (error) {
-    const message = String(error instanceof Error ? error.message : error);
-    if (/quota|exhausted|over_query|rate.limit|\b429\b/i.test(message)) {
+    if (isQuotaError(error)) {
       DETAIL_GATE.backoffUntil = Date.now() + DETAIL_QUOTA_BACKOFF_MS;
     }
     throw error;
   } finally {
     DETAIL_GATE.inflight -= 1;
   }
+}
+
+/** True when detail/photo hydration should not be attempted. */
+export function isGoogleDetailQuotaBlocked(): boolean {
+  return DETAIL_GATE.backoffUntil > Date.now();
 }
 
 export async function getGooglePlaceDetails(placeId: string): Promise<Place | null> {
