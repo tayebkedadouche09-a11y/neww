@@ -1,4 +1,4 @@
-import type { CategoryType, FilterState, Place, VybeCategory } from '../types';
+import type { FilterState, Place, VybeCategory } from '../types';
 import { isGoogleMapsConfigured } from '../lib/env';
 import { searchNearbyGooglePlaces, searchGooglePlacesText } from './googlePlaces';
 import {
@@ -59,18 +59,25 @@ function targets(o: DiscoveryOptions): VybeCategory[] {
   return c ? [c] : [...new Set((o.filters?.categories ?? []).flatMap(legacyCategoryToCanonical))];
 }
 
-/** Detect strong mosque intent so we can prefer mosque-only results. */
 function isMosqueIntent(query: string, categories: VybeCategory[]): boolean {
   const n = query.toLowerCase();
-  if (/mosque|mosqu[eé]|masjid|مسجد|مسجد/.test(n)) return true;
-  // UI category button for Mosques maps to worship; treat pure worship selection as mosque-first.
+  if (/mosque|mosqu[eé]|masjid|مسجد/.test(n)) return true;
   return categories.length === 1 && categories[0] === 'worship';
 }
 
-// Google Places browser API enforces per-key quota/minute. Discovery paces its
-// requests (one in flight at a time with a small gap) and keeps the fan-out
-// tight so consecutive user searches do not trip rate limits.
-const GOOGLE_REQUEST_PACING_MS = 750;
+function isCafeIntent(query: string, categories: VybeCategory[]): boolean {
+  const n = query.toLowerCase();
+  if (/\bcafe\b|\bcafé\b|coffee|salon de thé|tea shop/.test(n)) return true;
+  return categories.length === 1 && categories[0] === 'cafe';
+}
+
+function isRestaurantIntent(query: string, categories: VybeCategory[]): boolean {
+  const n = query.toLowerCase();
+  if (/restaurant|resto|dining|\beat\b|pizzeria|burger|tacos/.test(n)) return true;
+  return categories.length === 1 && categories[0] === 'restaurant';
+}
+
+const GOOGLE_REQUEST_PACING_MS = 700;
 const pace = () => new Promise(r => setTimeout(r, GOOGLE_REQUEST_PACING_MS));
 
 async function google(
@@ -96,17 +103,30 @@ async function google(
   };
 
   const mosqueMode = isMosqueIntent(q, t);
+  const cafeMode = isCafeIntent(q, t);
+  const restaurantMode = isRestaurantIntent(q, t);
 
-  if (t.length) {
+  if (t.length || mosqueMode || cafeMode || restaurantMode) {
     if (mosqueMode) {
-      // Prefer real mosques only — avoid mixing churches/temples.
       await add(searchNearbyGooglePlaces(o.userLat, o.userLng, r, ['mosque']));
       await pace();
       await add(searchGooglePlacesText('mosques nearby', o.userLat, o.userLng, r, 'mosque'));
       await pace();
       await add(searchGooglePlacesText('masjid mosque', o.userLat, o.userLng, r));
       await pace();
-    } else {
+    } else if (cafeMode) {
+      await add(searchNearbyGooglePlaces(o.userLat, o.userLng, r, ['cafe', 'coffee_shop']));
+      await pace();
+      await add(searchGooglePlacesText('cafes nearby', o.userLat, o.userLng, r, 'cafe'));
+      await pace();
+      await add(searchGooglePlacesText('coffee shops nearby', o.userLat, o.userLng, r, 'coffee_shop'));
+      await pace();
+    } else if (restaurantMode) {
+      await add(searchNearbyGooglePlaces(o.userLat, o.userLng, r, ['restaurant']));
+      await pace();
+      await add(searchGooglePlacesText('restaurants nearby', o.userLat, o.userLng, r, 'restaurant'));
+      await pace();
+    } else if (t.length) {
       const types = categorySearchTypes(t);
       if (types.length) {
         await add(searchNearbyGooglePlaces(o.userLat, o.userLng, r, types));
@@ -130,10 +150,9 @@ async function google(
     p => p.provider === 'google' && !p.providerTypes?.some(x => BAD_GOOGLE_TYPES.has(x))
   );
 
-  // Extra safety: when user asked for mosques, drop obvious non-mosque worship places.
   if (mosqueMode) {
     places = places.filter(p => {
-      const types = (p.providerTypes ?? []).map(t => t.toLowerCase());
+      const types = (p.providerTypes ?? []).map(x => x.toLowerCase());
       const primary = (p.providerPrimaryType ?? '').toLowerCase();
       const name = (p.name ?? '').toLowerCase();
       const isMosque =
@@ -149,6 +168,42 @@ async function google(
         types.includes('synagogue') ||
         /church|cathedral|temple|synagogue|presbyterian|catholic|baptist/.test(name);
       return isMosque || !isClearlyOther;
+    });
+  }
+
+  if (cafeMode) {
+    places = places.filter(p => {
+      const types = (p.providerTypes ?? []).map(x => x.toLowerCase());
+      const primary = (p.providerPrimaryType ?? '').toLowerCase();
+      const name = (p.name ?? '').toLowerCase();
+      const isCafe =
+        primary === 'cafe' ||
+        primary === 'coffee_shop' ||
+        types.includes('cafe') ||
+        types.includes('coffee_shop') ||
+        /cafe|café|coffee|espresso|tea house|salon de thé/.test(name);
+      const isPureRestaurant =
+        (primary === 'restaurant' || types.includes('restaurant')) &&
+        !isCafe &&
+        !/cafe|café|coffee/.test(name);
+      return isCafe || !isPureRestaurant;
+    });
+  }
+
+  if (restaurantMode) {
+    places = places.filter(p => {
+      const types = (p.providerTypes ?? []).map(x => x.toLowerCase());
+      const primary = (p.providerPrimaryType ?? '').toLowerCase();
+      const name = (p.name ?? '').toLowerCase();
+      const isRestaurant =
+        primary === 'restaurant' ||
+        types.includes('restaurant') ||
+        /restaurant|resto|pizzeria|grill|bistro|diner/.test(name);
+      const isPureCafe =
+        (primary === 'cafe' || primary === 'coffee_shop' || types.includes('cafe')) &&
+        !isRestaurant &&
+        !/restaurant|resto|grill/.test(name);
+      return isRestaurant || !isPureCafe;
     });
   }
 
@@ -195,15 +250,18 @@ async function osm(o: DiscoveryOptions, t: VybeCategory[]): Promise<Place[]> {
         ['place_of_worship', 'park', 'playground', 'library'].includes(g.amenity) ||
         ['park', 'playground'].includes(g.leisure);
 
-      // When looking for mosques, prefer OSM religion=muslim / mosque tags.
       if (c === 'worship' && isMosqueIntent(o.searchQuery || '', t)) {
         const religion = String(g.religion || '').toLowerCase();
         const amenity = String(g.amenity || '').toLowerCase();
         if (religion && religion !== 'muslim' && religion !== 'islam') return [];
         if (amenity === 'place_of_worship' && religion !== 'muslim' && religion !== 'islam') {
-          // keep only if name strongly suggests mosque
           if (!/mosque|masjid|مسجد/.test(n.toLowerCase())) return [];
         }
+      }
+
+      if (c === 'cafe' && isCafeIntent(o.searchQuery || '', t)) {
+        const amenity = String(g.amenity || '').toLowerCase();
+        if (amenity && amenity !== 'cafe' && !/cafe|café|coffee/.test(n.toLowerCase())) return [];
       }
 
       const p: Place = {
@@ -275,7 +333,8 @@ async function osm(o: DiscoveryOptions, t: VybeCategory[]): Promise<Place[]> {
 export async function discoverPlaces(o: DiscoveryOptions): Promise<Place[]> {
   const t = targets(o);
   const q = o.searchQuery?.trim() || o.filters?.searchQuery?.trim() || '';
-  const r = o.radiusKm ?? 5;
+  // Slightly wider default radius so users see more than ~19 places in dense cities
+  const r = o.radiusKm ?? 8;
   const [g, om] = await Promise.all([google(o, t), osm(o, t)]);
 
   if (!g.places.length && g.failures > 0 && !om.length) {
@@ -288,7 +347,7 @@ export async function discoverPlaces(o: DiscoveryOptions): Promise<Place[]> {
     p =>
       o.userLat === undefined ||
       o.userLng === undefined ||
-      (p.distanceKm ?? Infinity) <= r + 0.05
+      (p.distanceKm ?? Infinity) <= r + 0.15
   );
 
   return limitCoverage(rankPlaces(extras(gatePlaces(all, q, t), o.filters), o.filters?.sortBy));
