@@ -17,7 +17,6 @@ import {
   normalizeCategoryQuery,
   classifyProviderPlace,
   evaluatePlaceRelevance,
-  isGooglePhotoIdentityExact,
   type ProviderCategoryDefinition,
 } from '../data/categoryTaxonomy.ts';
 
@@ -33,19 +32,11 @@ function googleApproxCost(priceLevel?: number, isFree = false): number {
 }
 
 const GOOGLE_PHOTO_URL =
-  /^https:\/\/(places\.googleapis\.com\/v1\/places\/|lh[0-9]*\.googleusercontent\.com\/|streetviewpixels-pa\.googleapis\.com\/|encrypted-tbn[0-9]*\.gstatic\.com\/|photos\.google\.com\/)/i;
+  /^https:\/\/(places\.googleapis\.com\/|lh[0-9]*\.googleusercontent\.com\/|streetviewpixels-pa\.googleapis\.com\/|encrypted-tbn[0-9]*\.gstatic\.com\/|photos\.google\.com\/|maps\.googleapis\.com\/)/i;
 
 /**
- * Build photo identities for a Google place.
- *
- * Important: photo.getURI() often returns lh*.googleusercontent.com URLs that
- * do NOT look like places/{id}/photos/{token}. The old code required
- * isGooglePhotoIdentityExact on the photo name and dropped almost every image,
- * which is why Explore cards showed icons only.
- *
- * Rule now:
- * - If we already have a valid Google-hosted https URL → accept it.
- * - If we only have a photo name path → still require identity match before use.
+ * Accept any usable Google photo URL. Previous versions over-filtered with
+ * isGooglePhotoIdentityExact and dropped nearly all images from search results.
  */
 function googlePhotoIdentities(
   photos: GooglePlaceResult['photos'],
@@ -56,17 +47,9 @@ function googlePhotoIdentities(
   return (photos ?? []).flatMap(photo => {
     const uri = photo.photo_reference?.trim();
     const name = photo.name?.trim();
-
-    if (!uri || !/^https:\/\//i.test(uri) || !GOOGLE_PHOTO_URL.test(uri)) {
-      return [];
-    }
-
-    // When the URI is a constructed Places media path, enforce identity.
-    // When it is a getURI() content URL (lh*.googleusercontent.com etc.), accept it.
-    const isPlacesMediaPath = /places\.googleapis\.com\/v1\/places\//i.test(uri);
-    if (isPlacesMediaPath && name && !isGooglePhotoIdentityExact(providerPlaceId, name)) {
-      return [];
-    }
+    if (!uri || !/^https:\/\//i.test(uri)) return [];
+    // Prefer known Google hosts; still accept other https URLs from getURI()
+    if (!GOOGLE_PHOTO_URL.test(uri) && !uri.includes('google')) return [];
 
     const attributions: PlacePhotoAttribution[] = [];
     for (const author of photo.author_attributions ?? []) {
@@ -98,9 +81,7 @@ function googlePhotoAttributions(identities: PlacePhotoIdentity[]): PlacePhotoAt
   const out: PlacePhotoAttribution[] = [];
   for (const id of identities) {
     for (const a of id.attributions) {
-      if (!out.some(x => x.displayName === a.displayName && x.uri === a.uri)) {
-        out.push(a);
-      }
+      if (!out.some(x => x.displayName === a.displayName && x.uri === a.uri)) out.push(a);
     }
   }
   return out.slice(0, 3);

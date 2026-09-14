@@ -3,7 +3,6 @@ import { loadGoogleMaps } from '../lib/googleMapsLoader';
 import { Place } from '../types';
 import { GooglePlaceResult, GooglePlacePhoto } from './googlePlacesTypes';
 import { googlePlaceToVybePlace } from './googlePlacesAdapter';
-import { isGooglePhotoIdentityExact } from '../../api/_shared/classify';
 
 const PLACE_FIELDS: string[] = [
   'id',
@@ -31,31 +30,40 @@ interface RawPlacePhoto {
   widthPx?: number;
   authorAttributions?: Array<{ displayName?: string; uri?: string; photoURI?: string }>;
   getURI?: (options?: { maxWidthPx?: number; maxHeightPx?: number }) => string | undefined;
+  getUrl?: (options?: { maxWidth?: number; maxHeight?: number }) => string | undefined;
 }
 
-function photoToUrl(photo: RawPlacePhoto, expectedPlaceId: string): string | null {
-  const name = typeof photo.name === 'string' ? photo.name.trim() : '';
-
-  // Prefer the library helper — it already scopes the photo to this place instance.
+/** Build a usable <img src> for a Google Places photo. */
+function photoToUrl(photo: RawPlacePhoto, _expectedPlaceId: string): string | null {
+  // 1) Library helpers (preferred — already scoped to this place)
   try {
     if (typeof photo.getURI === 'function') {
-      const uri = photo.getURI({ maxWidthPx: 1200, maxHeightPx: 750 });
-      if (typeof uri === 'string' && uri.length > 10 && /^https?:\/\//i.test(uri)) {
-        return uri;
-      }
+      const uri = photo.getURI({ maxWidthPx: 1200, maxHeightPx: 800 });
+      if (typeof uri === 'string' && uri.length > 10 && /^https?:\/\//i.test(uri)) return uri;
     }
   } catch {
-    // fall through to constructed URL
+    /* ignore */
+  }
+  try {
+    if (typeof photo.getUrl === 'function') {
+      const uri = photo.getUrl({ maxWidth: 1200, maxHeight: 800 });
+      if (typeof uri === 'string' && uri.length > 10 && /^https?:\/\//i.test(uri)) return uri;
+    }
+  } catch {
+    /* ignore */
   }
 
+  // 2) Construct Places Photo media URL from resource name
+  const name = typeof photo.name === 'string' ? photo.name.trim() : '';
   if (!name) return null;
 
-  // Constructed media URLs must still match the place identity for safety.
-  if (!isGooglePhotoIdentityExact(expectedPlaceId, name)) return null;
-
+  // name is usually: places/ChIJ.../photos/AUc7t...
   const key = googleMapsConfig.apiKey;
   if (!key) return null;
-  return `https://places.googleapis.com/v1/${name}/media?maxHeightPx=750&key=${encodeURIComponent(key)}`;
+
+  // Normalize: accept full resource name or already-prefixed path
+  const resource = name.startsWith('places/') ? name : name;
+  return `https://places.googleapis.com/v1/${resource}/media?maxHeightPx=800&maxWidthPx=1200&key=${encodeURIComponent(key)}`;
 }
 
 async function importPlacesLibrary(): Promise<google.maps.PlacesLibrary> {
@@ -78,7 +86,7 @@ async function libraryPlaceToResult(p: google.maps.places.Place): Promise<Google
       const x = p as google.maps.places.Place & { isOpen?: () => Promise<boolean | undefined> };
       if (typeof x.isOpen === 'function') openNow = await x.isOpen();
     } catch {
-      // ignore open-now probe failures
+      /* ignore */
     }
   }
 
@@ -223,8 +231,8 @@ export async function searchGooglePlacesText(
 }
 
 const DETAIL_GATE = { inflight: 0, lastStartAt: 0, backoffUntil: 0 };
-const DETAIL_MAX_CONCURRENCY = 2;
-const DETAIL_START_SPACING_MS = 250;
+const DETAIL_MAX_CONCURRENCY = 3;
+const DETAIL_START_SPACING_MS = 180;
 const DETAIL_QUOTA_BACKOFF_MS = 45000;
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
@@ -237,11 +245,11 @@ async function runPacedDetail<T>(task: () => Promise<T>): Promise<T> {
     const waitMs = Math.max(
       0,
       DETAIL_GATE.backoffUntil - now,
-      DETAIL_GATE.inflight >= DETAIL_MAX_CONCURRENCY ? 150 : 0,
+      DETAIL_GATE.inflight >= DETAIL_MAX_CONCURRENCY ? 120 : 0,
       DETAIL_GATE.lastStartAt + DETAIL_START_SPACING_MS - now
     );
     if (waitMs === 0) break;
-    await sleep(Math.min(waitMs, 250));
+    await sleep(Math.min(waitMs, 200));
   }
   DETAIL_GATE.inflight += 1;
   DETAIL_GATE.lastStartAt = Date.now();
